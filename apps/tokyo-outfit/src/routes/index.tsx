@@ -16,8 +16,15 @@ import {
   Title,
 } from '@mantine/core'
 import { CATEGORY_EMOJI, COLOR_LABELS, type ClothingItem, type Outfit } from '../types'
-import { loadItems } from '../lib/storage'
-import { fetchTodayWeather, tempToBand, weatherCodeToLabel, type TodayWeather } from '../lib/weather'
+import { listItems } from '../lib/storage'
+import {
+  fetchTodayWeather,
+  formatDateJa,
+  tempToBand,
+  todayInTokyoISO,
+  weatherCodeToLabel,
+  type TodayWeather,
+} from '../lib/weather'
 import { suggestOutfit } from '../lib/suggest'
 
 export const Route = createFileRoute('/')({
@@ -27,17 +34,28 @@ export const Route = createFileRoute('/')({
 function HomeComponent() {
   const [items, setItems] = useState<ClothingItem[]>([])
   const [itemsLoaded, setItemsLoaded] = useState(false)
+  const [itemsError, setItemsError] = useState<string | null>(null)
   const [weather, setWeather] = useState<TodayWeather | null>(null)
   const [weatherLoading, setWeatherLoading] = useState(true)
   const [weatherError, setWeatherError] = useState<string | null>(null)
   const [outfit, setOutfit] = useState<Outfit | null>(null)
 
-  // localStorage は SSR に存在しないため、マウント後にのみ読み込む
+  const loadClothingItems = useCallback(async () => {
+    setItemsError(null)
+    try {
+      const list = await listItems()
+      setItems(list)
+    } catch (err) {
+      setItemsError(err instanceof Error ? err.message : '服の読み込みに失敗しました')
+    } finally {
+      setItemsLoaded(true)
+    }
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
-    setItems(loadItems())
-    setItemsLoaded(true)
-  }, [])
+    void loadClothingItems()
+  }, [loadClothingItems])
 
   const loadWeather = useCallback(() => {
     setWeatherLoading(true)
@@ -67,6 +85,7 @@ function HomeComponent() {
   }
 
   const weatherIcon = weather ? weatherCodeToLabel(weather.weatherCode) : null
+  const todayISO = todayInTokyoISO()
 
   return (
     <Container size="sm" pb="xl">
@@ -99,6 +118,16 @@ function HomeComponent() {
 
             {!weatherLoading && !weatherError && weather && weatherIcon && (
               <Stack gap="xs">
+                <Text c="dimmed" size="sm">
+                  対象日: {formatDateJa(weather.dateISO)}
+                </Text>
+
+                {weather.dateISO !== todayISO && (
+                  <Alert color="yellow" variant="light" title="日付の不一致に注意">
+                    表示中のデータは今日（{formatDateJa(todayISO)}）のものではありません。
+                  </Alert>
+                )}
+
                 <Group gap="lg">
                   <Text fz={44} lh={1}>
                     {weatherIcon.emoji}
@@ -125,7 +154,27 @@ function HomeComponent() {
           </Stack>
         </Card>
 
-        {itemsLoaded && band && outfit && (
+        {itemsLoaded && itemsError && (
+          <Alert color="red" title="服の読み込みに失敗しました" variant="light">
+            <Stack gap="sm">
+              <Text size="sm">{itemsError}</Text>
+              <Button variant="light" color="red" onClick={() => void loadClothingItems()} w="fit-content">
+                再試行
+              </Button>
+            </Stack>
+          </Alert>
+        )}
+
+        {!itemsLoaded && (
+          <Card withBorder radius="md" padding="lg">
+            <Stack gap="xs">
+              <Skeleton height={24} width="40%" />
+              <Skeleton height={100} />
+            </Stack>
+          </Card>
+        )}
+
+        {itemsLoaded && !itemsError && band && outfit && (
           <Card withBorder radius="md" padding="lg">
             <Stack gap="md">
               <Group justify="space-between" wrap="nowrap">
@@ -163,7 +212,7 @@ function HomeComponent() {
           </Card>
         )}
 
-        {itemsLoaded && band && !outfit && (
+        {itemsLoaded && !itemsError && band && !outfit && (
           <Card withBorder radius="md" padding="lg">
             <Stack align="center" gap="sm" py="lg">
               <Text fz={36}>🧺</Text>
@@ -191,8 +240,8 @@ function OutfitPieceCard({ item, isKey }: { item: ClothingItem; isKey: boolean }
             今日の一着
           </Badge>
         )}
-        {item.imageDataUrl ? (
-          <Image src={item.imageDataUrl} h={96} w={96} fit="cover" radius="sm" alt={item.name} />
+        {item.hasImage ? (
+          <Image src={`/api/img/${item.id}`} h={96} w={96} fit="cover" radius="sm" alt={item.name} />
         ) : (
           <Center h={96} w={96} bg="gray.1" style={{ borderRadius: 8 }}>
             <Text fz={36}>{CATEGORY_EMOJI[item.category]}</Text>

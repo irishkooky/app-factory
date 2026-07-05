@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   ActionIcon,
@@ -14,6 +14,7 @@ import {
   Select,
   SegmentedControl,
   SimpleGrid,
+  Skeleton,
   Slider,
   Stack,
   Text,
@@ -32,7 +33,7 @@ import {
   type ClothingItem,
   type ItemColor,
 } from '../types'
-import { addItem, compressImage, loadItems, removeItem } from '../lib/storage'
+import { addItem, compressImage, hasLegacyItems, listItems, migrateLegacyItems, removeItem } from '../lib/storage'
 
 export const Route = createFileRoute('/closet')({
   component: ClosetComponent,
@@ -50,7 +51,9 @@ const COLOR_SELECT_DATA = COLORS.map((c) => ({ value: c, label: COLOR_LABELS[c] 
 
 function ClosetComponent() {
   const [items, setItems] = useState<ClothingItem[]>([])
-  const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [migrating, setMigrating] = useState(false)
 
   const [name, setName] = useState('')
   const [category, setCategory] = useState<Category>('tops')
@@ -61,12 +64,32 @@ function ClosetComponent() {
 
   const [nameError, setNameError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
+
+  const cameraResetRef = useRef<() => void>(null)
+  const albumResetRef = useRef<() => void>(null)
+
+  const loadClosetData = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      setMigrating(hasLegacyItems())
+      await migrateLegacyItems()
+      setMigrating(false)
+      const list = await listItems()
+      setItems(list)
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : '読み込みに失敗しました')
+    } finally {
+      setMigrating(false)
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    setItems(loadItems())
-    setLoaded(true)
-  }, [])
+    void loadClosetData()
+  }, [loadClosetData])
 
   const handleFileChange = async (file: File | null) => {
     setSaveError(null)
@@ -91,9 +114,11 @@ function ClosetComponent() {
     setWarmth(3)
     setColor('white')
     setImageDataUrl(undefined)
+    cameraResetRef.current?.()
+    albumResetRef.current?.()
   }
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const trimmed = name.trim()
     if (!trimmed) {
       setNameError('名前を入力してください')
@@ -102,31 +127,25 @@ function ClosetComponent() {
     setNameError(null)
     setSaveError(null)
 
-    const newItem: ClothingItem = {
-      id: crypto.randomUUID(),
-      name: trimmed,
-      category,
-      warmth,
-      color,
-      imageDataUrl,
-      createdAt: Date.now(),
-    }
-
     try {
-      const next = addItem(newItem)
-      setItems(next)
+      const newItem = await addItem({
+        meta: { name: trimmed, category, warmth, color },
+        imageDataUrl,
+      })
+      setItems((prev) => [newItem, ...prev])
       resetForm()
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : '保存に失敗しました')
     }
   }
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
+    setRemoveError(null)
     try {
-      const next = removeItem(id)
-      setItems(next)
+      await removeItem(id)
+      setItems((prev) => prev.filter((item) => item.id !== id))
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : '削除に失敗しました')
+      setRemoveError(err instanceof Error ? err.message : '削除に失敗しました')
     }
   }
 
@@ -134,6 +153,12 @@ function ClosetComponent() {
     <Container size="sm" pb="xl">
       <Stack gap="lg">
         <Title order={1}>クローゼット</Title>
+
+        {migrating && (
+          <Alert color="blue" variant="light" title="データ移行中">
+            以前のデータを移行中…
+          </Alert>
+        )}
 
         <Card withBorder radius="md" padding="lg">
           <Stack gap="md">
@@ -156,13 +181,22 @@ function ClosetComponent() {
                     <Text fz={36}>{CATEGORY_EMOJI[category]}</Text>
                   </Center>
                 )}
-                <FileButton onChange={handleFileChange} accept="image/*">
-                  {(props) => (
-                    <Button {...props} size="xs" variant="light" loading={imageProcessing}>
-                      画像を選ぶ
-                    </Button>
-                  )}
-                </FileButton>
+                <Stack gap={4}>
+                  <FileButton onChange={handleFileChange} accept="image/*" capture="environment" resetRef={cameraResetRef}>
+                    {(props) => (
+                      <Button {...props} size="xs" variant="light" loading={imageProcessing}>
+                        📷 カメラで撮る
+                      </Button>
+                    )}
+                  </FileButton>
+                  <FileButton onChange={handleFileChange} accept="image/*" resetRef={albumResetRef}>
+                    {(props) => (
+                      <Button {...props} size="xs" variant="light" loading={imageProcessing}>
+                        🖼 アルバムから選ぶ
+                      </Button>
+                    )}
+                  </FileButton>
+                </Stack>
               </Stack>
 
               <Stack gap="sm" style={{ flex: 1 }}>
@@ -219,7 +253,31 @@ function ClosetComponent() {
             登録済みの服
           </Title>
 
-          {loaded && items.length === 0 && (
+          {removeError && (
+            <Alert color="red" variant="light" title="エラー">
+              {removeError}
+            </Alert>
+          )}
+
+          {loading && (
+            <Stack gap="sm">
+              <Skeleton height={120} radius="md" />
+              <Skeleton height={120} radius="md" />
+            </Stack>
+          )}
+
+          {!loading && loadError && (
+            <Alert color="red" title="服の読み込みに失敗しました" variant="light">
+              <Stack gap="sm">
+                <Text size="sm">{loadError}</Text>
+                <Button variant="light" color="red" onClick={() => void loadClosetData()} w="fit-content">
+                  再試行
+                </Button>
+              </Stack>
+            </Alert>
+          )}
+
+          {!loading && !loadError && items.length === 0 && (
             <Card withBorder radius="md" padding="lg">
               <Stack align="center" gap="xs" py="md">
                 <Text fz={32}>🧺</Text>
@@ -228,22 +286,24 @@ function ClosetComponent() {
             </Card>
           )}
 
-          {CATEGORIES.map((cat) => {
-            const catItems = items.filter((item) => item.category === cat)
-            if (catItems.length === 0) return null
-            return (
-              <Stack gap="xs" key={cat}>
-                <Text fw={600}>
-                  {CATEGORY_EMOJI[cat]} {CATEGORY_LABELS[cat]}
-                </Text>
-                <SimpleGrid cols={{ base: 2, xs: 3, sm: 4 }} spacing="sm">
-                  {catItems.map((item) => (
-                    <ClothingCard key={item.id} item={item} onRemove={() => handleRemove(item.id)} />
-                  ))}
-                </SimpleGrid>
-              </Stack>
-            )
-          })}
+          {!loading &&
+            !loadError &&
+            CATEGORIES.map((cat) => {
+              const catItems = items.filter((item) => item.category === cat)
+              if (catItems.length === 0) return null
+              return (
+                <Stack gap="xs" key={cat}>
+                  <Text fw={600}>
+                    {CATEGORY_EMOJI[cat]} {CATEGORY_LABELS[cat]}
+                  </Text>
+                  <SimpleGrid cols={{ base: 2, xs: 3, sm: 4 }} spacing="sm">
+                    {catItems.map((item) => (
+                      <ClothingCard key={item.id} item={item} onRemove={() => void handleRemove(item.id)} />
+                    ))}
+                  </SimpleGrid>
+                </Stack>
+              )
+            })}
         </Stack>
       </Stack>
     </Container>
@@ -264,8 +324,8 @@ function ClothingCard({ item, onRemove }: { item: ClothingItem; onRemove: () => 
         >
           ✕
         </ActionIcon>
-        {item.imageDataUrl ? (
-          <Image src={item.imageDataUrl} h={96} w={96} fit="cover" radius="sm" alt={item.name} />
+        {item.hasImage ? (
+          <Image src={`/api/img/${item.id}`} h={96} w={96} fit="cover" radius="sm" alt={item.name} />
         ) : (
           <Center h={96} w={96} bg="gray.1" style={{ borderRadius: 8 }}>
             <Text fz={36}>{CATEGORY_EMOJI[item.category]}</Text>

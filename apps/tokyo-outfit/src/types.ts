@@ -67,12 +67,12 @@ export const COLOR_HEX: Record<ItemColor, string> = {
 }
 
 export interface ClothingItem {
-  id: string // crypto.randomUUID()
+  id: string // crypto.randomUUID()（サーバー側で採番）
   name: string
   category: Category
   warmth: number // 1..5
   color: ItemColor
-  imageDataUrl?: string // 圧縮済みJPEG data URL
+  hasImage: boolean // 画像は /api/img/<id> から配信される
   createdAt: number
 }
 

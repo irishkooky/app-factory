@@ -38,6 +38,31 @@ export async function fetchTodayWeather(): Promise<TodayWeather> {
   }
 }
 
+const WEEKDAY_LABELS_JA = ['日', '月', '火', '水', '木', '金', '土']
+
+/**
+ * "2026-07-05" のようなISO日付文字列を "2026年7月5日（土）" 形式に変換する。
+ * タイムゾーンのズレを避けるため `new Date(iso)` は使わず、文字列を分解して
+ * `Date.UTC` で曜日だけを計算する（ローカルタイムゾーンの影響を受けない）。
+ * 形式が不正な場合は元の文字列をそのまま返す（防御的）。
+ */
+export function formatDateJa(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (!match) return iso
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const utcDate = new Date(Date.UTC(year, month - 1, day))
+  if (Number.isNaN(utcDate.getTime())) return iso
+  const weekday = WEEKDAY_LABELS_JA[utcDate.getUTCDay()]
+  return `${year}年${month}月${day}日（${weekday}）`
+}
+
+/** 日本標準時（JST）における「今日」を "YYYY-MM-DD" 形式で返す */
+export function todayInTokyoISO(): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date())
+}
+
 export function weatherCodeToLabel(code: number): { emoji: string; label: string } {
   if (code === 0) return { emoji: '☀️', label: '快晴' }
   if (code === 1) return { emoji: '🌤️', label: '晴れ' }

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ClosetRouteImport } from './routes/closet'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiImgIdRouteImport } from './routes/api/img/$id'
 
 const ClosetRoute = ClosetRouteImport.update({
   id: '/closet',
@@ -22,31 +23,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiImgIdRoute = ApiImgIdRouteImport.update({
+  id: '/api/img/$id',
+  path: '/api/img/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/closet': typeof ClosetRoute
+  '/api/img/$id': typeof ApiImgIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/closet': typeof ClosetRoute
+  '/api/img/$id': typeof ApiImgIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/closet': typeof ClosetRoute
+  '/api/img/$id': typeof ApiImgIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/closet'
+  fullPaths: '/' | '/closet' | '/api/img/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/closet'
-  id: '__root__' | '/' | '/closet'
+  to: '/' | '/closet' | '/api/img/$id'
+  id: '__root__' | '/' | '/closet' | '/api/img/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ClosetRoute: typeof ClosetRoute
+  ApiImgIdRoute: typeof ApiImgIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/img/$id': {
+      id: '/api/img/$id'
+      path: '/api/img/$id'
+      fullPath: '/api/img/$id'
+      preLoaderRoute: typeof ApiImgIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ClosetRoute: ClosetRoute,
+  ApiImgIdRoute: ApiImgIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
