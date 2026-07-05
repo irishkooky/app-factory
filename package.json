@@ -1,0 +1,5 @@
+{
+  "name": "app-factory",
+  "private": true,
+  "packageManager": "pnpm@11.5.2"
+}
