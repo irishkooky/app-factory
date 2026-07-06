@@ -53,6 +53,9 @@ function AppHeader() {
             <Text component={Link} to="/closet" fw={500}>
               クローゼット
             </Text>
+            <Text component={Link} to="/architecture" fw={500}>
+              仕組み
+            </Text>
           </Group>
         </Group>
       </Container>

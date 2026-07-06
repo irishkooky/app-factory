@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ClosetRouteImport } from './routes/closet'
+import { Route as ArchitectureRouteImport } from './routes/architecture'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiImgIdRouteImport } from './routes/api/img/$id'
 
 const ClosetRoute = ClosetRouteImport.update({
   id: '/closet',
   path: '/closet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchitectureRoute = ArchitectureRouteImport.update({
+  id: '/architecture',
+  path: '/architecture',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -31,30 +37,34 @@ const ApiImgIdRoute = ApiImgIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/architecture': typeof ArchitectureRoute
   '/closet': typeof ClosetRoute
   '/api/img/$id': typeof ApiImgIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/architecture': typeof ArchitectureRoute
   '/closet': typeof ClosetRoute
   '/api/img/$id': typeof ApiImgIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/architecture': typeof ArchitectureRoute
   '/closet': typeof ClosetRoute
   '/api/img/$id': typeof ApiImgIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/closet' | '/api/img/$id'
+  fullPaths: '/' | '/architecture' | '/closet' | '/api/img/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/closet' | '/api/img/$id'
-  id: '__root__' | '/' | '/closet' | '/api/img/$id'
+  to: '/' | '/architecture' | '/closet' | '/api/img/$id'
+  id: '__root__' | '/' | '/architecture' | '/closet' | '/api/img/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArchitectureRoute: typeof ArchitectureRoute
   ClosetRoute: typeof ClosetRoute
   ApiImgIdRoute: typeof ApiImgIdRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/closet'
       fullPath: '/closet'
       preLoaderRoute: typeof ClosetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/architecture': {
+      id: '/architecture'
+      path: '/architecture'
+      fullPath: '/architecture'
+      preLoaderRoute: typeof ArchitectureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArchitectureRoute: ArchitectureRoute,
   ClosetRoute: ClosetRoute,
   ApiImgIdRoute: ApiImgIdRoute,
 }
