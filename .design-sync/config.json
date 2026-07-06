@@ -1,0 +1,36 @@
+{
+  "pkg": "@app-factory/ui",
+  "globalName": "AppFactoryUI",
+  "shape": "package",
+  "buildCmd": "pnpm -F @app-factory/ui build",
+  "cssEntry": "dist/mantine.css",
+  "provider": {
+    "component": "AppProvider"
+  },
+  "overrides": {
+    "Modal": {
+      "cardMode": "single",
+      "viewport": "800x600"
+    },
+    "Drawer": {
+      "cardMode": "single",
+      "viewport": "800x600"
+    },
+    "Menu": {
+      "cardMode": "single",
+      "viewport": "480x420"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "480x240"
+    },
+    "Popover": {
+      "cardMode": "single",
+      "viewport": "480x360"
+    },
+    "AppShell": {
+      "cardMode": "single",
+      "viewport": "1000x700"
+    }
+  }
+}

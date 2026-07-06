@@ -5,3 +5,8 @@ dist
 .DS_Store
 *.local
 node_modules/.vite
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
