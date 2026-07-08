@@ -1,0 +1,95 @@
+{
+  "pkg": "@app-factory/ui",
+  "globalName": "AppFactoryUI",
+  "shape": "package",
+  "buildCmd": "pnpm -F @app-factory/ui build",
+  "cssEntry": "dist/mantine.css",
+  "provider": {
+    "component": "AppProvider"
+  },
+  "overrides": {
+    "Modal": {
+      "cardMode": "single",
+      "viewport": "800x600"
+    },
+    "Drawer": {
+      "cardMode": "single",
+      "viewport": "800x600"
+    },
+    "Menu": {
+      "cardMode": "single",
+      "viewport": "480x420"
+    },
+    "Tooltip": {
+      "cardMode": "single",
+      "viewport": "480x240"
+    },
+    "Popover": {
+      "cardMode": "single",
+      "viewport": "480x360"
+    },
+    "AppShell": {
+      "cardMode": "single",
+      "viewport": "1000x700"
+    }
+  },
+  "libOverrides": {
+    "dts.mjs": "@app-factory/ui re-exports @mantine/core; exempt Mantine lib/components/** declarations from the style-system prop filter so real component API survives"
+  },
+  "readmeHeader": ".design-sync/conventions.md",
+  "docsMap": {
+    "AppProvider": "../../.design-sync/docs/AppProvider.md",
+    "AppShell": "../../.design-sync/docs/AppShell.md",
+    "Container": "../../.design-sync/docs/Container.md",
+    "Stack": "../../.design-sync/docs/Stack.md",
+    "Group": "../../.design-sync/docs/Group.md",
+    "Flex": "../../.design-sync/docs/Flex.md",
+    "Grid": "../../.design-sync/docs/Grid.md",
+    "SimpleGrid": "../../.design-sync/docs/SimpleGrid.md",
+    "Box": "../../.design-sync/docs/Box.md",
+    "Center": "../../.design-sync/docs/Center.md",
+    "Paper": "../../.design-sync/docs/Paper.md",
+    "Card": "../../.design-sync/docs/Card.md",
+    "Divider": "../../.design-sync/docs/Divider.md",
+    "ScrollArea": "../../.design-sync/docs/ScrollArea.md",
+    "Title": "../../.design-sync/docs/Title.md",
+    "Text": "../../.design-sync/docs/Text.md",
+    "Anchor": "../../.design-sync/docs/Anchor.md",
+    "List": "../../.design-sync/docs/List.md",
+    "Code": "../../.design-sync/docs/Code.md",
+    "Button": "../../.design-sync/docs/Button.md",
+    "ActionIcon": "../../.design-sync/docs/ActionIcon.md",
+    "TextInput": "../../.design-sync/docs/TextInput.md",
+    "Textarea": "../../.design-sync/docs/Textarea.md",
+    "NumberInput": "../../.design-sync/docs/NumberInput.md",
+    "PasswordInput": "../../.design-sync/docs/PasswordInput.md",
+    "Select": "../../.design-sync/docs/Select.md",
+    "Checkbox": "../../.design-sync/docs/Checkbox.md",
+    "Radio": "../../.design-sync/docs/Radio.md",
+    "Switch": "../../.design-sync/docs/Switch.md",
+    "Slider": "../../.design-sync/docs/Slider.md",
+    "SegmentedControl": "../../.design-sync/docs/SegmentedControl.md",
+    "Alert": "../../.design-sync/docs/Alert.md",
+    "Badge": "../../.design-sync/docs/Badge.md",
+    "Progress": "../../.design-sync/docs/Progress.md",
+    "RingProgress": "../../.design-sync/docs/RingProgress.md",
+    "Loader": "../../.design-sync/docs/Loader.md",
+    "Skeleton": "../../.design-sync/docs/Skeleton.md",
+    "Notification": "../../.design-sync/docs/Notification.md",
+    "Table": "../../.design-sync/docs/Table.md",
+    "Avatar": "../../.design-sync/docs/Avatar.md",
+    "Image": "../../.design-sync/docs/Image.md",
+    "ThemeIcon": "../../.design-sync/docs/ThemeIcon.md",
+    "Timeline": "../../.design-sync/docs/Timeline.md",
+    "Tabs": "../../.design-sync/docs/Tabs.md",
+    "Accordion": "../../.design-sync/docs/Accordion.md",
+    "Pagination": "../../.design-sync/docs/Pagination.md",
+    "Breadcrumbs": "../../.design-sync/docs/Breadcrumbs.md",
+    "Stepper": "../../.design-sync/docs/Stepper.md",
+    "Modal": "../../.design-sync/docs/Modal.md",
+    "Drawer": "../../.design-sync/docs/Drawer.md",
+    "Menu": "../../.design-sync/docs/Menu.md",
+    "Tooltip": "../../.design-sync/docs/Tooltip.md",
+    "Popover": "../../.design-sync/docs/Popover.md"
+  }
+}
