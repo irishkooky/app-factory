@@ -98,6 +98,24 @@ export const remove = mutation({
     if (!existing || existing.userId !== identity.subject) {
       throw new Error("権限がありません");
     }
+
+    // このルールを参照する取引を月ごとに分類する。
+    // 上書き行（addonでない）がある月のアドオンは内訳履歴として残し、
+    // 上書きが無い月（未確定）のアドオンはルールと一緒に削除する。
+    const relatedRows = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_rule", (q) => q.eq("userId", identity.subject).eq("ruleId", id))
+      .collect();
+
+    const overriddenMonths = new Set(
+      relatedRows.filter((row) => row.addon !== true).map((row) => row.ruleMonth),
+    );
+    for (const row of relatedRows) {
+      if (row.addon === true && !overriddenMonths.has(row.ruleMonth)) {
+        await ctx.db.delete(row._id);
+      }
+    }
+
     await ctx.db.delete(id);
   },
 });
