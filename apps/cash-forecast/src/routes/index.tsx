@@ -15,6 +15,7 @@ import {
   Title,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
+import { notifications } from '@mantine/notifications'
 import { IconPlus } from '@tabler/icons-react'
 import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/clerk-react'
@@ -39,39 +40,34 @@ export const Route = createFileRoute('/')({
 })
 
 // Stripe Checkoutから戻ったときの案内。?billing=success/cancel を読み取り、
-// successならAlertを出して、いずれの場合もクエリはURLから取り除く（SSR時はwindowに触れない）。
-function useBillingReturnNotice(): { show: boolean; dismiss: () => void } {
-  const [show, setShow] = useState(false)
-
+// successなら通知を出して、いずれの場合もクエリはURLから取り除く（SSR時はwindowに触れない）。
+function useBillingReturnNotice() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const billing = params.get('billing')
     if (billing === null) return
 
     if (billing === 'success') {
-      setShow(true)
+      notifications.show({
+        title: '決済を受け付けました',
+        message: 'プランへの反映まで数秒かかることがあります。',
+        color: 'teal',
+        autoClose: 8000,
+      })
     }
     params.delete('billing')
     const query = params.toString()
     const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
     window.history.replaceState(null, '', newUrl)
   }, [])
-
-  return { show, dismiss: () => setShow(false) }
 }
 
 function HomeComponent() {
-  const billingNotice = useBillingReturnNotice()
+  useBillingReturnNotice()
 
   return (
     <Container size="xs" py="md">
       <Stack gap="lg">
-        {billingNotice.show && (
-          <Alert color="teal" title="決済を受け付けました" withCloseButton onClose={billingNotice.dismiss}>
-            プランへの反映まで数秒かかることがあります。
-          </Alert>
-        )}
-
         <AuthLoading>
           <Group justify="center" py="xl">
             <Loader />
