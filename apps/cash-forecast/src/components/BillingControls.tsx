@@ -3,8 +3,8 @@
 // convex/billing.ts が返すプラン情報をそのまま表示・操作するだけのコンポーネント群。
 // プラン制限（何を何件まで、等）はここには書かない。アプリ固有の組み込み側で判断する。
 import { useState, type ReactNode } from 'react'
-import { Badge, Button, Paper, Stack, Text, Title } from '@mantine/core'
-import type { ButtonProps } from '@mantine/core'
+import { Button, Chip } from '@heroui/react'
+import type { ButtonProps } from '@heroui/react'
 import { useAction, useQuery } from 'convex/react'
 import { ConvexError } from 'convex/values'
 import { api } from '../../convex/_generated/api'
@@ -46,15 +46,19 @@ function extractErrorMessage(err: unknown, fallback: string): string {
 export function PlanBadge() {
   const { isLoading, plan } = usePlan()
   if (isLoading || plan === null) return null
-  if (plan === 'pro') return <Badge>Pro</Badge>
+  if (plan === 'pro') return (
+    <Chip color="accent" size="sm">
+      Pro
+    </Chip>
+  )
   return (
-    <Badge variant="light" color="gray">
+    <Chip variant="soft" size="sm">
       Free
-    </Badge>
+    </Chip>
   )
 }
 
-type ActionButtonProps = Omit<ButtonProps, 'onClick' | 'loading'> & {
+type ActionButtonProps = Omit<ButtonProps, 'onPress' | 'isPending'> & {
   label?: string
 }
 
@@ -63,7 +67,7 @@ export function UpgradeButton({ label = 'Proにアップグレード', ...button
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleClick = async () => {
+  const handlePress = async () => {
     setError(null)
     setLoading(true)
     try {
@@ -76,16 +80,12 @@ export function UpgradeButton({ label = 'Proにアップグレード', ...button
   }
 
   return (
-    <Stack gap={4}>
-      <Button onClick={handleClick} loading={loading} disabled={loading} {...buttonProps}>
+    <div className="flex flex-col gap-1">
+      <Button onPress={handlePress} isPending={loading} isDisabled={loading} {...buttonProps}>
         {label}
       </Button>
-      {error && (
-        <Text size="xs" c="red">
-          {error}
-        </Text>
-      )}
-    </Stack>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
   )
 }
 
@@ -94,7 +94,7 @@ export function ManageBillingButton({ label = 'サブスク管理', ...buttonPro
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleClick = async () => {
+  const handlePress = async () => {
     setError(null)
     setLoading(true)
     try {
@@ -107,26 +107,22 @@ export function ManageBillingButton({ label = 'サブスク管理', ...buttonPro
   }
 
   return (
-    <Stack gap={4}>
-      <Button variant="default" onClick={handleClick} loading={loading} disabled={loading} {...buttonProps}>
+    <div className="flex flex-col gap-1">
+      <Button variant="secondary" onPress={handlePress} isPending={loading} isDisabled={loading} {...buttonProps}>
         {label}
       </Button>
-      {error && (
-        <Text size="xs" c="red">
-          {error}
-        </Text>
-      )}
-    </Stack>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
   )
 }
 
 /** plan に応じてUpgradeButton/ManageBillingButtonを出し分ける。ローディング中はdisabledのButton。 */
-export function BillingButton(buttonProps: Omit<ButtonProps, 'onClick' | 'loading'>) {
+export function BillingButton(buttonProps: Omit<ButtonProps, 'onPress' | 'isPending'>) {
   const { isLoading, plan } = usePlan()
 
   if (isLoading || plan === null) {
     return (
-      <Button disabled {...buttonProps}>
+      <Button isDisabled {...buttonProps}>
         プラン
       </Button>
     )
@@ -157,14 +153,12 @@ export function ProGate({ title, description, children }: ProGateProps) {
   }
 
   return (
-    <Paper withBorder p="md">
-      <Stack gap="xs">
-        <Title order={5}>{title}</Title>
-        <Text size="sm" c="dimmed">
-          {description}
-        </Text>
-        <UpgradeButton size="xs" />
-      </Stack>
-    </Paper>
+    <div className="rounded-2xl border border-border p-4">
+      <div className="flex flex-col gap-1.5">
+        <h5 className="text-sm font-semibold">{title}</h5>
+        <p className="text-sm text-muted">{description}</p>
+        <UpgradeButton size="sm" />
+      </div>
+    </div>
   )
 }

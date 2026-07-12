@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
-import { LineChart } from '@mantine/charts'
-import { Stack, Text } from '@mantine/core'
+import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BalancePoint } from '../lib/chart'
 import { formatDateShort } from '../lib/date'
 import { formatYen } from '../lib/money'
@@ -49,8 +48,8 @@ function renderMonthMinDot(threshold: number) {
         cx={cx}
         cy={cy}
         r={4}
-        fill={isBelow ? 'var(--mantine-color-red-6)' : 'var(--mantine-color-indigo-6)'}
-        stroke="var(--mantine-color-body)"
+        fill={isBelow ? '#dc2626' : 'var(--accent)'}
+        stroke="var(--background)"
         strokeWidth={2}
       />
     )
@@ -73,40 +72,37 @@ export function BalanceChart({ points, threshold, today }: BalanceChartProps) {
   }, [points])
 
   return (
-    <Stack gap={4}>
-      <LineChart
-        h={200}
-        data={points}
-        dataKey="date"
-        series={[{ name: 'balance', label: '残高', color: 'indigo.6' }]}
-        withLegend={false}
-        curveType="stepAfter"
-        strokeWidth={2}
-        gridAxis="x"
-        tickLine="none"
-        valueFormatter={formatYen}
-        xAxisProps={{
-          ticks: monthTicks,
-          interval: 0,
-          tickFormatter: formatMonthTick,
-          tick: { transform: 'translate(0, 10)', fontSize: 10, fill: 'currentColor' },
-        }}
-        yAxisProps={{
-          width: 44,
-          tickFormatter: formatManCompact,
-        }}
-        tooltipProps={{
-          labelFormatter: (label) => (typeof label === 'string' ? formatDateShort(label) : label),
-        }}
-        referenceLines={[
-          { y: threshold, color: 'red.6', label: 'しきい値', labelPosition: 'insideBottomRight' },
-          { x: today, color: 'gray.6' },
-        ]}
-        lineProps={{ dot: renderMonthMinDot(threshold) }}
-      />
-      <Text size="xs" c="dimmed">
-        ● は各月の最低残高・グレーの縦線は今日
-      </Text>
-    </Stack>
+    <div className="flex flex-col gap-1">
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <XAxis
+            dataKey="date"
+            ticks={monthTicks}
+            interval={0}
+            tickFormatter={formatMonthTick}
+            tick={{ transform: 'translate(0, 10)', fontSize: 10, fill: 'currentColor' }}
+            tickLine={false}
+            axisLine={true}
+          />
+          <YAxis width={44} tickFormatter={formatManCompact} tickLine={false} axisLine={false} />
+          <Tooltip
+            formatter={(value) => formatYen(Number(value))}
+            labelFormatter={(label) => (typeof label === 'string' ? formatDateShort(label) : label)}
+          />
+          <ReferenceLine y={threshold} stroke="#dc2626" label={{ value: 'しきい値', position: 'insideBottomRight', fontSize: 10 }} />
+          <ReferenceLine x={today} stroke="#6b7280" />
+          <Line
+            type="stepAfter"
+            dataKey="balance"
+            name="残高"
+            stroke="var(--accent)"
+            strokeWidth={2}
+            dot={renderMonthMinDot(threshold)}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+      <p className="text-xs text-muted">● は各月の最低残高・グレーの縦線は今日</p>
+    </div>
   )
 }
