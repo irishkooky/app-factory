@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { assertAmount, assertDateString, assertMonthString, assertName } from "./validate";
+import { requirePro } from "./billing";
 
 export const listAfter = query({
   args: { after: v.string() },
@@ -30,6 +31,11 @@ export const create = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("ログインが必要です");
+    }
+    if (addon === true) {
+      // アドオン（ルール月への上乗せ）の新規作成はProプラン限定。
+      // 既存アドオンの編集・削除（update/remove）や、ルール確定・手入力の作成は制限しない。
+      await requirePro(ctx, identity.subject);
     }
     if ((ruleId === undefined) !== (ruleMonth === undefined)) {
       throw new Error("ruleIdとruleMonthは両方指定するか、両方省略してください");

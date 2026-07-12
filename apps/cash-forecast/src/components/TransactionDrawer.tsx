@@ -17,6 +17,7 @@ import type { AddonInfo, ForecastRow } from '../lib/forecast'
 import { addDays, formatDateShort, formatMonthLabel } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
+import { UpgradeButton, usePlan } from './BillingControls'
 
 type TransactionDrawerProps = {
   opened: boolean
@@ -69,6 +70,8 @@ function RuleMonthDetail({
   const [editingAddon, setEditingAddon] = useState<AddonInfo | null>(null)
   const removeTx = useMutation(api.transactions.remove)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { plan } = usePlan()
+  const canAddAddon = plan === 'pro'
 
   const doDeleteAddon = async (addon: AddonInfo) => {
     setDeletingId(addon.txId)
@@ -166,9 +169,17 @@ function RuleMonthDetail({
         ))}
       </Stack>
 
-      <Button variant="light" onClick={() => setMode('addon-add')}>
+      <Button variant="light" onClick={() => setMode('addon-add')} disabled={!canAddAddon}>
         ＋この月に上乗せを追加
       </Button>
+      {!canAddAddon && (
+        <Stack gap={6}>
+          <Text size="sm" c="dimmed">
+            上乗せの追加はProプラン限定です
+          </Text>
+          <UpgradeButton size="xs" />
+        </Stack>
+      )}
       <Button onClick={() => setMode('confirm')}>この月の請求額を確定する</Button>
     </Stack>
   )

@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as billing from "../billing.js";
+import type * as http from "../http.js";
 import type * as rules from "../rules.js";
 import type * as settings from "../settings.js";
 import type * as transactions from "../transactions.js";
@@ -20,6 +22,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  billing: typeof billing;
+  http: typeof http;
   rules: typeof rules;
   settings: typeof settings;
   transactions: typeof transactions;

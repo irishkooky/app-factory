@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   ActionIcon,
@@ -15,6 +15,7 @@ import {
   Title,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
+import { notifications } from '@mantine/notifications'
 import { IconPlus } from '@tabler/icons-react'
 import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/clerk-react'
@@ -32,12 +33,38 @@ import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
 import { BalanceChart } from '../components/BalanceChart'
+import { BillingButton, PlanBadge, ProGate } from '../components/BillingControls'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
 })
 
+// Stripe Checkoutから戻ったときの案内。?billing=success/cancel を読み取り、
+// successなら通知を出して、いずれの場合もクエリはURLから取り除く（SSR時はwindowに触れない）。
+function useBillingReturnNotice() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const billing = params.get('billing')
+    if (billing === null) return
+
+    if (billing === 'success') {
+      notifications.show({
+        title: '決済を受け付けました',
+        message: 'プランへの反映まで数秒かかることがあります。',
+        color: 'teal',
+        autoClose: 8000,
+      })
+    }
+    params.delete('billing')
+    const query = params.toString()
+    const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+    window.history.replaceState(null, '', newUrl)
+  }, [])
+}
+
 function HomeComponent() {
+  useBillingReturnNotice()
+
   return (
     <Container size="xs" py="md">
       <Stack gap="lg">
@@ -169,7 +196,10 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     <Stack gap="lg">
       <Group justify="space-between" align="center">
         <Title order={4}>残高予測</Title>
-        <UserButton />
+        <Group gap="xs">
+          <PlanBadge />
+          <UserButton />
+        </Group>
       </Group>
 
       <Stack gap={4}>
@@ -181,7 +211,9 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         </Text>
       </Stack>
 
-      <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
+      <ProGate title="残高推移グラフ" description="グラフ表示はProプラン限定です">
+        <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
+      </ProGate>
 
       <SimpleGrid cols={2} spacing="xs">
         <Button variant="light" size="xs" onClick={() => setReconcileOpen(true)}>
@@ -196,6 +228,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         <Button variant="light" size="xs" onClick={() => setMonthlySummaryOpen(true)}>
           月次
         </Button>
+        <BillingButton variant="light" size="xs" />
       </SimpleGrid>
 
       <ForecastList

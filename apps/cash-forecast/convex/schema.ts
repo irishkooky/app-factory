@@ -30,4 +30,15 @@ export default defineSchema({
   })
     .index("by_user_date", ["userId", "date"])
     .index("by_user_rule", ["userId", "ruleId", "ruleMonth"]),
+
+  // アプリ非依存（billing.ts参照）。Stripeサブスクの現在状態のミラー。
+  subscriptions: defineTable({
+    userId: v.string(),
+    stripeCustomerId: v.string(),
+    stripeSubscriptionId: v.string(),
+    status: v.string(), // Stripeのsubscription status（active/trialing/past_due/canceled/...）
+    currentPeriodEnd: v.number(), // エポックミリ秒
+  })
+    .index("by_user", ["userId"])
+    .index("by_customer", ["stripeCustomerId"]),
 });

@@ -1,6 +1,11 @@
 import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { assertAmount, assertDateString, assertDayOfMonth, assertName } from "./validate";
+import { isPro } from "./billing";
+
+// Freeプランで作成できるルールの上限（アプリ固有の値のためbilling.tsではなくここに置く）。
+// 既存データは消さない: 上限超過は新規作成のみブロックし、既存ルールの編集・削除は制限しない。
+export const FREE_RULE_LIMIT = 3;
 
 export const list = query({
   args: {},
@@ -33,6 +38,21 @@ export const create = mutation({
     if (!identity) {
       throw new Error("ログインが必要です");
     }
+
+    if (!(await isPro(ctx, identity.subject))) {
+      const count = (
+        await ctx.db
+          .query("rules")
+          .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+          .collect()
+      ).length;
+      if (count >= FREE_RULE_LIMIT) {
+        throw new ConvexError(
+          `Freeプランで作成できるルールは${FREE_RULE_LIMIT}件までです。Proプランなら無制限です`,
+        );
+      }
+    }
+
     const trimmedName = assertName(name);
     assertAmount(amount);
     assertDayOfMonth(dayOfMonth);
