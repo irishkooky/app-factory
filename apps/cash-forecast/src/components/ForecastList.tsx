@@ -90,11 +90,7 @@ function MonthDividerLabel({ month, summary }: { month: string; summary: MonthSu
         {formatMonthLabel(month)}
       </Text>
       {summary && (
-        <Text
-          size="sm"
-          c={summary.net >= 0 ? 'blue.7' : 'red.7'}
-          style={{ fontVariantNumeric: 'tabular-nums' }}
-        >
+        <Text size="sm" c={summary.net >= 0 ? 'blue.7' : 'red.7'}>
           収支 {summary.net >= 0 ? '+' : ''}
           {formatYen(summary.net)}
         </Text>
@@ -120,16 +116,12 @@ function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => vo
     >
       <Group justify="space-between" wrap="nowrap" align="flex-start">
         <Group gap="xs" wrap="nowrap" align="flex-start" style={{ minWidth: 0 }}>
-          <Text
-            size="sm"
-            c="dimmed"
-            style={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 40 }}
-          >
+          <Text size="sm" c="dimmed" style={{ flexShrink: 0, width: 40 }}>
             {formatDateShort(row.date)}
           </Text>
           <Stack gap={0} style={{ minWidth: 0 }}>
             <Group gap="xs" wrap="nowrap">
-              <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Text size="sm" truncate>
                 {row.name}
               </Text>
               {row.isVirtual && (
@@ -151,11 +143,11 @@ function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => vo
           </Stack>
         </Group>
         <Stack gap={0} align="flex-end" style={{ flexShrink: 0 }}>
-          <Text size="sm" c={amountColor} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <Text size="sm" c={amountColor}>
             {amountSign}
             {formatYen(row.amount)}
           </Text>
-          <Text size="xs" c={balanceColor} style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <Text size="xs" c={balanceColor}>
             {formatYen(row.balance)}
           </Text>
         </Stack>
