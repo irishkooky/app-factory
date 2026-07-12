@@ -93,11 +93,7 @@ function MonthlySummaryContent({
                   </Table.Td>
                   <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     <Stack gap={0} align="flex-end">
-                      <Text
-                        span
-                        c={summary.minBalance < threshold ? 'red.7' : undefined}
-                        style={{ fontVariantNumeric: 'tabular-nums' }}
-                      >
+                      <Text span c={summary.minBalance < threshold ? 'red.7' : undefined}>
                         {formatYen(summary.minBalance)}
                       </Text>
                       <Text size="xs" c="dimmed">

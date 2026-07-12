@@ -3,7 +3,6 @@ import { createFileRoute } from '@tanstack/react-router'
 import {
   ActionIcon,
   Affix,
-  Alert,
   Button,
   Container,
   Drawer,
@@ -15,6 +14,8 @@ import {
   Text,
   Title,
 } from '@mantine/core'
+import { useForm } from '@mantine/form'
+import { IconPlus } from '@tabler/icons-react'
 import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/clerk-react'
 import { api } from '../../convex/_generated/api'
@@ -23,6 +24,7 @@ import { addMonthsToDateClamped, formatDateShort, todayJST } from '../lib/date'
 import { buildForecast, type ForecastRow } from '../lib/forecast'
 import { buildBalanceSeries } from '../lib/chart'
 import { formatYen } from '../lib/money'
+import { notifyError, notifySaved } from '../lib/notify'
 import { OnboardingView } from '../components/OnboardingView'
 import { ForecastList } from '../components/ForecastList'
 import { TransactionDrawer } from '../components/TransactionDrawer'
@@ -171,12 +173,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
       </Group>
 
       <Stack gap={4}>
-        <Text
-          fz={36}
-          fw={700}
-          c={currentBalance < 0 ? 'red.7' : undefined}
-          style={{ fontVariantNumeric: 'tabular-nums' }}
-        >
+        <Text fz={36} fw={700} c={currentBalance < 0 ? 'red.7' : undefined}>
           {formatYen(currentBalance)}
         </Text>
         <Text size="sm" c={belowThresholdNow ? 'orange.7' : 'dimmed'}>
@@ -220,9 +217,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
             setTxDrawerOpen(true)
           }}
         >
-          <Text fz={24} fw={700} lh={1}>
-            ＋
-          </Text>
+          <IconPlus size={28} stroke={2.5} />
         </ActionIcon>
       </Affix>
 
@@ -275,6 +270,10 @@ function ThresholdDrawer({
   )
 }
 
+type ThresholdFormValues = {
+  threshold: number | string
+}
+
 function ThresholdForm({
   currentThreshold,
   onClose,
@@ -283,55 +282,52 @@ function ThresholdForm({
   onClose: () => void
 }) {
   const setThreshold = useMutation(api.settings.setThreshold)
-  const [value, setValue] = useState<number | string>(currentThreshold)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async () => {
-    if (typeof value !== 'number') {
-      setError('しきい値を入力してください')
-      return
-    }
-    setError(null)
+  const form = useForm<ThresholdFormValues>({
+    initialValues: { threshold: currentThreshold },
+    validate: {
+      threshold: (value) => (typeof value !== 'number' ? 'しきい値を入力してください' : null),
+    },
+  })
+
+  const handleSubmit = async (values: ThresholdFormValues) => {
+    if (typeof values.threshold !== 'number') return
     setSubmitting(true)
     try {
-      await setThreshold({ threshold: Math.round(value) })
+      await setThreshold({ threshold: Math.round(values.threshold) })
+      notifySaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'しきい値の更新に失敗しました')
+      notifyError(err, 'しきい値の更新に失敗しました')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <Stack gap="md">
-      <Text size="sm" c="dimmed">
-        残高がこの金額を下回る行を強調表示します。
-      </Text>
+    <form onSubmit={form.onSubmit(handleSubmit)}>
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          残高がこの金額を下回る行を強調表示します。
+        </Text>
 
-      {error && (
-        <Alert color="red" title="エラー" onClose={() => setError(null)} withCloseButton>
-          {error}
-        </Alert>
-      )}
+        <NumberInput
+          label="しきい値"
+          thousandSeparator=","
+          hideControls
+          min={0}
+          max={1_000_000_000}
+          prefix="¥"
+          inputMode="numeric"
+          disabled={submitting}
+          {...form.getInputProps('threshold')}
+        />
 
-      <NumberInput
-        label="しきい値"
-        value={value}
-        onChange={setValue}
-        thousandSeparator=","
-        hideControls
-        min={0}
-        max={1_000_000_000}
-        prefix="¥"
-        inputMode="numeric"
-        disabled={submitting}
-      />
-
-      <Button onClick={handleSubmit} loading={submitting} disabled={submitting}>
-        保存
-      </Button>
-    </Stack>
+        <Button type="submit" loading={submitting} disabled={submitting}>
+          保存
+        </Button>
+      </Stack>
+    </form>
   )
 }
