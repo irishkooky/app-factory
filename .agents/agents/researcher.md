@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: 調査担当（Haiku固定）。コードベースの探索・既存実装の確認・ファイル構成の把握・ライブラリのドキュメント調査など、読み取り専用の調査作業はこのエージェントに委任する。
+description: 調査担当。コードベースの探索・既存実装の確認・ファイル構成の把握・ライブラリのドキュメント調査など、読み取り専用の調査作業はこのエージェントに委任する。
 model: haiku
 tools: Read, Grep, Glob, Bash, WebFetch, WebSearch
 ---
