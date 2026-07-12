@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  Alert,
   Button,
   Drawer,
   Group,
@@ -10,11 +9,14 @@ import {
   Text,
   TextInput,
 } from '@mantine/core'
+import { useForm } from '@mantine/form'
+import { modals } from '@mantine/modals'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { AddonInfo, ForecastRow } from '../lib/forecast'
 import { addDays, formatDateShort, formatMonthLabel } from '../lib/date'
 import { formatYen } from '../lib/money'
+import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 
 type TransactionDrawerProps = {
@@ -67,22 +69,32 @@ function RuleMonthDetail({
   const [mode, setMode] = useState<'detail' | 'confirm' | 'addon-add'>('detail')
   const [editingAddon, setEditingAddon] = useState<AddonInfo | null>(null)
   const removeTx = useMutation(api.transactions.remove)
-  const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { plan } = usePlan()
   const canAddAddon = plan === 'pro'
 
-  const handleDeleteAddon = async (addon: AddonInfo) => {
-    if (!window.confirm(`「${addon.name}」を削除しますか？`)) return
-    setError(null)
+  const doDeleteAddon = async (addon: AddonInfo) => {
     setDeletingId(addon.txId)
     try {
       await removeTx({ id: addon.txId })
+      notifyDeleted()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '削除に失敗しました')
+      notifyError(err, '削除に失敗しました')
     } finally {
       setDeletingId(null)
     }
+  }
+
+  const handleDeleteAddon = (addon: AddonInfo) => {
+    modals.openConfirmModal({
+      title: '削除の確認',
+      children: <Text size="sm">「{addon.name}」を削除しますか？</Text>,
+      labels: { confirm: '削除', cancel: 'キャンセル' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => {
+        void doDeleteAddon(addon)
+      },
+    })
   }
 
   if (mode === 'confirm') {
@@ -112,17 +124,11 @@ function RuleMonthDetail({
 
   return (
     <Stack gap="md">
-      {error && (
-        <Alert color="red" title="エラー" onClose={() => setError(null)} withCloseButton>
-          {error}
-        </Alert>
-      )}
-
       <Group justify="space-between" align="baseline">
         <Text size="sm" c="dimmed">
           合計
         </Text>
-        <Text fz={24} fw={700} c={totalColor} style={{ fontVariantNumeric: 'tabular-nums' }}>
+        <Text fz={24} fw={700} c={totalColor}>
           {totalSign}
           {formatYen(target.amount)}
         </Text>
@@ -133,22 +139,16 @@ function RuleMonthDetail({
           <Text size="sm" c="dimmed">
             ベース（ルール平均）
           </Text>
-          <Text size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {formatYen(baseAmount)}
-          </Text>
+          <Text size="sm">{formatYen(baseAmount)}</Text>
         </Group>
 
         {(target.addons ?? []).map((addon) => (
           <Group key={addon.txId} justify="space-between" wrap="nowrap">
-            <Text size="sm" c="dimmed" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Text size="sm" c="dimmed" truncate style={{ minWidth: 0 }}>
               {addon.name}
             </Text>
             <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-              <Text
-                size="sm"
-                c={addon.kind === 'expense' ? 'red.7' : 'blue.7'}
-                style={{ fontVariantNumeric: 'tabular-nums' }}
-              >
+              <Text size="sm" c={addon.kind === 'expense' ? 'red.7' : 'blue.7'}>
                 {addon.kind === 'expense' ? '-' : '+'}
                 {formatYen(addon.amount)}
               </Text>
@@ -185,6 +185,12 @@ function RuleMonthDetail({
   )
 }
 
+type AddonFormValues = {
+  name: string
+  amount: number | string
+  kind: 'income' | 'expense'
+}
+
 // 上乗せ（アドオン）の追加・編集フォーム。
 function AddonForm({
   target,
@@ -199,98 +205,99 @@ function AddonForm({
 }) {
   const createTx = useMutation(api.transactions.create)
   const updateTx = useMutation(api.transactions.update)
-
-  const [name, setName] = useState(addon?.name ?? '')
-  const [amount, setAmount] = useState<number | string>(addon?.amount ?? '')
-  const [kind, setKind] = useState<'income' | 'expense'>(addon?.kind ?? 'expense')
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async () => {
-    if (name.trim().length === 0) {
-      setError('名前を入力してください')
-      return
-    }
-    if (typeof amount !== 'number') {
-      setError('金額を入力してください')
-      return
-    }
-    setError(null)
+  const form = useForm<AddonFormValues>({
+    initialValues: {
+      name: addon?.name ?? '',
+      amount: addon?.amount ?? '',
+      kind: addon?.kind ?? 'expense',
+    },
+    validate: {
+      name: (value) => (value.trim().length === 0 ? '名前を入力してください' : null),
+      amount: (value) => (typeof value !== 'number' ? '金額を入力してください' : null),
+    },
+  })
+
+  const handleSubmit = async (values: AddonFormValues) => {
+    if (typeof values.amount !== 'number') return
     setSubmitting(true)
     try {
-      const roundedAmount = Math.round(amount)
+      const roundedAmount = Math.round(values.amount)
       if (addon) {
         // date はこの月の仮想行の日付（＝アドオン作成時に保存した値）をそのまま渡す。
-        await updateTx({ id: addon.txId, date: target.date, name, kind, amount: roundedAmount })
+        await updateTx({ id: addon.txId, date: target.date, name: values.name, kind: values.kind, amount: roundedAmount })
       } else {
         await createTx({
           date: target.date,
-          name,
-          kind,
+          name: values.name,
+          kind: values.kind,
           amount: roundedAmount,
           ruleId: target.ruleId,
           ruleMonth: target.ruleMonth,
           addon: true,
         })
       }
+      notifySaved()
       onDone()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存に失敗しました')
+      notifyError(err, '保存に失敗しました')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <Stack gap="md">
-      {error && (
-        <Alert color="red" title="エラー" onClose={() => setError(null)} withCloseButton>
-          {error}
-        </Alert>
-      )}
+    <form onSubmit={form.onSubmit(handleSubmit)}>
+      <Stack gap="md">
+        <TextInput
+          label="名前"
+          placeholder="例: ピーリング"
+          disabled={submitting}
+          {...form.getInputProps('name')}
+        />
 
-      <TextInput
-        label="名前"
-        placeholder="例: ピーリング"
-        value={name}
-        onChange={(event) => setName(event.currentTarget.value)}
-        disabled={submitting}
-      />
+        <NumberInput
+          label="金額"
+          placeholder="0"
+          thousandSeparator=","
+          hideControls
+          min={0}
+          max={1_000_000_000}
+          prefix="¥"
+          inputMode="numeric"
+          disabled={submitting}
+          {...form.getInputProps('amount')}
+        />
 
-      <NumberInput
-        label="金額"
-        placeholder="0"
-        value={amount}
-        onChange={setAmount}
-        thousandSeparator=","
-        hideControls
-        min={0}
-        max={1_000_000_000}
-        prefix="¥"
-        inputMode="numeric"
-        disabled={submitting}
-      />
+        <SegmentedControl
+          value={form.values.kind}
+          onChange={(value) => form.setFieldValue('kind', value as 'income' | 'expense')}
+          disabled={submitting}
+          data={[
+            { label: '支出', value: 'expense' },
+            { label: '収入', value: 'income' },
+          ]}
+        />
 
-      <SegmentedControl
-        value={kind}
-        onChange={(value) => setKind(value as 'income' | 'expense')}
-        disabled={submitting}
-        data={[
-          { label: '支出', value: 'expense' },
-          { label: '収入', value: 'income' },
-        ]}
-      />
-
-      <Group justify="space-between" mt="md">
-        <Button variant="subtle" onClick={onCancel} disabled={submitting}>
-          キャンセル
-        </Button>
-        <Button onClick={handleSubmit} loading={submitting} disabled={submitting}>
-          保存
-        </Button>
-      </Group>
-    </Stack>
+        <Group justify="space-between" mt="md">
+          <Button variant="subtle" onClick={onCancel} disabled={submitting}>
+            キャンセル
+          </Button>
+          <Button type="submit" loading={submitting} disabled={submitting}>
+            保存
+          </Button>
+        </Group>
+      </Stack>
+    </form>
   )
+}
+
+type ConfirmFormValues = {
+  date: string
+  name: string
+  amount: number | string
+  kind: 'income' | 'expense'
 }
 
 // 確定フォーム（従来の「予定を確定」）。金額の初期値は合算後の総額。
@@ -307,13 +314,20 @@ function ConfirmForm({
 }) {
   const createTx = useMutation(api.transactions.create)
   const minDate = addDays(anchorDate, 1)
-
-  const [date, setDate] = useState(target.date)
-  const [name, setName] = useState(target.name)
-  const [amount, setAmount] = useState<number | string>(target.amount)
-  const [kind, setKind] = useState<'income' | 'expense'>(target.kind)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  const form = useForm<ConfirmFormValues>({
+    initialValues: {
+      date: target.date,
+      name: target.name,
+      amount: target.amount,
+      kind: target.kind,
+    },
+    validate: {
+      name: (value) => (value.trim().length === 0 ? '名前を入力してください' : null),
+      amount: (value) => (typeof value !== 'number' ? '金額を入力してください' : null),
+    },
+  })
 
   const hasAddons = (target.addons?.length ?? 0) > 0
   const baseAmount = target.baseAmount ?? target.amount
@@ -322,101 +336,94 @@ function ConfirmForm({
     ? `ベース ${formatYen(baseAmount)} + 上乗せ ${formatYen(addonNet)}`
     : `ベース ${formatYen(baseAmount)}`
 
-  const handleSubmit = async () => {
-    if (name.trim().length === 0) {
-      setError('名前を入力してください')
-      return
-    }
-    if (typeof amount !== 'number') {
-      setError('金額を入力してください')
-      return
-    }
-    setError(null)
+  const handleSubmit = async (values: ConfirmFormValues) => {
+    if (typeof values.amount !== 'number') return
     setSubmitting(true)
     try {
-      const roundedAmount = Math.round(amount)
+      const roundedAmount = Math.round(values.amount)
       await createTx({
-        date,
-        name,
-        kind,
+        date: values.date,
+        name: values.name,
+        kind: values.kind,
         amount: roundedAmount,
         ruleId: target.ruleId,
         ruleMonth: target.ruleMonth,
       })
+      notifySaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存に失敗しました')
+      notifyError(err, '保存に失敗しました')
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <Stack gap="md">
-      <Text size="sm" c="dimmed">
-        金額を実際の請求額に直して保存してください。
-      </Text>
-      <Text size="xs" c="dimmed">
-        {referenceText}
-      </Text>
+    <form onSubmit={form.onSubmit(handleSubmit)}>
+      <Stack gap="md">
+        <Text size="sm" c="dimmed">
+          金額を実際の請求額に直して保存してください。
+        </Text>
+        <Text size="xs" c="dimmed">
+          {referenceText}
+        </Text>
 
-      {error && (
-        <Alert color="red" title="エラー" onClose={() => setError(null)} withCloseButton>
-          {error}
-        </Alert>
-      )}
+        <TextInput
+          type="date"
+          label="日付"
+          min={minDate}
+          disabled={submitting}
+          {...form.getInputProps('date')}
+        />
 
-      <TextInput
-        type="date"
-        label="日付"
-        value={date}
-        min={minDate}
-        onChange={(event) => setDate(event.currentTarget.value)}
-        disabled={submitting}
-      />
+        <TextInput
+          label="名前"
+          placeholder="例: 家賃"
+          disabled={submitting}
+          {...form.getInputProps('name')}
+        />
 
-      <TextInput
-        label="名前"
-        placeholder="例: 家賃"
-        value={name}
-        onChange={(event) => setName(event.currentTarget.value)}
-        disabled={submitting}
-      />
+        <NumberInput
+          label="金額"
+          placeholder="0"
+          thousandSeparator=","
+          hideControls
+          min={0}
+          max={1_000_000_000}
+          prefix="¥"
+          inputMode="numeric"
+          disabled={submitting}
+          {...form.getInputProps('amount')}
+        />
 
-      <NumberInput
-        label="金額"
-        placeholder="0"
-        value={amount}
-        onChange={setAmount}
-        thousandSeparator=","
-        hideControls
-        min={0}
-        max={1_000_000_000}
-        prefix="¥"
-        inputMode="numeric"
-        disabled={submitting}
-      />
+        <SegmentedControl
+          value={form.values.kind}
+          onChange={(value) => form.setFieldValue('kind', value as 'income' | 'expense')}
+          disabled={submitting}
+          data={[
+            { label: '支出', value: 'expense' },
+            { label: '収入', value: 'income' },
+          ]}
+        />
 
-      <SegmentedControl
-        value={kind}
-        onChange={(value) => setKind(value as 'income' | 'expense')}
-        disabled={submitting}
-        data={[
-          { label: '支出', value: 'expense' },
-          { label: '収入', value: 'income' },
-        ]}
-      />
-
-      <Group justify="space-between" mt="md">
-        <Button variant="subtle" onClick={onBack} disabled={submitting}>
-          戻る
-        </Button>
-        <Button onClick={handleSubmit} loading={submitting} disabled={submitting}>
-          保存
-        </Button>
-      </Group>
-    </Stack>
+        <Group justify="space-between" mt="md">
+          <Button variant="subtle" onClick={onBack} disabled={submitting}>
+            戻る
+          </Button>
+          <Button type="submit" loading={submitting} disabled={submitting}>
+            保存
+          </Button>
+        </Group>
+      </Stack>
+    </form>
   )
+}
+
+type TransactionFormValues = {
+  date: string
+  name: string
+  amount: number | string
+  kind: 'income' | 'expense'
 }
 
 function TransactionForm({
@@ -437,173 +444,191 @@ function TransactionForm({
   const minDate = addDays(anchorDate, 1)
   const initialDate = target?.date ?? (today > minDate ? today : minDate)
 
-  const [date, setDate] = useState(initialDate)
-  const [name, setName] = useState(target?.name ?? '')
-  const [amount, setAmount] = useState<number | string>(target?.amount ?? '')
-  const [kind, setKind] = useState<'income' | 'expense'>(target?.kind ?? 'expense')
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [deletingAddonId, setDeletingAddonId] = useState<string | null>(null)
+
+  const form = useForm<TransactionFormValues>({
+    initialValues: {
+      date: initialDate,
+      name: target?.name ?? '',
+      amount: target?.amount ?? '',
+      kind: target?.kind ?? 'expense',
+    },
+    validate: {
+      name: (value) => (value.trim().length === 0 ? '名前を入力してください' : null),
+      amount: (value) => (typeof value !== 'number' ? '金額を入力してください' : null),
+    },
+  })
 
   const isEdit = target !== null && !target.isVirtual
   const isRuleBacked = isEdit && target?.ruleId !== undefined
   const absorbedAddons = isRuleBacked ? target?.addons ?? [] : []
 
-  const handleSubmit = async () => {
-    if (name.trim().length === 0) {
-      setError('名前を入力してください')
-      return
-    }
-    if (typeof amount !== 'number') {
-      setError('金額を入力してください')
-      return
-    }
-    setError(null)
+  const handleSubmit = async (values: TransactionFormValues) => {
+    if (typeof values.amount !== 'number') return
     setSubmitting(true)
     try {
-      const roundedAmount = Math.round(amount)
+      const roundedAmount = Math.round(values.amount)
       if (isEdit && target?.txId) {
-        await updateTx({ id: target.txId, date, name, kind, amount: roundedAmount })
+        await updateTx({ id: target.txId, date: values.date, name: values.name, kind: values.kind, amount: roundedAmount })
       } else {
-        await createTx({ date, name, kind, amount: roundedAmount })
+        await createTx({ date: values.date, name: values.name, kind: values.kind, amount: roundedAmount })
       }
+      notifySaved()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存に失敗しました')
+      notifyError(err, '保存に失敗しました')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleDelete = async () => {
+  const doDelete = async () => {
     if (!target?.txId) return
-    const message = isRuleBacked
-      ? 'この確定を取り消して予定に戻しますか？'
-      : 'この取引を削除しますか？'
-    if (!window.confirm(message)) return
-    setError(null)
     setSubmitting(true)
     try {
       await removeTx({ id: target.txId })
+      notifyDeleted()
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '削除に失敗しました')
+      notifyError(err, '削除に失敗しました')
       setSubmitting(false)
     }
   }
 
-  const handleDeleteAbsorbedAddon = async (addon: AddonInfo) => {
-    if (!window.confirm('内訳の記録から削除します。よろしいですか？')) return
-    setError(null)
+  const handleDelete = () => {
+    if (!target?.txId) return
+    if (isRuleBacked) {
+      modals.openConfirmModal({
+        title: '予定に戻す',
+        children: <Text size="sm">この確定を取り消して予定に戻しますか？</Text>,
+        labels: { confirm: '予定に戻す', cancel: 'キャンセル' },
+        confirmProps: { color: 'red' },
+        onConfirm: () => {
+          void doDelete()
+        },
+      })
+    } else {
+      modals.openConfirmModal({
+        title: '削除の確認',
+        children: <Text size="sm">この取引を削除しますか？</Text>,
+        labels: { confirm: '削除', cancel: 'キャンセル' },
+        confirmProps: { color: 'red' },
+        onConfirm: () => {
+          void doDelete()
+        },
+      })
+    }
+  }
+
+  const doDeleteAbsorbedAddon = async (addon: AddonInfo) => {
     setDeletingAddonId(addon.txId)
     try {
       await removeTx({ id: addon.txId })
+      notifyDeleted()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '削除に失敗しました')
+      notifyError(err, '削除に失敗しました')
     } finally {
       setDeletingAddonId(null)
     }
   }
 
+  const handleDeleteAbsorbedAddon = (addon: AddonInfo) => {
+    modals.openConfirmModal({
+      title: '削除の確認',
+      children: <Text size="sm">内訳の記録から削除します。よろしいですか？</Text>,
+      labels: { confirm: '削除', cancel: 'キャンセル' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => {
+        void doDeleteAbsorbedAddon(addon)
+      },
+    })
+  }
+
   return (
-    <Stack gap="md">
-      {error && (
-        <Alert color="red" title="エラー" onClose={() => setError(null)} withCloseButton>
-          {error}
-        </Alert>
-      )}
+    <form onSubmit={form.onSubmit(handleSubmit)}>
+      <Stack gap="md">
+        <TextInput
+          type="date"
+          label="日付"
+          min={minDate}
+          disabled={submitting}
+          {...form.getInputProps('date')}
+        />
 
-      <TextInput
-        type="date"
-        label="日付"
-        value={date}
-        min={minDate}
-        onChange={(event) => setDate(event.currentTarget.value)}
-        disabled={submitting}
-      />
+        <TextInput
+          label="名前"
+          placeholder="例: 家賃"
+          disabled={submitting}
+          {...form.getInputProps('name')}
+        />
 
-      <TextInput
-        label="名前"
-        placeholder="例: 家賃"
-        value={name}
-        onChange={(event) => setName(event.currentTarget.value)}
-        disabled={submitting}
-      />
+        <NumberInput
+          label="金額"
+          placeholder="0"
+          thousandSeparator=","
+          hideControls
+          min={0}
+          max={1_000_000_000}
+          prefix="¥"
+          inputMode="numeric"
+          disabled={submitting}
+          {...form.getInputProps('amount')}
+        />
 
-      <NumberInput
-        label="金額"
-        placeholder="0"
-        value={amount}
-        onChange={setAmount}
-        thousandSeparator=","
-        hideControls
-        min={0}
-        max={1_000_000_000}
-        prefix="¥"
-        inputMode="numeric"
-        disabled={submitting}
-      />
+        <SegmentedControl
+          value={form.values.kind}
+          onChange={(value) => form.setFieldValue('kind', value as 'income' | 'expense')}
+          disabled={submitting}
+          data={[
+            { label: '支出', value: 'expense' },
+            { label: '収入', value: 'income' },
+          ]}
+        />
 
-      <SegmentedControl
-        value={kind}
-        onChange={(value) => setKind(value as 'income' | 'expense')}
-        disabled={submitting}
-        data={[
-          { label: '支出', value: 'expense' },
-          { label: '収入', value: 'income' },
-        ]}
-      />
-
-      {absorbedAddons.length > 0 && (
-        <Stack gap={6}>
-          <Text size="sm" fw={500}>
-            この請求に含まれた上乗せ
-          </Text>
-          {absorbedAddons.map((addon) => (
-            <Group key={addon.txId} justify="space-between" wrap="nowrap">
-              <Text
-                size="sm"
-                c="dimmed"
-                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-              >
-                {addon.name}
-              </Text>
-              <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                <Text
-                  size="sm"
-                  c={addon.kind === 'expense' ? 'red.7' : 'blue.7'}
-                  style={{ fontVariantNumeric: 'tabular-nums' }}
-                >
-                  {addon.kind === 'expense' ? '-' : '+'}
-                  {formatYen(addon.amount)}
+        {absorbedAddons.length > 0 && (
+          <Stack gap={6}>
+            <Text size="sm" fw={500}>
+              この請求に含まれた上乗せ
+            </Text>
+            {absorbedAddons.map((addon) => (
+              <Group key={addon.txId} justify="space-between" wrap="nowrap">
+                <Text size="sm" c="dimmed" truncate style={{ minWidth: 0 }}>
+                  {addon.name}
                 </Text>
-                <Button
-                  variant="subtle"
-                  color="red"
-                  size="xs"
-                  loading={deletingAddonId === addon.txId}
-                  onClick={() => handleDeleteAbsorbedAddon(addon)}
-                >
-                  削除
-                </Button>
+                <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
+                  <Text size="sm" c={addon.kind === 'expense' ? 'red.7' : 'blue.7'}>
+                    {addon.kind === 'expense' ? '-' : '+'}
+                    {formatYen(addon.amount)}
+                  </Text>
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    size="xs"
+                    loading={deletingAddonId === addon.txId}
+                    onClick={() => handleDeleteAbsorbedAddon(addon)}
+                  >
+                    削除
+                  </Button>
+                </Group>
               </Group>
-            </Group>
-          ))}
-        </Stack>
-      )}
-
-      <Group justify="space-between" mt="md">
-        {isEdit ? (
-          <Button variant="subtle" color="red" onClick={handleDelete} disabled={submitting}>
-            {isRuleBacked ? '予定に戻す' : '削除'}
-          </Button>
-        ) : (
-          <div />
+            ))}
+          </Stack>
         )}
-        <Button onClick={handleSubmit} loading={submitting} disabled={submitting}>
-          保存
-        </Button>
-      </Group>
-    </Stack>
+
+        <Group justify="space-between" mt="md">
+          {isEdit ? (
+            <Button variant="subtle" color="red" onClick={handleDelete} disabled={submitting}>
+              {isRuleBacked ? '予定に戻す' : '削除'}
+            </Button>
+          ) : (
+            <div />
+          )}
+          <Button type="submit" loading={submitting} disabled={submitting}>
+            保存
+          </Button>
+        </Group>
+      </Stack>
+    </form>
   )
 }
