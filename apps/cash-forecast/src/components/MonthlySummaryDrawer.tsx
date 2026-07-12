@@ -4,6 +4,7 @@ import type { ForecastRow } from '../lib/forecast'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { summarizeByMonth } from '../lib/summary'
+import { ProGate } from './BillingControls'
 
 type MonthlySummaryDrawerProps = {
   opened: boolean
@@ -22,7 +23,11 @@ export function MonthlySummaryDrawer({
 }: MonthlySummaryDrawerProps) {
   return (
     <Drawer opened={opened} onClose={onClose} position="bottom" size="lg" title="月次サマリー">
-      {opened && <MonthlySummaryContent rows={rows} anchorDate={anchorDate} threshold={threshold} />}
+      {opened && (
+        <ProGate title="月次サマリー" description="月次サマリーはProプラン限定です">
+          <MonthlySummaryContent rows={rows} anchorDate={anchorDate} threshold={threshold} />
+        </ProGate>
+      )}
     </Drawer>
   )
 }

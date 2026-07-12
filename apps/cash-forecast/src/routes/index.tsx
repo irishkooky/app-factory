@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   ActionIcon,
@@ -30,15 +30,46 @@ import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
 import { BalanceChart } from '../components/BalanceChart'
+import { BillingButton, PlanBadge, ProGate } from '../components/BillingControls'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
 })
 
+// Stripe Checkoutから戻ったときの案内。?billing=success/cancel を読み取り、
+// successならAlertを出して、いずれの場合もクエリはURLから取り除く（SSR時はwindowに触れない）。
+function useBillingReturnNotice(): { show: boolean; dismiss: () => void } {
+  const [show, setShow] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const billing = params.get('billing')
+    if (billing === null) return
+
+    if (billing === 'success') {
+      setShow(true)
+    }
+    params.delete('billing')
+    const query = params.toString()
+    const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`
+    window.history.replaceState(null, '', newUrl)
+  }, [])
+
+  return { show, dismiss: () => setShow(false) }
+}
+
 function HomeComponent() {
+  const billingNotice = useBillingReturnNotice()
+
   return (
     <Container size="xs" py="md">
       <Stack gap="lg">
+        {billingNotice.show && (
+          <Alert color="teal" title="決済を受け付けました" withCloseButton onClose={billingNotice.dismiss}>
+            プランへの反映まで数秒かかることがあります。
+          </Alert>
+        )}
+
         <AuthLoading>
           <Group justify="center" py="xl">
             <Loader />
@@ -167,7 +198,10 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     <Stack gap="lg">
       <Group justify="space-between" align="center">
         <Title order={4}>残高予測</Title>
-        <UserButton />
+        <Group gap="xs">
+          <PlanBadge />
+          <UserButton />
+        </Group>
       </Group>
 
       <Stack gap={4}>
@@ -184,7 +218,9 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         </Text>
       </Stack>
 
-      <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
+      <ProGate title="残高推移グラフ" description="グラフ表示はProプラン限定です">
+        <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
+      </ProGate>
 
       <SimpleGrid cols={2} spacing="xs">
         <Button variant="light" size="xs" onClick={() => setReconcileOpen(true)}>
@@ -199,6 +235,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         <Button variant="light" size="xs" onClick={() => setMonthlySummaryOpen(true)}>
           月次
         </Button>
+        <BillingButton variant="light" size="xs" />
       </SimpleGrid>
 
       <ForecastList

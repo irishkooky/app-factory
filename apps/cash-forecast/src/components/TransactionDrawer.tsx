@@ -15,6 +15,7 @@ import { api } from '../../convex/_generated/api'
 import type { AddonInfo, ForecastRow } from '../lib/forecast'
 import { addDays, formatDateShort, formatMonthLabel } from '../lib/date'
 import { formatYen } from '../lib/money'
+import { UpgradeButton, usePlan } from './BillingControls'
 
 type TransactionDrawerProps = {
   opened: boolean
@@ -68,6 +69,8 @@ function RuleMonthDetail({
   const removeTx = useMutation(api.transactions.remove)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { plan } = usePlan()
+  const canAddAddon = plan === 'pro'
 
   const handleDeleteAddon = async (addon: AddonInfo) => {
     if (!window.confirm(`「${addon.name}」を削除しますか？`)) return
@@ -166,9 +169,17 @@ function RuleMonthDetail({
         ))}
       </Stack>
 
-      <Button variant="light" onClick={() => setMode('addon-add')}>
+      <Button variant="light" onClick={() => setMode('addon-add')} disabled={!canAddAddon}>
         ＋この月に上乗せを追加
       </Button>
+      {!canAddAddon && (
+        <Stack gap={6}>
+          <Text size="sm" c="dimmed">
+            上乗せの追加はProプラン限定です
+          </Text>
+          <UpgradeButton size="xs" />
+        </Stack>
+      )}
       <Button onClick={() => setMode('confirm')}>この月の請求額を確定する</Button>
     </Stack>
   )

@@ -17,6 +17,11 @@ import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { formatYen } from '../lib/money'
+import { UpgradeButton, usePlan } from './BillingControls'
+
+// convex/rules.ts の FREE_RULE_LIMIT と同じ値。UI表示用の写しであり、
+// 実際の上限判定は常にサーバー側（rules.create）で行われる。
+const FREE_RULE_LIMIT = 3
 
 type RulesDrawerProps = {
   opened: boolean
@@ -37,6 +42,8 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
   const [editingRule, setEditingRule] = useState<Doc<'rules'> | null>(null)
   const removeRule = useMutation(api.rules.remove)
   const [error, setError] = useState<string | null>(null)
+  const { plan } = usePlan()
+  const atFreeLimit = plan === 'free' && (rules?.length ?? 0) >= FREE_RULE_LIMIT
 
   const handleAdd = () => {
     setEditingRule(null)
@@ -116,7 +123,17 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
               </Card>
             ))}
           </Stack>
-          <Button onClick={handleAdd}>＋ルールを追加</Button>
+          <Button onClick={handleAdd} disabled={atFreeLimit}>
+            ＋ルールを追加
+          </Button>
+          {atFreeLimit && (
+            <Stack gap={6}>
+              <Text size="sm" c="dimmed">
+                Freeプランはルール{FREE_RULE_LIMIT}件まで。Proプランなら無制限です
+              </Text>
+              <UpgradeButton size="xs" />
+            </Stack>
+          )}
         </>
       )}
     </Stack>
