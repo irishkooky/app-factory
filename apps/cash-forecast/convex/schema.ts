@@ -26,6 +26,7 @@ export default defineSchema({
     amount: v.number(), // 整数円 >= 0
     ruleId: v.optional(v.id("rules")), // ルール確定（上書き）の場合のみ
     ruleMonth: v.optional(v.string()), // "YYYY-MM"。どの月の仮想行を置き換えるか
+    addon: v.optional(v.boolean()), // true = ルール月への上乗せ。ruleId/ruleMonth とセットで使う
   })
     .index("by_user_date", ["userId", "date"])
     .index("by_user_rule", ["userId", "ruleId", "ruleMonth"]),

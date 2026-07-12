@@ -24,14 +24,18 @@ export const create = mutation({
     amount: v.number(),
     ruleId: v.optional(v.id("rules")),
     ruleMonth: v.optional(v.string()),
+    addon: v.optional(v.boolean()),
   },
-  handler: async (ctx, { date, name, kind, amount, ruleId, ruleMonth }) => {
+  handler: async (ctx, { date, name, kind, amount, ruleId, ruleMonth, addon }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("ログインが必要です");
     }
     if ((ruleId === undefined) !== (ruleMonth === undefined)) {
       throw new Error("ruleIdとruleMonthは両方指定するか、両方省略してください");
+    }
+    if (addon === true && (ruleId === undefined || ruleMonth === undefined)) {
+      throw new Error("上乗せにはruleIdとruleMonthが必要です");
     }
 
     const trimmedName = assertName(name);
@@ -46,14 +50,23 @@ export const create = mutation({
       if (!rule || rule.userId !== identity.subject) {
         throw new Error("権限がありません");
       }
-      const existing = await ctx.db
+      // 【重要】同一 (userId, ruleId, ruleMonth) にはアドオン導入後、上書き行(最大1件)と
+      // アドオン行(複数件)が並び得るため .unique() は使えない。.collect() してフィルタする。
+      const existingRows = await ctx.db
         .query("transactions")
         .withIndex("by_user_rule", (q) =>
           q.eq("userId", identity.subject).eq("ruleId", ruleId).eq("ruleMonth", ruleMonth),
         )
-        .unique();
-      if (existing) {
-        throw new Error("この月は確定済みです");
+        .collect();
+      const hasOverride = existingRows.some((row) => row.addon !== true);
+      if (hasOverride) {
+        // 上書き作成時: 既存の上書きがあれば重複確定を防ぐ。
+        // アドオン作成時: 上書き済みの月には上乗せを追加させない（確定額を直接編集させる）。
+        throw new Error(
+          addon === true
+            ? "この月は確定済みです。確定した金額を直接編集してください"
+            : "この月は確定済みです",
+        );
       }
     }
 
@@ -76,6 +89,7 @@ export const create = mutation({
       amount,
       ruleId,
       ruleMonth,
+      addon,
     });
   },
 });

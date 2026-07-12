@@ -10,6 +10,7 @@ import {
   Group,
   Loader,
   NumberInput,
+  SimpleGrid,
   Stack,
   Text,
   Title,
@@ -26,6 +27,7 @@ import { ForecastList } from '../components/ForecastList'
 import { TransactionDrawer } from '../components/TransactionDrawer'
 import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
+import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -95,6 +97,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [reconcileOpen, setReconcileOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [thresholdOpen, setThresholdOpen] = useState(false)
+  const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
 
   const forecast = useMemo(() => {
     if (transactions === undefined || rules === undefined) return undefined
@@ -141,6 +144,12 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   }
   const belowThresholdNow = minBalance < settings.threshold
 
+  // Drawerを開いたまま上乗せの追加・削除等で予測が更新されても、
+  // 内訳・合計の表示が追従するよう、対象行のライブ版を引き直して渡す
+  const liveDrawerTarget = txDrawerTarget
+    ? (forecast.find((row) => row.key === txDrawerTarget.key) ?? txDrawerTarget)
+    : null
+
   return (
     <Stack gap="lg">
       <Group justify="space-between" align="center">
@@ -162,7 +171,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         </Text>
       </Stack>
 
-      <Group grow>
+      <SimpleGrid cols={2} spacing="xs">
         <Button variant="light" size="xs" onClick={() => setReconcileOpen(true)}>
           残高を合わせる
         </Button>
@@ -172,7 +181,10 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         <Button variant="light" size="xs" onClick={() => setThresholdOpen(true)}>
           しきい値
         </Button>
-      </Group>
+        <Button variant="light" size="xs" onClick={() => setMonthlySummaryOpen(true)}>
+          月次
+        </Button>
+      </SimpleGrid>
 
       <ForecastList
         rows={forecast}
@@ -204,7 +216,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onClose={() => setTxDrawerOpen(false)}
         anchorDate={settings.anchorDate}
         today={today}
-        target={txDrawerTarget}
+        target={liveDrawerTarget}
       />
 
       <ReconcileDrawer
@@ -214,6 +226,13 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
       />
 
       <RulesDrawer opened={rulesOpen} onClose={() => setRulesOpen(false)} rules={rules} />
+
+      <MonthlySummaryDrawer
+        opened={monthlySummaryOpen}
+        onClose={() => setMonthlySummaryOpen(false)}
+        rows={forecast}
+        anchorDate={settings.anchorDate}
+      />
 
       <ThresholdDrawer
         opened={thresholdOpen}

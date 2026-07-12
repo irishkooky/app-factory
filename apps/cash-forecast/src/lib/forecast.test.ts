@@ -23,10 +23,11 @@ function makeTx(
   txSeq += 1;
   return {
     _id: `tx_${txSeq}` as Doc<"transactions">["_id"],
-    _creationTime: 0,
+    _creationTime: txSeq, // 作成順を安定させる（アドオンの並び順テストに使う）
     userId: "user_1",
     ruleId: undefined,
     ruleMonth: undefined,
+    addon: undefined,
     ...overrides,
   };
 }
@@ -202,5 +203,208 @@ describe("buildForecast", () => {
     expect(rows.map((r) => r.kind)).toEqual(["income", "expense"]);
     expect(rows[0].balance).toBe(1000);
     expect(rows[1].balance).toBe(700);
+  });
+});
+
+describe("buildForecast: アドオン", () => {
+  it("アドオン合算: expenseルール + expenseアドオン → 仮想行に合算され残高が総額分減る", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 10 });
+    const rows = buildForecast({
+      anchorDate: "2026-11-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        makeTx({
+          date: "2026-11-10",
+          name: "ピーリング",
+          kind: "expense",
+          amount: 100_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-11-30",
+    });
+
+    const novemberRows = rows.filter((r) => r.date.startsWith("2026-11"));
+    expect(novemberRows).toHaveLength(1);
+    const row = novemberRows[0];
+    expect(row.isVirtual).toBe(true);
+    expect(row.kind).toBe("expense");
+    expect(row.amount).toBe(230_000);
+    expect(row.baseAmount).toBe(130_000);
+    expect(row.addons).toHaveLength(1);
+    expect(row.addons?.[0].name).toBe("ピーリング");
+    expect(row.balance).toBe(-230_000);
+  });
+
+  it("アドオンincome（返金相当）: expenseルール + incomeアドオンで打ち消し合う", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 10 });
+    const rows = buildForecast({
+      anchorDate: "2026-11-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        makeTx({
+          date: "2026-11-10",
+          name: "返金",
+          kind: "income",
+          amount: 30_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-11-30",
+    });
+
+    const row = rows.find((r) => r.date === "2026-11-10");
+    expect(row).toBeDefined();
+    expect(row?.amount).toBe(100_000);
+    expect(row?.kind).toBe("expense");
+  });
+
+  it("吸収: 上書き行がある月のアドオンは残高に入らず、上書き行のaddonsに付く", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 10 });
+    const rows = buildForecast({
+      anchorDate: "2026-11-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        makeTx({
+          date: "2026-11-10",
+          name: "AMEX(確定)",
+          kind: "expense",
+          amount: 230_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+        }),
+        makeTx({
+          date: "2026-11-10",
+          name: "ピーリング",
+          kind: "expense",
+          amount: 100_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-11-30",
+    });
+
+    const novemberRows = rows.filter((r) => r.date.startsWith("2026-11"));
+    expect(novemberRows).toHaveLength(1);
+    expect(novemberRows[0].isVirtual).toBe(false);
+    expect(novemberRows[0].amount).toBe(230_000);
+    expect(novemberRows[0].addons).toHaveLength(1);
+    expect(novemberRows[0].addons?.[0].name).toBe("ピーリング");
+    expect(novemberRows[0].balance).toBe(-230_000);
+  });
+
+  it("上書き判定がアドオンに汚染されない: アドオンだけの月は仮想行(合算)が出て、他月の上書き判定に影響しない", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 10 });
+    const rows = buildForecast({
+      anchorDate: "2026-10-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        // 11月: アドオンのみ（上書きなし）→ 仮想行が合算されて出るはず
+        makeTx({
+          date: "2026-11-10",
+          name: "ピーリング",
+          kind: "expense",
+          amount: 100_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+        // 12月: 上書きのみ
+        makeTx({
+          date: "2026-12-10",
+          name: "AMEX(確定)",
+          kind: "expense",
+          amount: 140_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-12",
+        }),
+      ],
+      horizonEnd: "2026-12-31",
+    });
+
+    const novemberRow = rows.find((r) => r.date === "2026-11-10");
+    expect(novemberRow?.isVirtual).toBe(true);
+    expect(novemberRow?.amount).toBe(230_000);
+
+    const decemberRow = rows.find((r) => r.date === "2026-12-10");
+    expect(decemberRow?.isVirtual).toBe(false);
+    expect(decemberRow?.amount).toBe(140_000);
+  });
+
+  it("孤児アドオン: rulesに無いruleIdを持ち上書きも無いアドオンは通常行として残高に入る", () => {
+    const rows = buildForecast({
+      anchorDate: "2026-10-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [], // ルールは既に削除されている想定
+      transactions: [
+        makeTx({
+          date: "2026-11-10",
+          name: "ピーリング(孤児)",
+          kind: "expense",
+          amount: 100_000,
+          ruleId: "rule_deleted" as Doc<"rules">["_id"],
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-11-30",
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].isVirtual).toBe(false);
+    expect(rows[0].amount).toBe(100_000);
+    expect(rows[0].addons).toBeUndefined();
+    expect(rows[0].balance).toBe(-100_000);
+  });
+
+  it("複数アドオン（同月2件）が両方合算される", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 10 });
+    const rows = buildForecast({
+      anchorDate: "2026-10-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        makeTx({
+          date: "2026-11-10",
+          name: "ピーリング",
+          kind: "expense",
+          amount: 100_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+        makeTx({
+          date: "2026-11-10",
+          name: "外食",
+          kind: "expense",
+          amount: 20_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-11-30",
+    });
+
+    const row = rows.find((r) => r.date === "2026-11-10");
+    expect(row?.amount).toBe(250_000);
+    expect(row?.addons).toHaveLength(2);
+    expect(row?.addons?.map((a) => a.name)).toEqual(["ピーリング", "外食"]);
   });
 });

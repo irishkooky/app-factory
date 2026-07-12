@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import { Badge, Divider, Group, Stack, Text, UnstyledButton } from '@mantine/core'
 import type { ForecastRow } from '../lib/forecast'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
+import { summarizeByMonth, type MonthSummary } from '../lib/summary'
 
 type ForecastListProps = {
   rows: ForecastRow[]
@@ -41,6 +43,13 @@ function buildItems(rows: ForecastRow[], today: string): ListItem[] {
 
 export function ForecastList({ rows, today, onRowClick }: ForecastListProps) {
   const items = buildItems(rows, today)
+  const monthSummaries = useMemo(() => {
+    const map = new Map<string, MonthSummary>()
+    for (const summary of summarizeByMonth(rows)) {
+      map.set(summary.month, summary)
+    }
+    return map
+  }, [rows])
 
   if (rows.length === 0) {
     return (
@@ -54,10 +63,11 @@ export function ForecastList({ rows, today, onRowClick }: ForecastListProps) {
     <Stack gap={0}>
       {items.map((item) => {
         if (item.type === 'month') {
+          const summary = monthSummaries.get(item.month)
           return (
             <Divider
               key={item.key}
-              label={formatMonthLabel(item.month)}
+              label={<MonthDividerLabel month={item.month} summary={summary} />}
               labelPosition="left"
               mt="md"
               mb="xs"
@@ -73,10 +83,32 @@ export function ForecastList({ rows, today, onRowClick }: ForecastListProps) {
   )
 }
 
+function MonthDividerLabel({ month, summary }: { month: string; summary: MonthSummary | undefined }) {
+  return (
+    <Group gap={6} wrap="nowrap">
+      <Text size="sm" fw={500}>
+        {formatMonthLabel(month)}
+      </Text>
+      {summary && (
+        <Text
+          size="sm"
+          c={summary.net >= 0 ? 'blue.7' : 'red.7'}
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          収支 {summary.net >= 0 ? '+' : ''}
+          {formatYen(summary.net)}
+        </Text>
+      )}
+    </Group>
+  )
+}
+
 function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => void }) {
   const amountColor = row.kind === 'expense' ? 'red.7' : 'blue.7'
   const amountSign = row.kind === 'expense' ? '-' : '+'
   const balanceColor = row.balance < 0 ? 'red.7' : undefined
+  const isConfirmed = !row.isVirtual && row.ruleId !== undefined
+  const addonCount = row.addons?.length ?? 0
 
   return (
     <UnstyledButton
@@ -87,7 +119,7 @@ function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => vo
       style={{ borderRadius: 'var(--mantine-radius-md)' }}
     >
       <Group justify="space-between" wrap="nowrap" align="flex-start">
-        <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+        <Group gap="xs" wrap="nowrap" align="flex-start" style={{ minWidth: 0 }}>
           <Text
             size="sm"
             c="dimmed"
@@ -95,14 +127,28 @@ function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => vo
           >
             {formatDateShort(row.date)}
           </Text>
-          <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {row.name}
-          </Text>
-          {row.isVirtual && (
-            <Badge size="xs" variant="light" style={{ flexShrink: 0 }}>
-              予定
-            </Badge>
-          )}
+          <Stack gap={0} style={{ minWidth: 0 }}>
+            <Group gap="xs" wrap="nowrap">
+              <Text size="sm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.name}
+              </Text>
+              {row.isVirtual && (
+                <Badge size="xs" variant="light" style={{ flexShrink: 0 }}>
+                  予定
+                </Badge>
+              )}
+              {isConfirmed && (
+                <Badge size="xs" variant="light" color="teal" style={{ flexShrink: 0 }}>
+                  確定
+                </Badge>
+              )}
+            </Group>
+            {addonCount > 0 && (
+              <Text size="xs" c="dimmed">
+                上乗せ {addonCount}件
+              </Text>
+            )}
+          </Stack>
         </Group>
         <Stack gap={0} align="flex-end" style={{ flexShrink: 0 }}>
           <Text size="sm" c={amountColor} style={{ fontVariantNumeric: 'tabular-nums' }}>
