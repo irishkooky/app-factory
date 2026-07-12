@@ -1,4 +1,5 @@
 import '@mantine/core/styles.css'
+import '@mantine/charts/styles.css'
 
 import type { ReactNode } from 'react'
 import {

@@ -11,13 +11,15 @@
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",
+    "@mantine/charts": "^9.4.1",
     "@mantine/core": "^9.4.1",
     "@mantine/hooks": "^9.4.1",
     "@tanstack/react-router": "^1.170.17",
     "@tanstack/react-start": "^1.168.27",
     "convex": "^1.42.1",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "recharts": "^3.9.2"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.43.0",
