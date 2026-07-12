@@ -21,6 +21,7 @@ import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { addMonthsToDateClamped, formatDateShort, todayJST } from '../lib/date'
 import { buildForecast, type ForecastRow } from '../lib/forecast'
+import { buildBalanceSeries } from '../lib/chart'
 import { formatYen } from '../lib/money'
 import { OnboardingView } from '../components/OnboardingView'
 import { ForecastList } from '../components/ForecastList'
@@ -28,6 +29,7 @@ import { TransactionDrawer } from '../components/TransactionDrawer'
 import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
+import { BalanceChart } from '../components/BalanceChart'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -111,7 +113,18 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     })
   }, [transactions, rules, settings.anchorDate, settings.anchorBalance, settings.threshold, horizonEnd])
 
-  if (forecast === undefined) {
+  const balancePoints = useMemo(() => {
+    if (forecast === undefined) return undefined
+    return buildBalanceSeries({
+      anchorDate: settings.anchorDate,
+      anchorBalance: settings.anchorBalance,
+      rows: forecast,
+      today,
+      horizonEnd,
+    })
+  }, [forecast, settings.anchorDate, settings.anchorBalance, today, horizonEnd])
+
+  if (forecast === undefined || balancePoints === undefined) {
     return (
       <Group justify="center" py="xl">
         <Loader />
@@ -170,6 +183,8 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
           今後12ヶ月の最低残高 {formatYen(minBalance)}（{formatDateShort(minDate)}）
         </Text>
       </Stack>
+
+      <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
 
       <SimpleGrid cols={2} spacing="xs">
         <Button variant="light" size="xs" onClick={() => setReconcileOpen(true)}>
@@ -232,6 +247,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onClose={() => setMonthlySummaryOpen(false)}
         rows={forecast}
         anchorDate={settings.anchorDate}
+        threshold={settings.threshold}
       />
 
       <ThresholdDrawer

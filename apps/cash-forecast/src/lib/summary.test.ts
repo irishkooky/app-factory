@@ -48,4 +48,20 @@ describe("summarizeByMonth", () => {
     expect(summary[0].income).toBe(0);
     expect(summary[0].savingsRate).toBeNull();
   });
+
+  it("minBalance/minBalanceDateが月ごとに正しく求まる（同値タイは最初の行）", () => {
+    const rows: ForecastRow[] = [
+      makeRow({ date: "2026-07-05", kind: "income", amount: 100_000, balance: 90_000 }),
+      makeRow({ date: "2026-07-10", kind: "expense", amount: 50_000, balance: 40_000 }), // 7月最小(1個目)
+      makeRow({ date: "2026-07-20", kind: "income", amount: 10_000, balance: 40_000 }), // 同値だが2個目
+      makeRow({ date: "2026-08-03", kind: "expense", amount: 20_000, balance: 20_000 }),
+    ];
+    const summary = summarizeByMonth(rows);
+    const july = summary.find((s) => s.month === "2026-07");
+    const august = summary.find((s) => s.month === "2026-08");
+    expect(july?.minBalance).toBe(40_000);
+    expect(july?.minBalanceDate).toBe("2026-07-10");
+    expect(august?.minBalance).toBe(20_000);
+    expect(august?.minBalanceDate).toBe("2026-08-03");
+  });
 });
