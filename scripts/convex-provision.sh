@@ -12,6 +12,15 @@
 # 必要な環境変数: CONVEX_TEAM_ACCESS_TOKEN（Convexダッシュボードで発行するTeam Access Token）
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# 環境変数が無ければリポジトリ直下の .env から読み込む（ローカル実行用）
+if [ -z "${CONVEX_TEAM_ACCESS_TOKEN:-}" ] && [ -f "$REPO_ROOT/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/.env"
+  set +a
+fi
+
 API_BASE="https://api.convex.dev/v1"
 
 APP_NAME="${1:-}"
@@ -22,7 +31,6 @@ fi
 
 : "${CONVEX_TEAM_ACCESS_TOKEN:?CONVEX_TEAM_ACCESS_TOKEN が未設定です（ConvexダッシュボードでTeam Access Tokenを発行して設定してください）}"
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$REPO_ROOT/apps/$APP_NAME"
 if [ ! -d "$APP_DIR" ]; then
   echo "error: apps/$APP_NAME がありません。先に apps/hello をコピーしてアプリを作成してください。" >&2
