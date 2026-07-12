@@ -1,25 +1,24 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import {
-  Badge,
   Button,
   Card,
   Drawer,
-  Group,
-  Loader,
-  NumberInput,
-  SegmentedControl,
-  Stack,
-  Text,
-  TextInput,
-} from '@mantine/core'
-import { useForm } from '@mantine/form'
-import { modals } from '@mantine/modals'
+  FieldError,
+  Input,
+  Label,
+  NumberField,
+  Spinner,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+} from '@heroui/react'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { formatYen } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
+import { useConfirm } from './ConfirmDialog'
 
 // convex/rules.ts の FREE_RULE_LIMIT と同じ値。UI表示用の写しであり、
 // 実際の上限判定は常にサーバー側（rules.create）で行われる。
@@ -33,9 +32,17 @@ type RulesDrawerProps = {
 
 export function RulesDrawer({ opened, onClose, rules }: RulesDrawerProps) {
   return (
-    <Drawer opened={opened} onClose={onClose} position="bottom" title="ルール管理" size="md">
-      {opened && <RulesDrawerContent rules={rules} />}
-    </Drawer>
+    <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
+      <Drawer.Content placement="bottom">
+        <Drawer.Dialog>
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <Drawer.Heading>ルール管理</Drawer.Heading>
+          </Drawer.Header>
+          <Drawer.Body>{opened && <RulesDrawerContent rules={rules} />}</Drawer.Body>
+        </Drawer.Dialog>
+      </Drawer.Content>
+    </Drawer.Backdrop>
   )
 }
 
@@ -44,6 +51,7 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
   const [editingRule, setEditingRule] = useState<Doc<'rules'> | null>(null)
   const removeRule = useMutation(api.rules.remove)
   const { plan } = usePlan()
+  const confirm = useConfirm()
   const atFreeLimit = plan === 'free' && (rules?.length ?? 0) >= FREE_RULE_LIMIT
 
   const handleAdd = () => {
@@ -65,18 +73,15 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
     }
   }
 
-  const handleDelete = (rule: Doc<'rules'>) => {
-    modals.openConfirmModal({
+  const handleDelete = async (rule: Doc<'rules'>) => {
+    const ok = await confirm({
       title: '削除の確認',
-      children: (
-        <Text size="sm">「{rule.name}」を削除しますか？確定済みの過去分は残ります。</Text>
-      ),
-      labels: { confirm: '削除', cancel: 'キャンセル' },
-      confirmProps: { color: 'red' },
-      onConfirm: () => {
-        void doDelete(rule)
-      },
+      description: `「${rule.name}」を削除しますか？確定済みの過去分は残ります。`,
+      confirmLabel: '削除',
+      isDestructive: true,
     })
+    if (!ok) return
+    await doDelete(rule)
   }
 
   if (mode === 'form') {
@@ -90,70 +95,62 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
   }
 
   return (
-    <Stack gap="md">
+    <div className="flex flex-col gap-4">
       {rules === undefined ? (
-        <Group justify="center" py="xl">
-          <Loader />
-        </Group>
+        <div className="flex justify-center py-8">
+          <Spinner />
+        </div>
       ) : rules.length === 0 ? (
-        <Stack gap="md" align="center" py="xl">
-          <Text c="dimmed" ta="center">
+        <div className="flex flex-col items-center gap-4 py-8">
+          <p className="text-center text-muted">
             給与や毎月の引き落としをルールにすると、未来の残高が自動で予測されます。
-          </Text>
-          <Button onClick={handleAdd}>＋ルールを追加</Button>
-        </Stack>
+          </p>
+          <Button onPress={handleAdd}>＋ルールを追加</Button>
+        </div>
       ) : (
         <>
-          <Stack gap="sm">
+          <div className="flex flex-col gap-3">
             {rules.map((rule) => (
-              <Card key={rule._id} withBorder radius="md" padding="sm">
-                <Group justify="space-between" wrap="nowrap" align="flex-start">
-                  <Stack gap={2} style={{ minWidth: 0 }}>
-                    <Text fw={500}>{rule.name}</Text>
-                    <Text size="sm" c={rule.kind === 'expense' ? 'red.7' : 'blue.7'}>
+              <Card key={rule._id}>
+                <Card.Content className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="font-medium">{rule.name}</span>
+                    <span className={`text-sm ${rule.kind === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
                       {rule.kind === 'expense' ? '-' : '+'}
                       {formatYen(rule.amount)}
-                    </Text>
-                    <Text size="xs" c="dimmed">
+                    </span>
+                    <span className="text-xs text-muted">
                       毎月{rule.dayOfMonth}日
                       {rule.endDate ? `（${rule.endDate}まで）` : ''}
-                    </Text>
-                  </Stack>
-                  <Group gap="xs" style={{ flexShrink: 0 }}>
-                    <Button variant="subtle" size="xs" onClick={() => handleEdit(rule)}>
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button variant="tertiary" size="sm" onPress={() => handleEdit(rule)}>
                       編集
                     </Button>
-                    <Button variant="subtle" color="red" size="xs" onClick={() => handleDelete(rule)}>
+                    <Button variant="tertiary" size="sm" onPress={() => handleDelete(rule)}>
                       削除
                     </Button>
-                  </Group>
-                </Group>
+                  </div>
+                </Card.Content>
               </Card>
             ))}
-          </Stack>
-          <Button onClick={handleAdd} disabled={atFreeLimit}>
+          </div>
+          <Button onPress={handleAdd} isDisabled={atFreeLimit}>
             ＋ルールを追加
           </Button>
           {atFreeLimit && (
-            <Stack gap={6}>
-              <Text size="sm" c="dimmed">
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm text-muted">
                 Freeプランはルール{FREE_RULE_LIMIT}件まで。Proプランなら無制限です
-              </Text>
-              <UpgradeButton size="xs" />
-            </Stack>
+              </p>
+              <UpgradeButton size="sm" />
+            </div>
           )}
         </>
       )}
-    </Stack>
+    </div>
   )
-}
-
-type RuleFormValues = {
-  name: string
-  kind: 'income' | 'expense'
-  amount: number | string
-  dayOfMonth: number | string
-  endDate: string
 }
 
 function RuleForm({
@@ -169,34 +166,33 @@ function RuleForm({
   const updateRule = useMutation(api.rules.update)
   const [submitting, setSubmitting] = useState(false)
 
-  const form = useForm<RuleFormValues>({
-    initialValues: {
-      name: rule?.name ?? '',
-      kind: rule?.kind ?? 'expense',
-      amount: rule?.amount ?? '',
-      dayOfMonth: rule?.dayOfMonth ?? 1,
-      endDate: rule?.endDate ?? '',
-    },
-    validate: {
-      name: (value) => (value.trim().length === 0 ? '名前を入力してください' : null),
-      amount: (value) => (typeof value !== 'number' ? '金額を入力してください' : null),
-      dayOfMonth: (value) =>
-        typeof value !== 'number' || value < 1 || value > 31
-          ? '日は1から31の間で入力してください'
-          : null,
-    },
-  })
+  const [name, setName] = useState(rule?.name ?? '')
+  const [kind, setKind] = useState<'income' | 'expense'>(rule?.kind ?? 'expense')
+  const [amount, setAmount] = useState<number | undefined>(rule?.amount)
+  const [dayOfMonth, setDayOfMonth] = useState<number | undefined>(rule?.dayOfMonth ?? 1)
+  const [endDate, setEndDate] = useState(rule?.endDate ?? '')
 
-  const handleSubmit = async (values: RuleFormValues) => {
-    if (typeof values.amount !== 'number' || typeof values.dayOfMonth !== 'number') return
+  const [errors, setErrors] = useState<{ name?: string; amount?: string; dayOfMonth?: string }>({})
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    const nextErrors: typeof errors = {}
+    if (name.trim().length === 0) nextErrors.name = '名前を入力してください'
+    if (amount === undefined) nextErrors.amount = '金額を入力してください'
+    if (dayOfMonth === undefined || dayOfMonth < 1 || dayOfMonth > 31) {
+      nextErrors.dayOfMonth = '日は1から31の間で入力してください'
+    }
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0 || amount === undefined || dayOfMonth === undefined) return
+
     setSubmitting(true)
     try {
       const args = {
-        name: values.name,
-        kind: values.kind,
-        amount: Math.round(values.amount),
-        dayOfMonth: Math.round(values.dayOfMonth),
-        endDate: values.endDate.length > 0 ? values.endDate : undefined,
+        name,
+        kind,
+        amount: Math.round(amount),
+        dayOfMonth: Math.round(dayOfMonth),
+        endDate: endDate.length > 0 ? endDate : undefined,
       }
       if (rule) {
         await updateRule({ id: rule._id, ...args })
@@ -213,70 +209,92 @@ function RuleForm({
   }
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
-      <Stack gap="md">
-        <TextInput
-          label="名前"
-          placeholder="例: 給与"
-          disabled={submitting}
-          {...form.getInputProps('name')}
-        />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <TextField isInvalid={!!errors.name} isDisabled={submitting}>
+        <Label>名前</Label>
+        <Input placeholder="例: 給与" value={name} onChange={(e) => setName(e.target.value)} />
+        {errors.name && <FieldError>{errors.name}</FieldError>}
+      </TextField>
 
-        <SegmentedControl
-          value={form.values.kind}
-          onChange={(value) => form.setFieldValue('kind', value as 'income' | 'expense')}
-          disabled={submitting}
-          data={[
-            { label: '支出', value: 'expense' },
-            { label: '収入', value: 'income' },
-          ]}
-        />
+      <ToggleButtonGroup
+        selectionMode="single"
+        disallowEmptySelection
+        selectedKeys={[kind]}
+        onSelectionChange={(keys) => {
+          const value = Array.from(keys)[0]
+          if (value === 'income' || value === 'expense') setKind(value)
+        }}
+        isDisabled={submitting}
+      >
+        <ToggleButton id="expense">支出</ToggleButton>
+        <ToggleButton id="income">
+          <ToggleButtonGroup.Separator />
+          収入
+        </ToggleButton>
+      </ToggleButtonGroup>
 
-        <NumberInput
-          label="金額"
-          thousandSeparator=","
-          hideControls
-          min={0}
-          max={1_000_000_000}
-          prefix="¥"
-          inputMode="numeric"
-          disabled={submitting}
-          {...form.getInputProps('amount')}
-        />
+      <NumberField
+        isInvalid={!!errors.amount}
+        isDisabled={submitting}
+        minValue={0}
+        maxValue={1_000_000_000}
+        value={amount}
+        onChange={setAmount}
+        formatOptions={{ style: 'currency', currency: 'JPY' }}
+      >
+        <Label>金額</Label>
+        <NumberField.Group>
+          <NumberField.DecrementButton />
+          <NumberField.Input className="flex-1" />
+          <NumberField.IncrementButton />
+        </NumberField.Group>
+        {errors.amount && <FieldError>{errors.amount}</FieldError>}
+      </NumberField>
 
-        <NumberInput
-          label="毎月◯日"
-          hideControls
-          min={1}
-          max={31}
-          disabled={submitting}
-          {...form.getInputProps('dayOfMonth')}
-        />
+      <NumberField
+        isInvalid={!!errors.dayOfMonth}
+        isDisabled={submitting}
+        minValue={1}
+        maxValue={31}
+        value={dayOfMonth}
+        onChange={setDayOfMonth}
+      >
+        <Label>毎月◯日</Label>
+        <NumberField.Group>
+          <NumberField.DecrementButton />
+          <NumberField.Input className="flex-1" />
+          <NumberField.IncrementButton />
+        </NumberField.Group>
+        {errors.dayOfMonth && <FieldError>{errors.dayOfMonth}</FieldError>}
+      </NumberField>
 
-        <Group align="flex-end" gap="xs">
-          <TextInput
+      <div className="flex items-end gap-2">
+        <label className="flex flex-1 flex-col gap-1.5 text-sm">
+          終了日（任意）
+          <input
             type="date"
-            label="終了日（任意）"
             disabled={submitting}
-            style={{ flex: 1 }}
-            {...form.getInputProps('endDate')}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
           />
-          {form.values.endDate.length > 0 && (
-            <Button variant="subtle" onClick={() => form.setFieldValue('endDate', '')} disabled={submitting}>
-              クリア
-            </Button>
-          )}
-        </Group>
+        </label>
+        {endDate.length > 0 && (
+          <Button variant="tertiary" onPress={() => setEndDate('')} isDisabled={submitting}>
+            クリア
+          </Button>
+        )}
+      </div>
 
-        <Group justify="space-between" mt="md">
-          <Button variant="subtle" onClick={onCancel} disabled={submitting}>
-            キャンセル
-          </Button>
-          <Button type="submit" loading={submitting} disabled={submitting}>
-            保存
-          </Button>
-        </Group>
-      </Stack>
+      <div className="mt-2 flex justify-between">
+        <Button variant="tertiary" onPress={onCancel} isDisabled={submitting}>
+          キャンセル
+        </Button>
+        <Button type="submit" isPending={submitting} isDisabled={submitting}>
+          {submitting && <Spinner color="current" size="sm" />}
+          保存
+        </Button>
+      </div>
     </form>
   )
 }

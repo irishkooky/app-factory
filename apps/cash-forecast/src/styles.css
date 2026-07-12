@@ -1,0 +1,19 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+:root,
+[data-theme="light"] {
+  --accent: oklch(0.51 0.18 275);
+  --accent-foreground: oklch(0.98 0 0);
+}
+
+.dark,
+[data-theme="dark"] {
+  --accent: oklch(0.65 0.16 275);
+  --accent-foreground: oklch(0.15 0 0);
+}
+
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+}

@@ -1,6 +1,4 @@
-import '@mantine/core/styles.css'
-import '@mantine/charts/styles.css'
-import '@mantine/notifications/styles.css'
+import '../styles.css'
 
 import type { ReactNode } from 'react'
 import {
@@ -9,10 +7,9 @@ import {
   HeadContent,
   Scripts,
 } from '@tanstack/react-router'
-import { ColorSchemeScript, MantineProvider, mantineHtmlProps } from '@mantine/core'
-import { ModalsProvider } from '@mantine/modals'
-import { Notifications } from '@mantine/notifications'
-import { theme } from '../theme'
+import { Toast } from '@heroui/react'
+import { ConfirmDialogProvider } from '../components/ConfirmDialog'
+import { notifyQueue } from '../lib/notify'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -42,18 +39,15 @@ function RootComponent() {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="ja" {...mantineHtmlProps}>
+    <html lang="ja">
       <head>
-        <ColorSchemeScript />
         <HeadContent />
       </head>
-      <body>
-        <MantineProvider theme={theme}>
-          <ModalsProvider modalProps={{ zIndex: 1000 }}>
-            <Notifications position="top-center" />
-            {children}
-          </ModalsProvider>
-        </MantineProvider>
+      <body className="bg-background text-foreground">
+        <ConfirmDialogProvider>
+          <Toast.Provider placement="top" queue={notifyQueue} />
+          {children}
+        </ConfirmDialogProvider>
         <Scripts />
       </body>
     </html>

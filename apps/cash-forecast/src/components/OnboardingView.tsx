@@ -1,31 +1,26 @@
-import { useState } from 'react'
-import { Button, Card, NumberInput, Stack, Text, Title } from '@mantine/core'
-import { useForm } from '@mantine/form'
+import { useState, type FormEvent } from 'react'
+import { Button, Card, FieldError, Label, NumberField, Spinner } from '@heroui/react'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { todayJST } from '../lib/date'
 import { notifyError, notifySaved } from '../lib/notify'
 
-type OnboardingFormValues = {
-  balance: number | string
-}
-
 export function OnboardingView() {
   const setAnchor = useMutation(api.settings.setAnchor)
   const [submitting, setSubmitting] = useState(false)
+  const [balance, setBalance] = useState<number | undefined>(undefined)
+  const [error, setError] = useState<string | null>(null)
 
-  const form = useForm<OnboardingFormValues>({
-    initialValues: { balance: '' },
-    validate: {
-      balance: (value) => (typeof value !== 'number' ? '残高を入力してください' : null),
-    },
-  })
-
-  const handleSubmit = async (values: OnboardingFormValues) => {
-    if (typeof values.balance !== 'number') return
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (balance === undefined) {
+      setError('残高を入力してください')
+      return
+    }
+    setError(null)
     setSubmitting(true)
     try {
-      await setAnchor({ anchorDate: todayJST(), anchorBalance: Math.round(values.balance) })
+      await setAnchor({ anchorDate: todayJST(), anchorBalance: Math.round(balance) })
       notifySaved()
     } catch (err) {
       notifyError(err, '初期設定に失敗しました')
@@ -35,33 +30,39 @@ export function OnboardingView() {
   }
 
   return (
-    <Card withBorder radius="md" padding="lg">
-      <form onSubmit={form.onSubmit(handleSubmit)}>
-        <Stack gap="md">
-          <Title order={2}>ようこそ</Title>
-          <Text c="dimmed" size="sm">
+    <Card>
+      <Card.Content>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <h2 className="text-xl font-semibold">ようこそ</h2>
+          <p className="text-sm text-muted">
             現在の預金残高を入力してスタートしてください。今日時点の残高として記録し、
             そこから未来の予定を積み上げて予測します。
-          </Text>
+          </p>
 
-          <NumberInput
-            label="現在の預金残高"
-            placeholder="1000000"
-            thousandSeparator=","
-            hideControls
-            min={-1_000_000_000}
-            max={1_000_000_000}
-            prefix="¥"
-            inputMode="numeric"
-            disabled={submitting}
-            {...form.getInputProps('balance')}
-          />
+          <NumberField
+            isInvalid={error !== null}
+            isDisabled={submitting}
+            minValue={-1_000_000_000}
+            maxValue={1_000_000_000}
+            value={balance}
+            onChange={setBalance}
+            formatOptions={{ style: 'currency', currency: 'JPY' }}
+          >
+            <Label>現在の預金残高</Label>
+            <NumberField.Group>
+              <NumberField.DecrementButton />
+              <NumberField.Input className="flex-1" placeholder="¥1,000,000" />
+              <NumberField.IncrementButton />
+            </NumberField.Group>
+            {error && <FieldError>{error}</FieldError>}
+          </NumberField>
 
-          <Button type="submit" loading={submitting} disabled={submitting}>
+          <Button type="submit" isPending={submitting} isDisabled={submitting}>
+            {submitting && <Spinner color="current" size="sm" />}
             はじめる
           </Button>
-        </Stack>
-      </form>
+        </form>
+      </Card.Content>
     </Card>
   )
 }

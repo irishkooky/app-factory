@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Drawer, Stack, Table, Text } from '@mantine/core'
+import { Drawer, Table } from '@heroui/react'
 import type { ForecastRow } from '../lib/forecast'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
@@ -22,13 +22,23 @@ export function MonthlySummaryDrawer({
   threshold,
 }: MonthlySummaryDrawerProps) {
   return (
-    <Drawer opened={opened} onClose={onClose} position="bottom" size="lg" title="月次サマリー">
-      {opened && (
-        <ProGate title="月次サマリー" description="月次サマリーはProプラン限定です">
-          <MonthlySummaryContent rows={rows} anchorDate={anchorDate} threshold={threshold} />
-        </ProGate>
-      )}
-    </Drawer>
+    <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
+      <Drawer.Content placement="bottom">
+        <Drawer.Dialog className="sm:max-w-2xl">
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <Drawer.Heading>月次サマリー</Drawer.Heading>
+          </Drawer.Header>
+          <Drawer.Body>
+            {opened && (
+              <ProGate title="月次サマリー" description="月次サマリーはProプラン限定です">
+                <MonthlySummaryContent rows={rows} anchorDate={anchorDate} threshold={threshold} />
+              </ProGate>
+            )}
+          </Drawer.Body>
+        </Drawer.Dialog>
+      </Drawer.Content>
+    </Drawer.Backdrop>
   )
 }
 
@@ -45,76 +55,58 @@ function MonthlySummaryContent({
   const anchorMonth = monthOf(anchorDate)
 
   if (summaries.length === 0) {
-    return (
-      <Text c="dimmed" ta="center" py="xl">
-        表示できるデータがありません。
-      </Text>
-    )
+    return <p className="py-8 text-center text-muted">表示できるデータがありません。</p>
   }
 
   return (
-    <Stack gap="sm">
-      <Table.ScrollContainer minWidth={560}>
-        <Table>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>月</Table.Th>
-              <Table.Th ta="right">収入</Table.Th>
-              <Table.Th ta="right">支出</Table.Th>
-              <Table.Th ta="right">収支</Table.Th>
-              <Table.Th ta="right">貯蓄率</Table.Th>
-              <Table.Th ta="right">最低残高</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {summaries.map((summary) => {
-              const isAnchorMonth = summary.month === anchorMonth
-              return (
-                <Table.Tr key={summary.month}>
-                  <Table.Td>
-                    {formatMonthLabel(summary.month)}
-                    {isAnchorMonth && (
-                      <Text component="span" size="xs" c="dimmed">
-                        *
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {formatYen(summary.income)}
-                  </Table.Td>
-                  <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {formatYen(summary.expense)}
-                  </Table.Td>
-                  <Table.Td
-                    ta="right"
-                    c={summary.net >= 0 ? 'blue.7' : 'red.7'}
-                    style={{ fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {summary.net >= 0 ? '+' : ''}
-                    {formatYen(summary.net)}
-                  </Table.Td>
-                  <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {summary.savingsRate === null ? '—' : `${Math.round(summary.savingsRate * 100)}%`}
-                  </Table.Td>
-                  <Table.Td ta="right" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    <Stack gap={0} align="flex-end">
-                      <Text span c={summary.minBalance < threshold ? 'red.7' : undefined}>
-                        {formatYen(summary.minBalance)}
-                      </Text>
-                      <Text size="xs" c="dimmed">
-                        {formatDateShort(summary.minBalanceDate)}
-                      </Text>
-                    </Stack>
-                  </Table.Td>
-                </Table.Tr>
-              )
-            })}
-          </Table.Tbody>
-        </Table>
-      </Table.ScrollContainer>
-      <Text size="xs" c="dimmed">
-        * 基準日以降の集計
-      </Text>
-    </Stack>
+    <div className="flex flex-col gap-3">
+      <Table>
+        <Table.ScrollContainer>
+          <Table.Content aria-label="月次サマリー" className="min-w-[560px]">
+            <Table.Header>
+              <Table.Column>月</Table.Column>
+              <Table.Column className="text-right">収入</Table.Column>
+              <Table.Column className="text-right">支出</Table.Column>
+              <Table.Column className="text-right">収支</Table.Column>
+              <Table.Column className="text-right">貯蓄率</Table.Column>
+              <Table.Column className="text-right">最低残高</Table.Column>
+            </Table.Header>
+            <Table.Body>
+              {summaries.map((summary) => {
+                const isAnchorMonth = summary.month === anchorMonth
+                return (
+                  <Table.Row key={summary.month}>
+                    <Table.Cell>
+                      {formatMonthLabel(summary.month)}
+                      {isAnchorMonth && <span className="text-xs text-muted">*</span>}
+                    </Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">{formatYen(summary.income)}</Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">{formatYen(summary.expense)}</Table.Cell>
+                    <Table.Cell
+                      className={`text-right tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}
+                    >
+                      {summary.net >= 0 ? '+' : ''}
+                      {formatYen(summary.net)}
+                    </Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">
+                      {summary.savingsRate === null ? '—' : `${Math.round(summary.savingsRate * 100)}%`}
+                    </Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">
+                      <div className="flex flex-col items-end gap-0">
+                        <span className={summary.minBalance < threshold ? 'text-red-600' : undefined}>
+                          {formatYen(summary.minBalance)}
+                        </span>
+                        <span className="text-xs text-muted">{formatDateShort(summary.minBalanceDate)}</span>
+                      </div>
+                    </Table.Cell>
+                  </Table.Row>
+                )
+              })}
+            </Table.Body>
+          </Table.Content>
+        </Table.ScrollContainer>
+      </Table>
+      <p className="text-xs text-muted">* 基準日以降の集計</p>
+    </div>
   )
 }

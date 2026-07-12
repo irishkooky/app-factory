@@ -1,16 +1,16 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import {
   Button,
   Drawer,
-  Group,
-  NumberInput,
-  SegmentedControl,
-  Stack,
-  Text,
-  TextInput,
-} from '@mantine/core'
-import { useForm } from '@mantine/form'
-import { modals } from '@mantine/modals'
+  FieldError,
+  Input,
+  Label,
+  NumberField,
+  Spinner,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+} from '@heroui/react'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { AddonInfo, ForecastRow } from '../lib/forecast'
@@ -18,6 +18,7 @@ import { addDays, formatDateShort, formatMonthLabel } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
+import { useConfirm } from './ConfirmDialog'
 
 type TransactionDrawerProps = {
   opened: boolean
@@ -38,20 +39,30 @@ function titleFor(target: ForecastRow | null): string {
 
 export function TransactionDrawer({ opened, onClose, anchorDate, today, target }: TransactionDrawerProps) {
   return (
-    <Drawer opened={opened} onClose={onClose} position="bottom" title={titleFor(target)} size="md">
-      {opened &&
-        (target?.isVirtual ? (
-          <RuleMonthDetail key={target.key} target={target} anchorDate={anchorDate} onClose={onClose} />
-        ) : (
-          <TransactionForm
-            key={target?.key ?? 'new'}
-            anchorDate={anchorDate}
-            today={today}
-            target={target}
-            onClose={onClose}
-          />
-        ))}
-    </Drawer>
+    <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
+      <Drawer.Content placement="bottom">
+        <Drawer.Dialog>
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <Drawer.Heading>{titleFor(target)}</Drawer.Heading>
+          </Drawer.Header>
+          <Drawer.Body>
+            {opened &&
+              (target?.isVirtual ? (
+                <RuleMonthDetail key={target.key} target={target} anchorDate={anchorDate} onClose={onClose} />
+              ) : (
+                <TransactionForm
+                  key={target?.key ?? 'new'}
+                  anchorDate={anchorDate}
+                  today={today}
+                  target={target}
+                  onClose={onClose}
+                />
+              ))}
+          </Drawer.Body>
+        </Drawer.Dialog>
+      </Drawer.Content>
+    </Drawer.Backdrop>
   )
 }
 
@@ -71,6 +82,7 @@ function RuleMonthDetail({
   const removeTx = useMutation(api.transactions.remove)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { plan } = usePlan()
+  const confirm = useConfirm()
   const canAddAddon = plan === 'pro'
 
   const doDeleteAddon = async (addon: AddonInfo) => {
@@ -85,16 +97,15 @@ function RuleMonthDetail({
     }
   }
 
-  const handleDeleteAddon = (addon: AddonInfo) => {
-    modals.openConfirmModal({
+  const handleDeleteAddon = async (addon: AddonInfo) => {
+    const ok = await confirm({
       title: '削除の確認',
-      children: <Text size="sm">「{addon.name}」を削除しますか？</Text>,
-      labels: { confirm: '削除', cancel: 'キャンセル' },
-      confirmProps: { color: 'red' },
-      onConfirm: () => {
-        void doDeleteAddon(addon)
-      },
+      description: `「${addon.name}」を削除しますか？`,
+      confirmLabel: '削除',
+      isDestructive: true,
     })
+    if (!ok) return
+    await doDeleteAddon(addon)
   }
 
   if (mode === 'confirm') {
@@ -119,76 +130,61 @@ function RuleMonthDetail({
   }
 
   const totalSign = target.kind === 'expense' ? '-' : '+'
-  const totalColor = target.kind === 'expense' ? 'red.7' : 'blue.7'
+  const totalColor = target.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
   const baseAmount = target.baseAmount ?? target.amount
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between" align="baseline">
-        <Text size="sm" c="dimmed">
-          合計
-        </Text>
-        <Text fz={24} fw={700} c={totalColor}>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm text-muted">合計</span>
+        <span className={`text-2xl font-bold tabular-nums ${totalColor}`}>
           {totalSign}
           {formatYen(target.amount)}
-        </Text>
-      </Group>
+        </span>
+      </div>
 
-      <Stack gap={6}>
-        <Group justify="space-between">
-          <Text size="sm" c="dimmed">
-            ベース（ルール平均）
-          </Text>
-          <Text size="sm">{formatYen(baseAmount)}</Text>
-        </Group>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex justify-between">
+          <span className="text-sm text-muted">ベース（ルール平均）</span>
+          <span className="text-sm tabular-nums">{formatYen(baseAmount)}</span>
+        </div>
 
         {(target.addons ?? []).map((addon) => (
-          <Group key={addon.txId} justify="space-between" wrap="nowrap">
-            <Text size="sm" c="dimmed" truncate style={{ minWidth: 0 }}>
-              {addon.name}
-            </Text>
-            <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-              <Text size="sm" c={addon.kind === 'expense' ? 'red.7' : 'blue.7'}>
+          <div key={addon.txId} className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-sm text-muted">{addon.name}</span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className={`text-sm tabular-nums ${addon.kind === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
                 {addon.kind === 'expense' ? '-' : '+'}
                 {formatYen(addon.amount)}
-              </Text>
-              <Button variant="subtle" size="xs" onClick={() => setEditingAddon(addon)}>
+              </span>
+              <Button variant="tertiary" size="sm" onPress={() => setEditingAddon(addon)}>
                 編集
               </Button>
               <Button
-                variant="subtle"
-                color="red"
-                size="xs"
-                loading={deletingId === addon.txId}
-                onClick={() => handleDeleteAddon(addon)}
+                variant="tertiary"
+                size="sm"
+                isPending={deletingId === addon.txId}
+                onPress={() => handleDeleteAddon(addon)}
               >
                 削除
               </Button>
-            </Group>
-          </Group>
+            </div>
+          </div>
         ))}
-      </Stack>
+      </div>
 
-      <Button variant="light" onClick={() => setMode('addon-add')} disabled={!canAddAddon}>
+      <Button variant="secondary" onPress={() => setMode('addon-add')} isDisabled={!canAddAddon}>
         ＋この月に上乗せを追加
       </Button>
       {!canAddAddon && (
-        <Stack gap={6}>
-          <Text size="sm" c="dimmed">
-            上乗せの追加はProプラン限定です
-          </Text>
-          <UpgradeButton size="xs" />
-        </Stack>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm text-muted">上乗せの追加はProプラン限定です</p>
+          <UpgradeButton size="sm" />
+        </div>
       )}
-      <Button onClick={() => setMode('confirm')}>この月の請求額を確定する</Button>
-    </Stack>
+      <Button onPress={() => setMode('confirm')}>この月の請求額を確定する</Button>
+    </div>
   )
-}
-
-type AddonFormValues = {
-  name: string
-  amount: number | string
-  kind: 'income' | 'expense'
 }
 
 // 上乗せ（アドオン）の追加・編集フォーム。
@@ -207,31 +203,30 @@ function AddonForm({
   const updateTx = useMutation(api.transactions.update)
   const [submitting, setSubmitting] = useState(false)
 
-  const form = useForm<AddonFormValues>({
-    initialValues: {
-      name: addon?.name ?? '',
-      amount: addon?.amount ?? '',
-      kind: addon?.kind ?? 'expense',
-    },
-    validate: {
-      name: (value) => (value.trim().length === 0 ? '名前を入力してください' : null),
-      amount: (value) => (typeof value !== 'number' ? '金額を入力してください' : null),
-    },
-  })
+  const [name, setName] = useState(addon?.name ?? '')
+  const [amount, setAmount] = useState<number | undefined>(addon?.amount)
+  const [kind, setKind] = useState<'income' | 'expense'>(addon?.kind ?? 'expense')
+  const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
-  const handleSubmit = async (values: AddonFormValues) => {
-    if (typeof values.amount !== 'number') return
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    const nextErrors: typeof errors = {}
+    if (name.trim().length === 0) nextErrors.name = '名前を入力してください'
+    if (amount === undefined) nextErrors.amount = '金額を入力してください'
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0 || amount === undefined) return
+
     setSubmitting(true)
     try {
-      const roundedAmount = Math.round(values.amount)
+      const roundedAmount = Math.round(amount)
       if (addon) {
         // date はこの月の仮想行の日付（＝アドオン作成時に保存した値）をそのまま渡す。
-        await updateTx({ id: addon.txId, date: target.date, name: values.name, kind: values.kind, amount: roundedAmount })
+        await updateTx({ id: addon.txId, date: target.date, name, kind, amount: roundedAmount })
       } else {
         await createTx({
           date: target.date,
-          name: values.name,
-          kind: values.kind,
+          name,
+          kind,
           amount: roundedAmount,
           ruleId: target.ruleId,
           ruleMonth: target.ruleMonth,
@@ -248,56 +243,59 @@ function AddonForm({
   }
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
-      <Stack gap="md">
-        <TextInput
-          label="名前"
-          placeholder="例: ピーリング"
-          disabled={submitting}
-          {...form.getInputProps('name')}
-        />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <TextField isInvalid={!!errors.name} isDisabled={submitting}>
+        <Label>名前</Label>
+        <Input placeholder="例: ピーリング" value={name} onChange={(e) => setName(e.target.value)} />
+        {errors.name && <FieldError>{errors.name}</FieldError>}
+      </TextField>
 
-        <NumberInput
-          label="金額"
-          placeholder="0"
-          thousandSeparator=","
-          hideControls
-          min={0}
-          max={1_000_000_000}
-          prefix="¥"
-          inputMode="numeric"
-          disabled={submitting}
-          {...form.getInputProps('amount')}
-        />
+      <NumberField
+        isInvalid={!!errors.amount}
+        isDisabled={submitting}
+        minValue={0}
+        maxValue={1_000_000_000}
+        value={amount}
+        onChange={setAmount}
+        formatOptions={{ style: 'currency', currency: 'JPY' }}
+      >
+        <Label>金額</Label>
+        <NumberField.Group>
+          <NumberField.DecrementButton />
+          <NumberField.Input className="flex-1" />
+          <NumberField.IncrementButton />
+        </NumberField.Group>
+        {errors.amount && <FieldError>{errors.amount}</FieldError>}
+      </NumberField>
 
-        <SegmentedControl
-          value={form.values.kind}
-          onChange={(value) => form.setFieldValue('kind', value as 'income' | 'expense')}
-          disabled={submitting}
-          data={[
-            { label: '支出', value: 'expense' },
-            { label: '収入', value: 'income' },
-          ]}
-        />
+      <ToggleButtonGroup
+        selectionMode="single"
+        disallowEmptySelection
+        selectedKeys={[kind]}
+        onSelectionChange={(keys) => {
+          const value = Array.from(keys)[0]
+          if (value === 'income' || value === 'expense') setKind(value)
+        }}
+        isDisabled={submitting}
+      >
+        <ToggleButton id="expense">支出</ToggleButton>
+        <ToggleButton id="income">
+          <ToggleButtonGroup.Separator />
+          収入
+        </ToggleButton>
+      </ToggleButtonGroup>
 
-        <Group justify="space-between" mt="md">
-          <Button variant="subtle" onClick={onCancel} disabled={submitting}>
-            キャンセル
-          </Button>
-          <Button type="submit" loading={submitting} disabled={submitting}>
-            保存
-          </Button>
-        </Group>
-      </Stack>
+      <div className="mt-2 flex justify-between">
+        <Button variant="tertiary" onPress={onCancel} isDisabled={submitting}>
+          キャンセル
+        </Button>
+        <Button type="submit" isPending={submitting} isDisabled={submitting}>
+          {submitting && <Spinner color="current" size="sm" />}
+          保存
+        </Button>
+      </div>
     </form>
   )
-}
-
-type ConfirmFormValues = {
-  date: string
-  name: string
-  amount: number | string
-  kind: 'income' | 'expense'
 }
 
 // 確定フォーム（従来の「予定を確定」）。金額の初期値は合算後の総額。
@@ -316,18 +314,11 @@ function ConfirmForm({
   const minDate = addDays(anchorDate, 1)
   const [submitting, setSubmitting] = useState(false)
 
-  const form = useForm<ConfirmFormValues>({
-    initialValues: {
-      date: target.date,
-      name: target.name,
-      amount: target.amount,
-      kind: target.kind,
-    },
-    validate: {
-      name: (value) => (value.trim().length === 0 ? '名前を入力してください' : null),
-      amount: (value) => (typeof value !== 'number' ? '金額を入力してください' : null),
-    },
-  })
+  const [date, setDate] = useState(target.date)
+  const [name, setName] = useState(target.name)
+  const [amount, setAmount] = useState<number | undefined>(target.amount)
+  const [kind, setKind] = useState<'income' | 'expense'>(target.kind)
+  const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
   const hasAddons = (target.addons?.length ?? 0) > 0
   const baseAmount = target.baseAmount ?? target.amount
@@ -336,15 +327,21 @@ function ConfirmForm({
     ? `ベース ${formatYen(baseAmount)} + 上乗せ ${formatYen(addonNet)}`
     : `ベース ${formatYen(baseAmount)}`
 
-  const handleSubmit = async (values: ConfirmFormValues) => {
-    if (typeof values.amount !== 'number') return
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    const nextErrors: typeof errors = {}
+    if (name.trim().length === 0) nextErrors.name = '名前を入力してください'
+    if (amount === undefined) nextErrors.amount = '金額を入力してください'
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0 || amount === undefined) return
+
     setSubmitting(true)
     try {
-      const roundedAmount = Math.round(values.amount)
+      const roundedAmount = Math.round(amount)
       await createTx({
-        date: values.date,
-        name: values.name,
-        kind: values.kind,
+        date,
+        name,
+        kind,
         amount: roundedAmount,
         ruleId: target.ruleId,
         ruleMonth: target.ruleMonth,
@@ -359,71 +356,74 @@ function ConfirmForm({
   }
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
-      <Stack gap="md">
-        <Text size="sm" c="dimmed">
-          金額を実際の請求額に直して保存してください。
-        </Text>
-        <Text size="xs" c="dimmed">
-          {referenceText}
-        </Text>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <p className="text-sm text-muted">金額を実際の請求額に直して保存してください。</p>
+      <p className="text-xs text-muted">{referenceText}</p>
 
-        <TextInput
+      <label className="flex flex-col gap-1.5 text-sm">
+        日付
+        <input
           type="date"
-          label="日付"
           min={minDate}
           disabled={submitting}
-          {...form.getInputProps('date')}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
         />
+      </label>
 
-        <TextInput
-          label="名前"
-          placeholder="例: 家賃"
-          disabled={submitting}
-          {...form.getInputProps('name')}
-        />
+      <TextField isInvalid={!!errors.name} isDisabled={submitting}>
+        <Label>名前</Label>
+        <Input placeholder="例: 家賃" value={name} onChange={(e) => setName(e.target.value)} />
+        {errors.name && <FieldError>{errors.name}</FieldError>}
+      </TextField>
 
-        <NumberInput
-          label="金額"
-          placeholder="0"
-          thousandSeparator=","
-          hideControls
-          min={0}
-          max={1_000_000_000}
-          prefix="¥"
-          inputMode="numeric"
-          disabled={submitting}
-          {...form.getInputProps('amount')}
-        />
+      <NumberField
+        isInvalid={!!errors.amount}
+        isDisabled={submitting}
+        minValue={0}
+        maxValue={1_000_000_000}
+        value={amount}
+        onChange={setAmount}
+        formatOptions={{ style: 'currency', currency: 'JPY' }}
+      >
+        <Label>金額</Label>
+        <NumberField.Group>
+          <NumberField.DecrementButton />
+          <NumberField.Input className="flex-1" />
+          <NumberField.IncrementButton />
+        </NumberField.Group>
+        {errors.amount && <FieldError>{errors.amount}</FieldError>}
+      </NumberField>
 
-        <SegmentedControl
-          value={form.values.kind}
-          onChange={(value) => form.setFieldValue('kind', value as 'income' | 'expense')}
-          disabled={submitting}
-          data={[
-            { label: '支出', value: 'expense' },
-            { label: '収入', value: 'income' },
-          ]}
-        />
+      <ToggleButtonGroup
+        selectionMode="single"
+        disallowEmptySelection
+        selectedKeys={[kind]}
+        onSelectionChange={(keys) => {
+          const value = Array.from(keys)[0]
+          if (value === 'income' || value === 'expense') setKind(value)
+        }}
+        isDisabled={submitting}
+      >
+        <ToggleButton id="expense">支出</ToggleButton>
+        <ToggleButton id="income">
+          <ToggleButtonGroup.Separator />
+          収入
+        </ToggleButton>
+      </ToggleButtonGroup>
 
-        <Group justify="space-between" mt="md">
-          <Button variant="subtle" onClick={onBack} disabled={submitting}>
-            戻る
-          </Button>
-          <Button type="submit" loading={submitting} disabled={submitting}>
-            保存
-          </Button>
-        </Group>
-      </Stack>
+      <div className="mt-2 flex justify-between">
+        <Button variant="tertiary" onPress={onBack} isDisabled={submitting}>
+          戻る
+        </Button>
+        <Button type="submit" isPending={submitting} isDisabled={submitting}>
+          {submitting && <Spinner color="current" size="sm" />}
+          保存
+        </Button>
+      </div>
     </form>
   )
-}
-
-type TransactionFormValues = {
-  date: string
-  name: string
-  amount: number | string
-  kind: 'income' | 'expense'
 }
 
 function TransactionForm({
@@ -440,6 +440,7 @@ function TransactionForm({
   const createTx = useMutation(api.transactions.create)
   const updateTx = useMutation(api.transactions.update)
   const removeTx = useMutation(api.transactions.remove)
+  const confirm = useConfirm()
 
   const minDate = addDays(anchorDate, 1)
   const initialDate = target?.date ?? (today > minDate ? today : minDate)
@@ -447,32 +448,31 @@ function TransactionForm({
   const [submitting, setSubmitting] = useState(false)
   const [deletingAddonId, setDeletingAddonId] = useState<string | null>(null)
 
-  const form = useForm<TransactionFormValues>({
-    initialValues: {
-      date: initialDate,
-      name: target?.name ?? '',
-      amount: target?.amount ?? '',
-      kind: target?.kind ?? 'expense',
-    },
-    validate: {
-      name: (value) => (value.trim().length === 0 ? '名前を入力してください' : null),
-      amount: (value) => (typeof value !== 'number' ? '金額を入力してください' : null),
-    },
-  })
+  const [date, setDate] = useState(initialDate)
+  const [name, setName] = useState(target?.name ?? '')
+  const [amount, setAmount] = useState<number | undefined>(target?.amount)
+  const [kind, setKind] = useState<'income' | 'expense'>(target?.kind ?? 'expense')
+  const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
   const isEdit = target !== null && !target.isVirtual
   const isRuleBacked = isEdit && target?.ruleId !== undefined
   const absorbedAddons = isRuleBacked ? target?.addons ?? [] : []
 
-  const handleSubmit = async (values: TransactionFormValues) => {
-    if (typeof values.amount !== 'number') return
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    const nextErrors: typeof errors = {}
+    if (name.trim().length === 0) nextErrors.name = '名前を入力してください'
+    if (amount === undefined) nextErrors.amount = '金額を入力してください'
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0 || amount === undefined) return
+
     setSubmitting(true)
     try {
-      const roundedAmount = Math.round(values.amount)
+      const roundedAmount = Math.round(amount)
       if (isEdit && target?.txId) {
-        await updateTx({ id: target.txId, date: values.date, name: values.name, kind: values.kind, amount: roundedAmount })
+        await updateTx({ id: target.txId, date, name, kind, amount: roundedAmount })
       } else {
-        await createTx({ date: values.date, name: values.name, kind: values.kind, amount: roundedAmount })
+        await createTx({ date, name, kind, amount: roundedAmount })
       }
       notifySaved()
       onClose()
@@ -496,28 +496,26 @@ function TransactionForm({
     }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!target?.txId) return
     if (isRuleBacked) {
-      modals.openConfirmModal({
+      const ok = await confirm({
         title: '予定に戻す',
-        children: <Text size="sm">この確定を取り消して予定に戻しますか？</Text>,
-        labels: { confirm: '予定に戻す', cancel: 'キャンセル' },
-        confirmProps: { color: 'red' },
-        onConfirm: () => {
-          void doDelete()
-        },
+        description: 'この確定を取り消して予定に戻しますか？',
+        confirmLabel: '予定に戻す',
+        isDestructive: true,
       })
+      if (!ok) return
+      await doDelete()
     } else {
-      modals.openConfirmModal({
+      const ok = await confirm({
         title: '削除の確認',
-        children: <Text size="sm">この取引を削除しますか？</Text>,
-        labels: { confirm: '削除', cancel: 'キャンセル' },
-        confirmProps: { color: 'red' },
-        onConfirm: () => {
-          void doDelete()
-        },
+        description: 'この取引を削除しますか？',
+        confirmLabel: '削除',
+        isDestructive: true,
       })
+      if (!ok) return
+      await doDelete()
     }
   }
 
@@ -533,102 +531,110 @@ function TransactionForm({
     }
   }
 
-  const handleDeleteAbsorbedAddon = (addon: AddonInfo) => {
-    modals.openConfirmModal({
+  const handleDeleteAbsorbedAddon = async (addon: AddonInfo) => {
+    const ok = await confirm({
       title: '削除の確認',
-      children: <Text size="sm">内訳の記録から削除します。よろしいですか？</Text>,
-      labels: { confirm: '削除', cancel: 'キャンセル' },
-      confirmProps: { color: 'red' },
-      onConfirm: () => {
-        void doDeleteAbsorbedAddon(addon)
-      },
+      description: '内訳の記録から削除します。よろしいですか？',
+      confirmLabel: '削除',
+      isDestructive: true,
     })
+    if (!ok) return
+    await doDeleteAbsorbedAddon(addon)
   }
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
-      <Stack gap="md">
-        <TextInput
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <label className="flex flex-col gap-1.5 text-sm">
+        日付
+        <input
           type="date"
-          label="日付"
           min={minDate}
           disabled={submitting}
-          {...form.getInputProps('date')}
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
         />
+      </label>
 
-        <TextInput
-          label="名前"
-          placeholder="例: 家賃"
-          disabled={submitting}
-          {...form.getInputProps('name')}
-        />
+      <TextField isInvalid={!!errors.name} isDisabled={submitting}>
+        <Label>名前</Label>
+        <Input placeholder="例: 家賃" value={name} onChange={(e) => setName(e.target.value)} />
+        {errors.name && <FieldError>{errors.name}</FieldError>}
+      </TextField>
 
-        <NumberInput
-          label="金額"
-          placeholder="0"
-          thousandSeparator=","
-          hideControls
-          min={0}
-          max={1_000_000_000}
-          prefix="¥"
-          inputMode="numeric"
-          disabled={submitting}
-          {...form.getInputProps('amount')}
-        />
+      <NumberField
+        isInvalid={!!errors.amount}
+        isDisabled={submitting}
+        minValue={0}
+        maxValue={1_000_000_000}
+        value={amount}
+        onChange={setAmount}
+        formatOptions={{ style: 'currency', currency: 'JPY' }}
+      >
+        <Label>金額</Label>
+        <NumberField.Group>
+          <NumberField.DecrementButton />
+          <NumberField.Input className="flex-1" />
+          <NumberField.IncrementButton />
+        </NumberField.Group>
+        {errors.amount && <FieldError>{errors.amount}</FieldError>}
+      </NumberField>
 
-        <SegmentedControl
-          value={form.values.kind}
-          onChange={(value) => form.setFieldValue('kind', value as 'income' | 'expense')}
-          disabled={submitting}
-          data={[
-            { label: '支出', value: 'expense' },
-            { label: '収入', value: 'income' },
-          ]}
-        />
+      <ToggleButtonGroup
+        selectionMode="single"
+        disallowEmptySelection
+        selectedKeys={[kind]}
+        onSelectionChange={(keys) => {
+          const value = Array.from(keys)[0]
+          if (value === 'income' || value === 'expense') setKind(value)
+        }}
+        isDisabled={submitting}
+      >
+        <ToggleButton id="expense">支出</ToggleButton>
+        <ToggleButton id="income">
+          <ToggleButtonGroup.Separator />
+          収入
+        </ToggleButton>
+      </ToggleButtonGroup>
 
-        {absorbedAddons.length > 0 && (
-          <Stack gap={6}>
-            <Text size="sm" fw={500}>
-              この請求に含まれた上乗せ
-            </Text>
-            {absorbedAddons.map((addon) => (
-              <Group key={addon.txId} justify="space-between" wrap="nowrap">
-                <Text size="sm" c="dimmed" truncate style={{ minWidth: 0 }}>
-                  {addon.name}
-                </Text>
-                <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                  <Text size="sm" c={addon.kind === 'expense' ? 'red.7' : 'blue.7'}>
-                    {addon.kind === 'expense' ? '-' : '+'}
-                    {formatYen(addon.amount)}
-                  </Text>
-                  <Button
-                    variant="subtle"
-                    color="red"
-                    size="xs"
-                    loading={deletingAddonId === addon.txId}
-                    onClick={() => handleDeleteAbsorbedAddon(addon)}
-                  >
-                    削除
-                  </Button>
-                </Group>
-              </Group>
-            ))}
-          </Stack>
-        )}
+      {absorbedAddons.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium">この請求に含まれた上乗せ</span>
+          {absorbedAddons.map((addon) => (
+            <div key={addon.txId} className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-sm text-muted">{addon.name}</span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className={`text-sm tabular-nums ${addon.kind === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
+                  {addon.kind === 'expense' ? '-' : '+'}
+                  {formatYen(addon.amount)}
+                </span>
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  isPending={deletingAddonId === addon.txId}
+                  onPress={() => handleDeleteAbsorbedAddon(addon)}
+                >
+                  削除
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
-        <Group justify="space-between" mt="md">
-          {isEdit ? (
-            <Button variant="subtle" color="red" onClick={handleDelete} disabled={submitting}>
-              {isRuleBacked ? '予定に戻す' : '削除'}
-            </Button>
-          ) : (
-            <div />
-          )}
-          <Button type="submit" loading={submitting} disabled={submitting}>
-            保存
+      <div className="mt-2 flex justify-between">
+        {isEdit ? (
+          <Button variant="danger-soft" onPress={handleDelete} isDisabled={submitting}>
+            {isRuleBacked ? '予定に戻す' : '削除'}
           </Button>
-        </Group>
-      </Stack>
+        ) : (
+          <div />
+        )}
+        <Button type="submit" isPending={submitting} isDisabled={submitting}>
+          {submitting && <Spinner color="current" size="sm" />}
+          保存
+        </Button>
+      </div>
     </form>
   )
 }

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Badge, Divider, Group, Stack, Text, UnstyledButton } from '@mantine/core'
+import { Chip, Separator } from '@heroui/react'
 import type { ForecastRow } from '../lib/forecast'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
@@ -53,105 +53,94 @@ export function ForecastList({ rows, today, onRowClick }: ForecastListProps) {
 
   if (rows.length === 0) {
     return (
-      <Text c="dimmed" ta="center" py="xl">
+      <p className="py-8 text-center text-muted">
         表示できる予定がありません。ルールや取引を追加してください。
-      </Text>
+      </p>
     )
   }
 
   return (
-    <Stack gap={0}>
+    <div className="flex flex-col">
       {items.map((item) => {
         if (item.type === 'month') {
           const summary = monthSummaries.get(item.month)
           return (
-            <Divider
-              key={item.key}
-              label={<MonthDividerLabel month={item.month} summary={summary} />}
-              labelPosition="left"
-              mt="md"
-              mb="xs"
-            />
+            <div key={item.key} className="mt-4 mb-1.5 flex items-center gap-2">
+              <MonthDividerLabel month={item.month} summary={summary} />
+              <Separator className="flex-1" />
+            </div>
           )
         }
         if (item.type === 'today') {
-          return <Divider key={item.key} label="今日" labelPosition="center" color="blue" my="xs" />
+          return (
+            <div key={item.key} className="my-1.5 flex items-center gap-2">
+              <Separator className="flex-1" />
+              <span className="text-sm text-accent">今日</span>
+              <Separator className="flex-1" />
+            </div>
+          )
         }
         return <ForecastListRow key={item.key} row={item.row} onClick={() => onRowClick(item.row)} />
       })}
-    </Stack>
+    </div>
   )
 }
 
 function MonthDividerLabel({ month, summary }: { month: string; summary: MonthSummary | undefined }) {
   return (
-    <Group gap={6} wrap="nowrap">
-      <Text size="sm" fw={500}>
-        {formatMonthLabel(month)}
-      </Text>
+    <div className="flex shrink-0 items-center gap-1.5">
+      <span className="text-sm font-medium">{formatMonthLabel(month)}</span>
       {summary && (
-        <Text size="sm" c={summary.net >= 0 ? 'blue.7' : 'red.7'}>
+        <span className={`text-sm tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
           収支 {summary.net >= 0 ? '+' : ''}
           {formatYen(summary.net)}
-        </Text>
+        </span>
       )}
-    </Group>
+    </div>
   )
 }
 
 function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => void }) {
-  const amountColor = row.kind === 'expense' ? 'red.7' : 'blue.7'
+  const amountColor = row.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
   const amountSign = row.kind === 'expense' ? '-' : '+'
-  const balanceColor = row.balance < 0 ? 'red.7' : undefined
+  const balanceColor = row.balance < 0 ? 'text-red-600' : undefined
   const isConfirmed = !row.isVirtual && row.ruleId !== undefined
   const addonCount = row.addons?.length ?? 0
 
   return (
-    <UnstyledButton
+    <button
+      type="button"
       onClick={onClick}
-      py="xs"
-      px="sm"
-      bg={row.belowThreshold ? 'yellow.1' : undefined}
-      style={{ borderRadius: 'var(--mantine-radius-md)' }}
+      className={`rounded-md px-3 py-2 text-left ${row.belowThreshold ? 'bg-warning-soft' : ''}`}
     >
-      <Group justify="space-between" wrap="nowrap" align="flex-start">
-        <Group gap="xs" wrap="nowrap" align="flex-start" style={{ minWidth: 0 }}>
-          <Text size="sm" c="dimmed" style={{ flexShrink: 0, width: 40 }}>
-            {formatDateShort(row.date)}
-          </Text>
-          <Stack gap={0} style={{ minWidth: 0 }}>
-            <Group gap="xs" wrap="nowrap">
-              <Text size="sm" truncate>
-                {row.name}
-              </Text>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="w-10 shrink-0 text-sm text-muted">{formatDateShort(row.date)}</span>
+          <div className="flex min-w-0 flex-col gap-0">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-sm">{row.name}</span>
               {row.isVirtual && (
-                <Badge size="xs" variant="light" style={{ flexShrink: 0 }}>
+                <Chip size="sm" variant="soft" className="shrink-0">
                   予定
-                </Badge>
+                </Chip>
               )}
               {isConfirmed && (
-                <Badge size="xs" variant="light" color="teal" style={{ flexShrink: 0 }}>
+                <Chip size="sm" variant="soft" color="success" className="shrink-0">
                   確定
-                </Badge>
+                </Chip>
               )}
-            </Group>
-            {addonCount > 0 && (
-              <Text size="xs" c="dimmed">
-                上乗せ {addonCount}件
-              </Text>
-            )}
-          </Stack>
-        </Group>
-        <Stack gap={0} align="flex-end" style={{ flexShrink: 0 }}>
-          <Text size="sm" c={amountColor}>
+            </div>
+            {addonCount > 0 && <span className="text-xs text-muted">上乗せ {addonCount}件</span>}
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-0">
+          <span className={`text-sm tabular-nums ${amountColor}`}>
             {amountSign}
             {formatYen(row.amount)}
-          </Text>
-          <Text size="xs" c={balanceColor}>
-            {formatYen(row.balance)}
-          </Text>
-        </Stack>
-      </Group>
-    </UnstyledButton>
+          </span>
+          <span className={`text-xs tabular-nums ${balanceColor ?? ''}`}>{formatYen(row.balance)}</span>
+        </div>
+      </div>
+    </button>
   )
 }

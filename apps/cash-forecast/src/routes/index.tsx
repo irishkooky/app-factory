@@ -1,21 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  ActionIcon,
-  Affix,
-  Button,
-  Container,
-  Drawer,
-  Group,
-  Loader,
-  NumberInput,
-  SimpleGrid,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core'
-import { useForm } from '@mantine/form'
-import { notifications } from '@mantine/notifications'
+import { Button, Drawer, FieldError, Label, NumberField, Spinner } from '@heroui/react'
 import { IconPlus } from '@tabler/icons-react'
 import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/clerk-react'
@@ -25,7 +10,7 @@ import { addMonthsToDateClamped, formatDateShort, todayJST } from '../lib/date'
 import { buildForecast, type ForecastRow } from '../lib/forecast'
 import { buildBalanceSeries } from '../lib/chart'
 import { formatYen } from '../lib/money'
-import { notifyError, notifySaved } from '../lib/notify'
+import { notifyError, notifyQueue, notifySaved } from '../lib/notify'
 import { OnboardingView } from '../components/OnboardingView'
 import { ForecastList } from '../components/ForecastList'
 import { TransactionDrawer } from '../components/TransactionDrawer'
@@ -48,12 +33,11 @@ function useBillingReturnNotice() {
     if (billing === null) return
 
     if (billing === 'success') {
-      notifications.show({
+      notifyQueue.add({
         title: '決済を受け付けました',
-        message: 'プランへの反映まで数秒かかることがあります。',
-        color: 'teal',
-        autoClose: 8000,
-      })
+        description: 'プランへの反映まで数秒かかることがあります。',
+        variant: 'success',
+      }, { timeout: 8000 })
     }
     params.delete('billing')
     const query = params.toString()
@@ -66,12 +50,12 @@ function HomeComponent() {
   useBillingReturnNotice()
 
   return (
-    <Container size="xs" py="md">
-      <Stack gap="lg">
+    <div className="mx-auto max-w-sm px-4 py-4">
+      <div className="flex flex-col gap-6">
         <AuthLoading>
-          <Group justify="center" py="xl">
-            <Loader />
-          </Group>
+          <div className="flex justify-center py-8">
+            <Spinner />
+          </div>
         </AuthLoading>
 
         <Unauthenticated>
@@ -81,20 +65,20 @@ function HomeComponent() {
         <Authenticated>
           <AuthenticatedView />
         </Authenticated>
-      </Stack>
-    </Container>
+      </div>
+    </div>
   )
 }
 
 function UnauthenticatedView() {
   return (
-    <Stack gap="lg">
-      <Title order={1}>残高予測</Title>
-      <Text c="dimmed">基準残高と毎月の予定から、これから12ヶ月の残高推移を予測します。</Text>
+    <div className="flex flex-col gap-6">
+      <h1 className="text-3xl font-bold">残高予測</h1>
+      <p className="text-muted">基準残高と毎月の予定から、これから12ヶ月の残高推移を予測します。</p>
       <SignInButton mode="modal">
-        <Button size="md">Googleでログイン</Button>
+        <Button size="lg">Googleでログイン</Button>
       </SignInButton>
-    </Stack>
+    </div>
   )
 }
 
@@ -103,9 +87,9 @@ function AuthenticatedView() {
 
   if (settings === undefined) {
     return (
-      <Group justify="center" py="xl">
-        <Loader />
-      </Group>
+      <div className="flex justify-center py-8">
+        <Spinner />
+      </div>
     )
   }
 
@@ -155,9 +139,9 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
 
   if (forecast === undefined || balancePoints === undefined) {
     return (
-      <Group justify="center" py="xl">
-        <Loader />
-      </Group>
+      <div className="flex justify-center py-8">
+        <Spinner />
+      </div>
     )
   }
 
@@ -193,43 +177,43 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     : null
 
   return (
-    <Stack gap="lg">
-      <Group justify="space-between" align="center">
-        <Title order={4}>残高予測</Title>
-        <Group gap="xs">
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h4 className="text-lg font-semibold">残高予測</h4>
+        <div className="flex items-center gap-2">
           <PlanBadge />
           <UserButton />
-        </Group>
-      </Group>
+        </div>
+      </div>
 
-      <Stack gap={4}>
-        <Text fz={36} fw={700} c={currentBalance < 0 ? 'red.7' : undefined}>
+      <div className="flex flex-col gap-1">
+        <span className={`text-4xl font-bold tabular-nums ${currentBalance < 0 ? 'text-red-600' : ''}`}>
           {formatYen(currentBalance)}
-        </Text>
-        <Text size="sm" c={belowThresholdNow ? 'orange.7' : 'dimmed'}>
+        </span>
+        <span className={`text-sm tabular-nums ${belowThresholdNow ? 'text-warning' : 'text-muted'}`}>
           今後12ヶ月の最低残高 {formatYen(minBalance)}（{formatDateShort(minDate)}）
-        </Text>
-      </Stack>
+        </span>
+      </div>
 
       <ProGate title="残高推移グラフ" description="グラフ表示はProプラン限定です">
         <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
       </ProGate>
 
-      <SimpleGrid cols={2} spacing="xs">
-        <Button variant="light" size="xs" onClick={() => setReconcileOpen(true)}>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="secondary" size="sm" onPress={() => setReconcileOpen(true)}>
           残高を合わせる
         </Button>
-        <Button variant="light" size="xs" onClick={() => setRulesOpen(true)}>
+        <Button variant="secondary" size="sm" onPress={() => setRulesOpen(true)}>
           ルール管理
         </Button>
-        <Button variant="light" size="xs" onClick={() => setThresholdOpen(true)}>
+        <Button variant="secondary" size="sm" onPress={() => setThresholdOpen(true)}>
           しきい値
         </Button>
-        <Button variant="light" size="xs" onClick={() => setMonthlySummaryOpen(true)}>
+        <Button variant="secondary" size="sm" onPress={() => setMonthlySummaryOpen(true)}>
           月次
         </Button>
-        <BillingButton variant="light" size="xs" />
-      </SimpleGrid>
+        <BillingButton variant="secondary" size="sm" className="col-span-2" />
+      </div>
 
       <ForecastList
         rows={forecast}
@@ -240,19 +224,18 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         }}
       />
 
-      <Affix position={{ bottom: 24, right: 24 }}>
-        <ActionIcon
-          size="xl"
-          radius="xl"
-          aria-label="取引を追加"
-          onClick={() => {
-            setTxDrawerTarget(null)
-            setTxDrawerOpen(true)
-          }}
-        >
-          <IconPlus size={28} stroke={2.5} />
-        </ActionIcon>
-      </Affix>
+      <Button
+        isIconOnly
+        size="lg"
+        aria-label="取引を追加"
+        className="fixed right-6 bottom-6 rounded-full shadow-lg"
+        onPress={() => {
+          setTxDrawerTarget(null)
+          setTxDrawerOpen(true)
+        }}
+      >
+        <IconPlus size={28} stroke={2.5} />
+      </Button>
 
       <TransactionDrawer
         opened={txDrawerOpen}
@@ -283,7 +266,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onClose={() => setThresholdOpen(false)}
         currentThreshold={settings.threshold}
       />
-    </Stack>
+    </div>
   )
 }
 
@@ -297,14 +280,20 @@ function ThresholdDrawer({
   currentThreshold: number
 }) {
   return (
-    <Drawer opened={opened} onClose={onClose} position="bottom" title="しきい値">
-      {opened && <ThresholdForm currentThreshold={currentThreshold} onClose={onClose} />}
-    </Drawer>
+    <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
+      <Drawer.Content placement="bottom">
+        <Drawer.Dialog>
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <Drawer.Heading>しきい値</Drawer.Heading>
+          </Drawer.Header>
+          <Drawer.Body>
+            {opened && <ThresholdForm currentThreshold={currentThreshold} onClose={onClose} />}
+          </Drawer.Body>
+        </Drawer.Dialog>
+      </Drawer.Content>
+    </Drawer.Backdrop>
   )
-}
-
-type ThresholdFormValues = {
-  threshold: number | string
 }
 
 function ThresholdForm({
@@ -316,19 +305,19 @@ function ThresholdForm({
 }) {
   const setThreshold = useMutation(api.settings.setThreshold)
   const [submitting, setSubmitting] = useState(false)
+  const [threshold, setThresholdValue] = useState<number | undefined>(currentThreshold)
+  const [error, setError] = useState<string | null>(null)
 
-  const form = useForm<ThresholdFormValues>({
-    initialValues: { threshold: currentThreshold },
-    validate: {
-      threshold: (value) => (typeof value !== 'number' ? 'しきい値を入力してください' : null),
-    },
-  })
-
-  const handleSubmit = async (values: ThresholdFormValues) => {
-    if (typeof values.threshold !== 'number') return
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (threshold === undefined) {
+      setError('しきい値を入力してください')
+      return
+    }
+    setError(null)
     setSubmitting(true)
     try {
-      await setThreshold({ threshold: Math.round(values.threshold) })
+      await setThreshold({ threshold: Math.round(threshold) })
       notifySaved()
       onClose()
     } catch (err) {
@@ -339,28 +328,31 @@ function ThresholdForm({
   }
 
   return (
-    <form onSubmit={form.onSubmit(handleSubmit)}>
-      <Stack gap="md">
-        <Text size="sm" c="dimmed">
-          残高がこの金額を下回る行を強調表示します。
-        </Text>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <p className="text-sm text-muted">残高がこの金額を下回る行を強調表示します。</p>
 
-        <NumberInput
-          label="しきい値"
-          thousandSeparator=","
-          hideControls
-          min={0}
-          max={1_000_000_000}
-          prefix="¥"
-          inputMode="numeric"
-          disabled={submitting}
-          {...form.getInputProps('threshold')}
-        />
+      <NumberField
+        isInvalid={error !== null}
+        isDisabled={submitting}
+        minValue={0}
+        maxValue={1_000_000_000}
+        value={threshold}
+        onChange={setThresholdValue}
+        formatOptions={{ style: 'currency', currency: 'JPY' }}
+      >
+        <Label>しきい値</Label>
+        <NumberField.Group>
+          <NumberField.DecrementButton />
+          <NumberField.Input className="flex-1" />
+          <NumberField.IncrementButton />
+        </NumberField.Group>
+        {error && <FieldError>{error}</FieldError>}
+      </NumberField>
 
-        <Button type="submit" loading={submitting} disabled={submitting}>
-          保存
-        </Button>
-      </Stack>
+      <Button type="submit" isPending={submitting} isDisabled={submitting}>
+        {submitting && <Spinner color="current" size="sm" />}
+        保存
+      </Button>
     </form>
   )
 }
