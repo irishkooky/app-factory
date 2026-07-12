@@ -1,5 +1,6 @@
 node_modules
 dist
+.agents/scheduled_tasks.lock
 .wrangler
 .env*
 .DS_Store
