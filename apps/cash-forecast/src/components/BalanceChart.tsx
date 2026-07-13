@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BalancePoint } from '../lib/chart'
 import { formatDateShort } from '../lib/date'
 import { formatYen } from '../lib/money'
@@ -71,10 +71,16 @@ export function BalanceChart({ points, threshold, today }: BalanceChartProps) {
     return ticks.filter((_, i) => i % 2 === 0)
   }, [points])
 
+  const chartData = useMemo(
+    () => points.map((point) => ({ ...point, monthMinBalance: point.isMonthMin ? point.balance : null })),
+    [points],
+  )
+
   return (
     <div className="flex flex-col gap-1">
       <ResponsiveContainer width="100%" height={200}>
-        <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.15} strokeWidth={1} />
           <XAxis
             dataKey="date"
             ticks={monthTicks}
@@ -84,20 +90,30 @@ export function BalanceChart({ points, threshold, today }: BalanceChartProps) {
             tickLine={false}
             axisLine={true}
           />
-          <YAxis width={44} tickFormatter={formatManCompact} tickLine={false} axisLine={false} />
+          <YAxis
+            width={44}
+            tickFormatter={formatManCompact}
+            tick={{ fontSize: 10, fill: 'currentColor' }}
+            tickLine={false}
+            axisLine={false}
+          />
           <Tooltip
             formatter={(value) => formatYen(Number(value))}
             labelFormatter={(label) => (typeof label === 'string' ? formatDateShort(label) : label)}
           />
           <ReferenceLine y={threshold} stroke="#dc2626" label={{ value: 'しきい値', position: 'insideBottomRight', fontSize: 10 }} />
           <ReferenceLine x={today} stroke="#6b7280" />
+          {/* 日次残高の非表示ライン: Tooltip表示とY軸ドメイン計算のためだけに置く */}
+          <Line dataKey="balance" name="残高" stroke="none" dot={false} activeDot={false} legendType="none" isAnimationActive={false} />
           <Line
-            type="stepAfter"
-            dataKey="balance"
-            name="残高"
+            type="linear"
+            dataKey="monthMinBalance"
+            name="最低残高"
             stroke="var(--accent)"
             strokeWidth={2}
             dot={renderMonthMinDot(threshold)}
+            connectNulls
+            tooltipType="none"
             isAnimationActive={false}
           />
         </LineChart>
