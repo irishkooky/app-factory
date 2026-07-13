@@ -77,48 +77,45 @@ export function BalanceChart({ points, threshold, today }: BalanceChartProps) {
   )
 
   return (
-    <div className="flex flex-col gap-1">
-      <ResponsiveContainer width="100%" height={200}>
-        <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.15} strokeWidth={1} />
-          <XAxis
-            dataKey="date"
-            ticks={monthTicks}
-            interval={0}
-            tickFormatter={formatMonthTick}
-            tick={{ transform: 'translate(0, 10)', fontSize: 10, fill: 'currentColor' }}
-            tickLine={false}
-            axisLine={true}
-          />
-          <YAxis
-            width={44}
-            tickFormatter={formatManCompact}
-            tick={{ fontSize: 10, fill: 'currentColor' }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <Tooltip
-            formatter={(value) => formatYen(Number(value))}
-            labelFormatter={(label) => (typeof label === 'string' ? formatDateShort(label) : label)}
-          />
-          <ReferenceLine y={threshold} stroke="#dc2626" label={{ value: 'しきい値', position: 'insideBottomRight', fontSize: 10 }} />
-          <ReferenceLine x={today} stroke="#6b7280" />
-          {/* 日次残高の非表示ライン: Tooltip表示とY軸ドメイン計算のためだけに置く */}
-          <Line dataKey="balance" name="残高" stroke="none" dot={false} activeDot={false} legendType="none" isAnimationActive={false} />
-          <Line
-            type="linear"
-            dataKey="monthMinBalance"
-            name="最低残高"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            dot={renderMonthMinDot(threshold)}
-            connectNulls
-            tooltipType="none"
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-      <p className="text-xs text-muted">● は各月の最低残高・グレーの縦線は今日</p>
-    </div>
+    <ResponsiveContainer width="100%" height={200}>
+      <LineChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} stroke="currentColor" strokeOpacity={0.15} strokeWidth={1} />
+        <XAxis
+          dataKey="date"
+          ticks={monthTicks}
+          interval={0}
+          tickFormatter={formatMonthTick}
+          tick={{ transform: 'translate(0, 10)', fontSize: 10, fill: 'currentColor' }}
+          tickLine={false}
+          axisLine={true}
+        />
+        <YAxis
+          width={44}
+          tickFormatter={formatManCompact}
+          tick={{ fontSize: 10, fill: 'currentColor' }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <Tooltip
+          formatter={(value) => formatYen(Number(value))}
+          labelFormatter={(label) => (typeof label === 'string' ? formatDateShort(label) : label)}
+        />
+        <ReferenceLine y={threshold} stroke="#dc2626" label={{ value: 'しきい値', position: 'insideBottomRight', fontSize: 10 }} />
+        <ReferenceLine x={today} stroke="#6b7280" />
+        {/* 日次残高の非表示ライン: Tooltip表示とY軸ドメイン計算のためだけに置く */}
+        <Line dataKey="balance" name="残高" stroke="none" dot={false} activeDot={false} legendType="none" isAnimationActive={false} />
+        <Line
+          type="linear"
+          dataKey="monthMinBalance"
+          name="最低残高"
+          stroke="var(--accent)"
+          strokeWidth={2}
+          dot={renderMonthMinDot(threshold)}
+          connectNulls
+          tooltipType="none"
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   )
 }
