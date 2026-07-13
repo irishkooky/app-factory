@@ -3,7 +3,7 @@ import { Drawer, Table } from '@heroui/react'
 import type { ForecastRow } from '../lib/forecast'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
-import { summarizeByMonth } from '../lib/summary'
+import { averageSavings, summarizeByMonth } from '../lib/summary'
 import { ProGate } from './BillingControls'
 
 type MonthlySummaryDrawerProps = {
@@ -53,6 +53,7 @@ function MonthlySummaryContent({
 }) {
   const summaries = useMemo(() => summarizeByMonth(rows), [rows])
   const anchorMonth = monthOf(anchorDate)
+  const average = useMemo(() => averageSavings(summaries, anchorMonth), [summaries, anchorMonth])
 
   if (summaries.length === 0) {
     return <p className="py-8 text-center text-muted">表示できるデータがありません。</p>
@@ -106,7 +107,21 @@ function MonthlySummaryContent({
           </Table.Content>
         </Table.ScrollContainer>
       </Table>
-      <p className="text-xs text-muted">* 基準日以降の集計</p>
+      {average && (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted">平均貯蓄率（基準月を除く{average.months}ヶ月）</span>
+          <span className="tabular-nums">
+            {average.savingsRate === null ? '—' : `${Math.round(average.savingsRate * 100)}%`}
+            {'（'}
+            <span className={average.totalNet >= 0 ? 'text-blue-600' : 'text-red-600'}>
+              {average.totalNet >= 0 ? '+' : ''}
+              {formatYen(average.totalNet)}
+            </span>
+            {'）'}
+          </span>
+        </div>
+      )}
+      <p className="text-xs text-muted">* 基準日以降の集計（平均には含めません）</p>
     </div>
   )
 }
