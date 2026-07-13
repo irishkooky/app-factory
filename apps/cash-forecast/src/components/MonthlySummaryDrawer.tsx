@@ -61,52 +61,81 @@ function MonthlySummaryContent({
 
   return (
     <div className="flex flex-col gap-3">
-      <Table>
-        <Table.ScrollContainer>
-          <Table.Content aria-label="月次サマリー" className="min-w-[560px]">
-            <Table.Header>
-              <Table.Column>月</Table.Column>
-              <Table.Column className="text-right">収入</Table.Column>
-              <Table.Column className="text-right">支出</Table.Column>
-              <Table.Column className="text-right">収支</Table.Column>
-              <Table.Column className="text-right">貯蓄率</Table.Column>
-              <Table.Column className="text-right">最低残高</Table.Column>
-            </Table.Header>
-            <Table.Body>
-              {summaries.map((summary) => {
-                const isAnchorMonth = summary.month === anchorMonth
-                return (
-                  <Table.Row key={summary.month}>
-                    <Table.Cell>
-                      {formatMonthLabel(summary.month)}
-                      {isAnchorMonth && <span className="text-xs text-muted">*</span>}
-                    </Table.Cell>
-                    <Table.Cell className="text-right tabular-nums">{formatYen(summary.income)}</Table.Cell>
-                    <Table.Cell className="text-right tabular-nums">{formatYen(summary.expense)}</Table.Cell>
-                    <Table.Cell
-                      className={`text-right tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}
-                    >
-                      {summary.net >= 0 ? '+' : ''}
-                      {formatYen(summary.net)}
-                    </Table.Cell>
-                    <Table.Cell className="text-right tabular-nums">
-                      {summary.savingsRate === null ? '—' : `${Math.round(summary.savingsRate * 100)}%`}
-                    </Table.Cell>
-                    <Table.Cell className="text-right tabular-nums">
-                      <div className="flex flex-col items-end gap-0">
-                        <span className={summary.minBalance < threshold ? 'text-red-600' : undefined}>
-                          {formatYen(summary.minBalance)}
-                        </span>
-                        <span className="text-xs text-muted">{formatDateShort(summary.minBalanceDate)}</span>
-                      </div>
-                    </Table.Cell>
-                  </Table.Row>
-                )
-              })}
-            </Table.Body>
-          </Table.Content>
-        </Table.ScrollContainer>
-      </Table>
+      <div className="flex flex-col gap-2 sm:hidden">
+        {summaries.map((summary) => (
+          <div key={summary.month} className="rounded-xl border border-border p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium">
+                {formatMonthLabel(summary.month)}
+                {summary.month === anchorMonth && <span className="text-xs text-muted">*</span>}
+              </span>
+              <span className={`text-base font-semibold tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                収支 {summary.net >= 0 ? '+' : ''}{formatYen(summary.net)}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+              <SummaryStat label="収入" value={formatYen(summary.income)} />
+              <SummaryStat label="支出" value={formatYen(summary.expense)} />
+              <SummaryStat label="貯蓄率" value={summary.savingsRate === null ? '—' : `${Math.round(summary.savingsRate * 100)}%`} />
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-muted">最低残高</span>
+                <span className="flex flex-col items-end gap-0">
+                  <span className={`tabular-nums ${summary.minBalance < threshold ? 'text-red-600' : ''}`}>{formatYen(summary.minBalance)}</span>
+                  <span className="text-xs text-muted">{formatDateShort(summary.minBalanceDate)}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden sm:block">
+        <Table>
+          <Table.ScrollContainer>
+            <Table.Content aria-label="月次サマリー" className="min-w-[560px]">
+              <Table.Header>
+                <Table.Column>月</Table.Column>
+                <Table.Column className="text-right">収入</Table.Column>
+                <Table.Column className="text-right">支出</Table.Column>
+                <Table.Column className="text-right">収支</Table.Column>
+                <Table.Column className="text-right">貯蓄率</Table.Column>
+                <Table.Column className="text-right">最低残高</Table.Column>
+              </Table.Header>
+              <Table.Body>
+                {summaries.map((summary) => {
+                  const isAnchorMonth = summary.month === anchorMonth
+                  return (
+                    <Table.Row key={summary.month}>
+                      <Table.Cell>
+                        {formatMonthLabel(summary.month)}
+                        {isAnchorMonth && <span className="text-xs text-muted">*</span>}
+                      </Table.Cell>
+                      <Table.Cell className="text-right tabular-nums">{formatYen(summary.income)}</Table.Cell>
+                      <Table.Cell className="text-right tabular-nums">{formatYen(summary.expense)}</Table.Cell>
+                      <Table.Cell
+                        className={`text-right tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}
+                      >
+                        {summary.net >= 0 ? '+' : ''}
+                        {formatYen(summary.net)}
+                      </Table.Cell>
+                      <Table.Cell className="text-right tabular-nums">
+                        {summary.savingsRate === null ? '—' : `${Math.round(summary.savingsRate * 100)}%`}
+                      </Table.Cell>
+                      <Table.Cell className="text-right tabular-nums">
+                        <div className="flex flex-col items-end gap-0">
+                          <span className={summary.minBalance < threshold ? 'text-red-600' : undefined}>
+                            {formatYen(summary.minBalance)}
+                          </span>
+                          <span className="text-xs text-muted">{formatDateShort(summary.minBalanceDate)}</span>
+                        </div>
+                      </Table.Cell>
+                    </Table.Row>
+                  )
+                })}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+        </Table>
+      </div>
       {average && (
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted">平均貯蓄率（基準月を除く{average.months}ヶ月）</span>
@@ -122,6 +151,15 @@ function MonthlySummaryContent({
         </div>
       )}
       <p className="text-xs text-muted">* 基準日以降の集計（平均には含めません）</p>
+    </div>
+  )
+}
+
+function SummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-muted">{label}</span>
+      <span className="tabular-nums">{value}</span>
     </div>
   )
 }

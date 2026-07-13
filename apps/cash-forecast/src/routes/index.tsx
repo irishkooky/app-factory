@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Button, Drawer, FieldError, Label, NumberField, Spinner } from '@heroui/react'
-import { IconPlus } from '@tabler/icons-react'
+import { IconMenu2, IconPlus } from '@tabler/icons-react'
 import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/clerk-react'
 import { api } from '../../convex/_generated/api'
@@ -18,7 +18,8 @@ import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
 import { BalanceChart } from '../components/BalanceChart'
-import { BillingButton, PlanBadge, ProGate } from '../components/BillingControls'
+import { MenuDrawer } from '../components/MenuDrawer'
+import { PlanBadge, ProGate } from '../components/BillingControls'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -113,6 +114,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [rulesOpen, setRulesOpen] = useState(false)
   const [thresholdOpen, setThresholdOpen] = useState(false)
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const forecast = useMemo(() => {
     if (transactions === undefined || rules === undefined) return undefined
@@ -183,6 +185,9 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         <div className="flex items-center gap-2">
           <PlanBadge />
           <UserButton />
+          <Button isIconOnly variant="tertiary" aria-label="メニュー" onPress={() => setMenuOpen(true)}>
+            <IconMenu2 size={20} />
+          </Button>
         </div>
       </div>
 
@@ -198,22 +203,6 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
       <ProGate title="残高推移グラフ" description="グラフ表示はProプラン限定です">
         <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
       </ProGate>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="secondary" size="sm" onPress={() => setReconcileOpen(true)}>
-          残高を合わせる
-        </Button>
-        <Button variant="secondary" size="sm" onPress={() => setRulesOpen(true)}>
-          ルール管理
-        </Button>
-        <Button variant="secondary" size="sm" onPress={() => setThresholdOpen(true)}>
-          しきい値
-        </Button>
-        <Button variant="secondary" size="sm" onPress={() => setMonthlySummaryOpen(true)}>
-          月次
-        </Button>
-        <BillingButton variant="secondary" size="sm" className="col-span-2" />
-      </div>
 
       <ForecastList
         rows={forecast}
@@ -265,6 +254,15 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         opened={thresholdOpen}
         onClose={() => setThresholdOpen(false)}
         currentThreshold={settings.threshold}
+      />
+
+      <MenuDrawer
+        opened={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onReconcile={() => { setMenuOpen(false); setReconcileOpen(true) }}
+        onRules={() => { setMenuOpen(false); setRulesOpen(true) }}
+        onThreshold={() => { setMenuOpen(false); setThresholdOpen(true) }}
+        onMonthlySummary={() => { setMenuOpen(false); setMonthlySummaryOpen(true) }}
       />
     </div>
   )
