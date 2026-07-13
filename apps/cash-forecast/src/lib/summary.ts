@@ -60,3 +60,41 @@ export function summarizeByMonth(rows: ForecastRow[]): MonthSummary[] {
       };
     });
 }
+
+export type AverageSavings = {
+  months: number; // 集計対象の月数（除外後）
+  totalIncome: number;
+  totalExpense: number;
+  totalNet: number;
+  savingsRate: number | null; // totalNet / totalIncome。totalIncome <= 0 のとき null
+};
+
+/**
+ * 月次サマリーの加重平均貯蓄率（Σnet / Σincome）を求める。
+ * 単純平均（各月のsavingsRateの平均）ではなく、収入で重み付けした平均にすることで
+ * 低収入月の極端な率に引きずられないようにする。
+ * excludeMonth（基準月＝部分月）は集計から除外する。
+ * 除外後に対象月が0ならnullを返す。
+ */
+export function averageSavings(summaries: MonthSummary[], excludeMonth: string): AverageSavings | null {
+  const targets = summaries.filter((s) => s.month !== excludeMonth);
+  if (targets.length === 0) {
+    return null;
+  }
+
+  let totalIncome = 0;
+  let totalExpense = 0;
+  for (const s of targets) {
+    totalIncome += s.income;
+    totalExpense += s.expense;
+  }
+  const totalNet = totalIncome - totalExpense;
+
+  return {
+    months: targets.length,
+    totalIncome,
+    totalExpense,
+    totalNet,
+    savingsRate: totalIncome > 0 ? totalNet / totalIncome : null,
+  };
+}
