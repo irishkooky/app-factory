@@ -17,3 +17,15 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
 }
+
+/*
+ * 下から出るドロワーは既定で全幅（w-full）・左寄せ（content--bottom は justify なし）。
+ * PC で画面いっぱいに広がるのを防ぐため、幅を制限して中央寄せにする。
+ * mobile は従来どおり全幅シート（sm: 未満では max-width を効かせない）。
+ * 個別のドロワーで sm:max-w-* を指定すればこの既定値を上書きできる（月次サマリーは sm:max-w-2xl）。
+ */
+@layer components {
+  .drawer__dialog--bottom {
+    @apply mx-auto sm:max-w-md;
+  }
+}
