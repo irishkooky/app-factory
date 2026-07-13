@@ -90,6 +90,15 @@ export const getForUser = internalQuery({
   },
 });
 
+// requirePro は ctx.db に依存するため action から直接呼べない。
+// action からは ctx.runQuery(internal.billing.assertProForAction, { userId }) 経由で使う。
+export const assertProForAction = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    await requirePro(ctx, userId);
+  },
+});
+
 // Checkout Session を作成し、そのURLを返す。
 export const createCheckoutSession = action({
   args: {},

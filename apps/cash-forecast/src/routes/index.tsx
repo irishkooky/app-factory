@@ -8,12 +8,14 @@ import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { addMonthsToDateClamped, formatDateShort, todayJST } from '../lib/date'
 import { buildForecast, type ForecastRow } from '../lib/forecast'
+import { buildHistoryRows, type HistoryRow } from '../lib/history'
 import { buildBalanceSeries } from '../lib/chart'
 import { formatYen } from '../lib/money'
 import { notifyError, notifyQueue, notifySaved } from '../lib/notify'
 import { OnboardingView } from '../components/OnboardingView'
 import { ForecastList } from '../components/ForecastList'
 import { TransactionDrawer } from '../components/TransactionDrawer'
+import { HistoryEditDrawer } from '../components/HistoryEditDrawer'
 import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
@@ -107,9 +109,12 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
 
   const transactions = useQuery(api.transactions.listAfter, { after: settings.anchorDate })
   const rules = useQuery(api.rules.list)
+  const historyTxs = useQuery(api.transactions.listHistory)
 
   const [txDrawerOpen, setTxDrawerOpen] = useState(false)
   const [txDrawerTarget, setTxDrawerTarget] = useState<ForecastRow | null>(null)
+  const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false)
+  const [historyDrawerTarget, setHistoryDrawerTarget] = useState<HistoryRow | null>(null)
   const [reconcileOpen, setReconcileOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [thresholdOpen, setThresholdOpen] = useState(false)
@@ -128,6 +133,11 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     })
   }, [transactions, rules, settings.anchorDate, settings.anchorBalance, settings.threshold, horizonEnd])
 
+  const historyRows = useMemo(() => {
+    if (historyTxs === undefined) return undefined
+    return buildHistoryRows({ anchorBalance: settings.anchorBalance, txs: historyTxs })
+  }, [historyTxs, settings.anchorBalance])
+
   const balancePoints = useMemo(() => {
     if (forecast === undefined) return undefined
     return buildBalanceSeries({
@@ -139,7 +149,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     })
   }, [forecast, settings.anchorDate, settings.anchorBalance, today, horizonEnd])
 
-  if (forecast === undefined || balancePoints === undefined) {
+  if (forecast === undefined || balancePoints === undefined || historyRows === undefined) {
     return (
       <div className="flex justify-center py-8">
         <Spinner />
@@ -177,6 +187,12 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const liveDrawerTarget = txDrawerTarget
     ? (forecast.find((row) => row.key === txDrawerTarget.key) ?? txDrawerTarget)
     : null
+  const liveHistoryDrawerTarget = historyDrawerTarget
+    ? (historyRows.find((row) => row.txId === historyDrawerTarget.txId) ?? historyDrawerTarget)
+    : null
+
+  // 「残高を合わせる」対象: 基準日より後・今日以下の予定・確定・手入力行（=まだ実績化されていない過去分）
+  const pendingRows = forecast.filter((row) => settings.anchorDate < row.date && row.date <= today)
 
   return (
     <div className="flex flex-col gap-6">
@@ -211,6 +227,11 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
           setTxDrawerTarget(row)
           setTxDrawerOpen(true)
         }}
+        historyRows={historyRows}
+        onHistoryRowClick={(row) => {
+          setHistoryDrawerTarget(row)
+          setHistoryDrawerOpen(true)
+        }}
       />
 
       <Button
@@ -234,10 +255,21 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         target={liveDrawerTarget}
       />
 
+      <HistoryEditDrawer
+        opened={historyDrawerOpen}
+        onClose={() => setHistoryDrawerOpen(false)}
+        anchorDate={settings.anchorDate}
+        target={liveHistoryDrawerTarget}
+      />
+
       <ReconcileDrawer
         opened={reconcileOpen}
         onClose={() => setReconcileOpen(false)}
         currentBalance={currentBalance}
+        anchorDate={settings.anchorDate}
+        anchorBalance={settings.anchorBalance}
+        pendingRows={pendingRows}
+        historyRows={historyRows}
       />
 
       <RulesDrawer opened={rulesOpen} onClose={() => setRulesOpen(false)} rules={rules} />
@@ -246,6 +278,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         opened={monthlySummaryOpen}
         onClose={() => setMonthlySummaryOpen(false)}
         rows={forecast}
+        historyRows={historyRows}
         anchorDate={settings.anchorDate}
         threshold={settings.threshold}
       />

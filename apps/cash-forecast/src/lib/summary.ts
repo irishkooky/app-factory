@@ -1,5 +1,13 @@
-import type { ForecastRow } from "./forecast";
 import { monthOf } from "./date";
+
+// summarizeByMonth が要求する最小限の形。ForecastRow / HistoryRow はどちらもこれを満たす
+// （構造的部分型のため、フィールドが多いぶんには問題ない）。
+export type MoneyRow = {
+  date: string;
+  kind: "income" | "expense";
+  amount: number;
+  balance: number;
+};
 
 export type MonthSummary = {
   month: string; // "YYYY-MM"
@@ -19,7 +27,7 @@ type MonthBucket = {
 };
 
 /** buildForecast の出力（アドオン合算・吸収処理済みの最終行。date昇順前提）を月ごとに集計する。 */
-export function summarizeByMonth(rows: ForecastRow[]): MonthSummary[] {
+export function summarizeByMonth(rows: MoneyRow[]): MonthSummary[] {
   const byMonth = new Map<string, MonthBucket>();
 
   for (const row of rows) {

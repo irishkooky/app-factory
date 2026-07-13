@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
-import { Drawer, Table } from '@heroui/react'
+import { Chip, Drawer, Table } from '@heroui/react'
 import type { ForecastRow } from '../lib/forecast'
+import type { HistoryRow } from '../lib/history'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { averageSavings, summarizeByMonth } from '../lib/summary'
@@ -10,6 +11,7 @@ type MonthlySummaryDrawerProps = {
   opened: boolean
   onClose: () => void
   rows: ForecastRow[]
+  historyRows?: HistoryRow[]
   anchorDate: string
   threshold: number
 }
@@ -18,6 +20,7 @@ export function MonthlySummaryDrawer({
   opened,
   onClose,
   rows,
+  historyRows,
   anchorDate,
   threshold,
 }: MonthlySummaryDrawerProps) {
@@ -32,7 +35,12 @@ export function MonthlySummaryDrawer({
           <Drawer.Body>
             {opened && (
               <ProGate title="月次サマリー" description="月次サマリーはProプラン限定です">
-                <MonthlySummaryContent rows={rows} anchorDate={anchorDate} threshold={threshold} />
+                <MonthlySummaryContent
+                  rows={rows}
+                  historyRows={historyRows ?? []}
+                  anchorDate={anchorDate}
+                  threshold={threshold}
+                />
               </ProGate>
             )}
           </Drawer.Body>
@@ -44,15 +52,19 @@ export function MonthlySummaryDrawer({
 
 function MonthlySummaryContent({
   rows,
+  historyRows,
   anchorDate,
   threshold,
 }: {
   rows: ForecastRow[]
+  historyRows: HistoryRow[]
   anchorDate: string
   threshold: number
 }) {
-  const summaries = useMemo(() => summarizeByMonth(rows), [rows])
   const anchorMonth = monthOf(anchorDate)
+  // 実績（過去の確定行）と予測行をまとめて月ごとに集計する。基準月は実績部分・予測部分の両方を含みうる。
+  const summaries = useMemo(() => summarizeByMonth([...historyRows, ...rows]), [historyRows, rows])
+  const historyMonths = useMemo(() => new Set(historyRows.map((r) => monthOf(r.date))), [historyRows])
   const average = useMemo(() => averageSavings(summaries, anchorMonth), [summaries, anchorMonth])
 
   if (summaries.length === 0) {
@@ -65,9 +77,14 @@ function MonthlySummaryContent({
         {summaries.map((summary) => (
           <div key={summary.month} className="rounded-xl border border-border p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium">
+              <span className="flex items-center gap-1.5 text-sm font-medium">
                 {formatMonthLabel(summary.month)}
                 {summary.month === anchorMonth && <span className="text-xs text-muted">*</span>}
+                {summary.month !== anchorMonth && historyMonths.has(summary.month) && (
+                  <Chip size="sm" variant="soft">
+                    実績
+                  </Chip>
+                )}
               </span>
               <span className={`text-base font-semibold tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                 収支 {summary.net >= 0 ? '+' : ''}{formatYen(summary.net)}
@@ -103,11 +120,19 @@ function MonthlySummaryContent({
               <Table.Body>
                 {summaries.map((summary) => {
                   const isAnchorMonth = summary.month === anchorMonth
+                  const isHistoryMonth = !isAnchorMonth && historyMonths.has(summary.month)
                   return (
                     <Table.Row key={summary.month}>
                       <Table.Cell>
-                        {formatMonthLabel(summary.month)}
-                        {isAnchorMonth && <span className="text-xs text-muted">*</span>}
+                        <span className="flex items-center gap-1.5">
+                          {formatMonthLabel(summary.month)}
+                          {isAnchorMonth && <span className="text-xs text-muted">*</span>}
+                          {isHistoryMonth && (
+                            <Chip size="sm" variant="soft">
+                              実績
+                            </Chip>
+                          )}
+                        </span>
                       </Table.Cell>
                       <Table.Cell className="text-right tabular-nums">{formatYen(summary.income)}</Table.Cell>
                       <Table.Cell className="text-right tabular-nums">{formatYen(summary.expense)}</Table.Cell>

@@ -17,6 +17,29 @@ export const listAfter = query({
   },
 });
 
+// 認証ユーザーの settings.anchorDate 以下の date を持つ全 transactions を返す（履歴表示用）。
+// actual フラグでは絞らない。実績導入前に作られた行（旧・確定行など）も履歴として見せるため。
+export const listHistory = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    if (!settings) {
+      return [];
+    }
+    return ctx.db
+      .query("transactions")
+      .withIndex("by_user_date", (q) => q.eq("userId", identity.subject).lte("date", settings.anchorDate))
+      .collect();
+  },
+});
+
 export const create = mutation({
   args: {
     date: v.string(),
@@ -129,7 +152,16 @@ export const update = mutation({
     if (!settings) {
       throw new Error("先に残高の初期設定を行ってください");
     }
-    if (date <= settings.anchorDate) {
+    // 判定は actual フラグではなく「行の現在位置」で行う。
+    // 実績導入前に作られ actual===undefined のまま基準日以前に取り残された旧行（レガシー行）も
+    // 履歴として編集できる必要があるため。
+    const isHistoryRow = existing.actual === true || existing.date <= settings.anchorDate;
+    if (isHistoryRow) {
+      // 履歴行（実績・レガシー問わず）は過去の記録なので、基準日より未来の日付には変更できない（逆向きガード）。
+      if (date > settings.anchorDate) {
+        throw new Error("実績は基準日以前の日付にしてください");
+      }
+    } else if (date <= settings.anchorDate) {
       throw new Error(`基準日(${settings.anchorDate})以前の日付には追加できません`);
     }
 
