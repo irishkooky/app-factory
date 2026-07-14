@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cash-forecast",
+      "runtimeExecutable": "vp",
+      "runtimeArgs": ["dev"],
+      "cwd": "apps/cash-forecast",
+      "port": 5173
+    }
+  ]
+}

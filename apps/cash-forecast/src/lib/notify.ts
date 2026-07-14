@@ -16,6 +16,9 @@ export function notifyDeleted(message = '削除しました') {
   notifyQueue.add({ title: message, variant: 'success' })
 }
 
+// ConvexError の場合は .data（このアプリでは日本語メッセージ）を優先して表示する。
+// 本番デプロイメントは通常の Error のメッセージをクライアントに渡さず "Server Error" に
+// 置き換えるため、意味のあるメッセージを見せたい箇所はサーバー側で ConvexError を使う想定。
 function extractErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof ConvexError) {
     const data: unknown = err.data
