@@ -1,5 +1,5 @@
 import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { assertAmount, assertAnchorBalance, assertDateString, assertMonthString, assertName } from "./validate";
@@ -25,7 +25,7 @@ async function deleteAddonsForKey(
 
 function assertInRange(date: string, oldAnchorDate: string, newAnchorDate: string): void {
   if (!(date > oldAnchorDate && date <= newAnchorDate)) {
-    throw new Error("日付が今回の照合対象期間外です");
+    throw new ConvexError("日付が今回の照合対象期間外です");
   }
 }
 
@@ -66,7 +66,7 @@ export const commit = mutation({
   handler: async (ctx, { newAnchorDate, newAnchorBalance, batchId, ops }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
     const userId = identity.subject;
 
@@ -75,17 +75,17 @@ export const commit = mutation({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
     if (!settings) {
-      throw new Error("先に残高の初期設定を行ってください");
+      throw new ConvexError("先に残高の初期設定を行ってください");
     }
 
     assertDateString(newAnchorDate, "基準日");
     assertAnchorBalance(newAnchorBalance);
     if (batchId.trim().length === 0) {
-      throw new Error("batchIdが不正です");
+      throw new ConvexError("batchIdが不正です");
     }
     const oldAnchorDate = settings.anchorDate;
     if (newAnchorDate < oldAnchorDate) {
-      throw new Error("基準日は現在より過去に戻せません");
+      throw new ConvexError("基準日は現在より過去に戻せません");
     }
 
     for (const op of ops) {
@@ -93,7 +93,7 @@ export const commit = mutation({
         case "materializeRule": {
           const rule = await ctx.db.get(op.ruleId);
           if (!rule || rule.userId !== userId) {
-            throw new Error("権限がありません");
+            throw new ConvexError("権限がありません");
           }
           assertMonthString(op.ruleMonth);
           assertDateString(op.date, "日付");
@@ -109,7 +109,7 @@ export const commit = mutation({
             .collect();
           const hasOverride = existingRows.some((row) => row.addon !== true);
           if (hasOverride) {
-            throw new Error("この月は既に確定済みです");
+            throw new ConvexError("この月は既に確定済みです");
           }
 
           await ctx.db.insert("transactions", {
@@ -131,7 +131,7 @@ export const commit = mutation({
         case "confirmTx": {
           const tx = await ctx.db.get(op.txId);
           if (!tx || tx.userId !== userId) {
-            throw new Error("権限がありません");
+            throw new ConvexError("権限がありません");
           }
           assertInRange(tx.date, oldAnchorDate, newAnchorDate);
 
@@ -145,7 +145,7 @@ export const commit = mutation({
         case "deleteTx": {
           const tx = await ctx.db.get(op.txId);
           if (!tx || tx.userId !== userId) {
-            throw new Error("権限がありません");
+            throw new ConvexError("権限がありません");
           }
           if (tx.ruleId !== undefined && tx.ruleMonth !== undefined) {
             await deleteAddonsForKey(ctx, userId, tx.ruleId, tx.ruleMonth);
@@ -156,11 +156,11 @@ export const commit = mutation({
         case "postponeTx": {
           const tx = await ctx.db.get(op.txId);
           if (!tx || tx.userId !== userId) {
-            throw new Error("権限がありません");
+            throw new ConvexError("権限がありません");
           }
           assertDateString(op.newDate, "先送り先の日付");
           if (op.newDate <= newAnchorDate) {
-            throw new Error("先送り先は新しい基準日より後にしてください");
+            throw new ConvexError("先送り先は新しい基準日より後にしてください");
           }
           await ctx.db.patch(op.txId, { date: op.newDate });
           break;
@@ -189,7 +189,7 @@ export const commit = mutation({
           // rule が存在する場合は所有権を確認する。addon行自体は by_user_rule インデックスの
           // userId 等値条件で常にこのユーザーの行に限定されるため、個別行のuserId一致は保証済み。
           if (rule && rule.userId !== userId) {
-            throw new Error("権限がありません");
+            throw new ConvexError("権限がありません");
           }
           await deleteAddonsForKey(ctx, userId, op.ruleId, op.ruleMonth);
           break;

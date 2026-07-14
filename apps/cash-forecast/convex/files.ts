@@ -1,6 +1,6 @@
 // スクショOCR取り込み用のファイルアップロード。通常ランタイム（ctx.db が使える）。
 import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { requirePro } from "./billing";
 
 // Convexの一時ストレージへの署名付きアップロードURLを発行する。
@@ -11,7 +11,7 @@ export const generateUploadUrl = mutation({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
     await requirePro(ctx, identity.subject);
     return ctx.storage.generateUploadUrl();
@@ -32,7 +32,7 @@ export const cleanup = mutation({
   handler: async (ctx, { storageIds }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
     for (const storageId of storageIds) {
       try {

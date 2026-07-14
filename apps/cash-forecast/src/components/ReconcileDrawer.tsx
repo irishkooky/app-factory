@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import {
   Button,
   Checkbox,
@@ -367,6 +367,7 @@ function OcrReconcileForm({
   const extractStatement = useAction(api.ocr.extractStatement)
   const commit = useMutation(api.reconcile.commit)
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<File[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
   const [extracting, setExtracting] = useState(false)
@@ -408,14 +409,24 @@ function OcrReconcileForm({
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? [])
+    // 表示は React state 側の files を出典にするため、同じファイルを選び直せるよう
+    // ネイティブ input の内部状態はここでリセットしておく（iOS等でinput自体のラベル表示には依存しない）。
     e.target.value = ''
     if (selected.length === 0) return
     if (selected.length > MAX_OCR_IMAGES) {
       setFileError('一度に選べるのはスクショ5枚までです')
+      setFiles([])
+      setResult(null)
       return
     }
     setFileError(null)
     setFiles(selected)
+    setResult(null)
+  }
+
+  const handleClearFiles = () => {
+    setFiles([])
+    setFileError(null)
     setResult(null)
   }
 
@@ -620,14 +631,45 @@ function OcrReconcileForm({
       </p>
 
       <div className="flex flex-col gap-2">
+        {/* ネイティブ input のラベル表示（iOS等で「ファイル未選択」のまま更新されないことがある）には
+            依存しない。選択状態は files state から描画し、input 自体は非表示にして ref 経由で開く。 */}
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           multiple
           disabled={busy}
           onChange={handleFileChange}
-          className="text-sm"
+          className="sr-only"
+          aria-hidden
+          tabIndex={-1}
         />
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onPress={() => fileInputRef.current?.click()} isDisabled={busy}>
+            ファイルを選択
+          </Button>
+          <div className="min-w-0 flex-1 text-sm text-muted">
+            {files.length === 0 ? (
+              '未選択'
+            ) : (
+              <span className="block truncate">
+                {files.length}枚選択中: {files.map((f) => f.name).join(', ')}
+              </span>
+            )}
+          </div>
+          {files.length > 0 && (
+            <Button
+              isIconOnly
+              size="sm"
+              variant="tertiary"
+              aria-label="選択を解除"
+              onPress={handleClearFiles}
+              isDisabled={busy}
+            >
+              ✕
+            </Button>
+          )}
+        </div>
         {fileError && <p className="text-xs text-danger">{fileError}</p>}
         <Button variant="secondary" onPress={handleExtract} isPending={extracting} isDisabled={busy || files.length === 0}>
           {extracting && <Spinner color="current" size="sm" />}

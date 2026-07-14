@@ -9,7 +9,7 @@
 // - process.env はモジュールトップレベルではなく handler 内でのみ読む。
 
 import { action } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { GoogleGenAI } from "@google/genai";
 import { internal } from "./_generated/api";
 
@@ -45,6 +45,24 @@ function isValidCalendarDate(date: string): boolean {
   const day = Number(dayStr);
   const d = new Date(Date.UTC(year, month - 1, day));
   return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+
+// Gemini呼び出しの失敗を、ユーザーに意味のある日本語メッセージへ分類する。
+// Convex本番デプロイメントは通常の Error のメッセージをクライアントに渡さず "Server Error" に
+// 置き換えてしまうため、ここで ConvexError（.data がそのままクライアントに届く）に変換する。
+// 元エラーは呼び出し側で console.error に残す。
+function classifyGeminiError(err: unknown): ConvexError<string> {
+  const message = err instanceof Error ? err.message : String(err);
+  if (/RESOURCE_EXHAUSTED/.test(message) || /\b429\b/.test(message)) {
+    return new ConvexError(
+      "Gemini APIの利用枠を使い切っています。Google AI Studioの請求設定を確認してください",
+    );
+  }
+  // 裸の400はペイロード過大等キーと無関係な理由でも返るため、キー無効とは断定しない
+  if (/API_KEY_INVALID/.test(message) || /\b403\b/.test(message)) {
+    return new ConvexError("Gemini APIキーが無効です。管理者向け: GEMINI_API_KEY を確認してください");
+  }
+  return new ConvexError("明細の読み取りに失敗しました。時間をおいて再度お試しください");
 }
 
 // Geminiの出力（信頼できない）を1行ずつ再検証する。不正なら null を返し、呼び出し側で落とす。
@@ -84,30 +102,30 @@ export const extractStatement = action({
     try {
       const identity = await ctx.auth.getUserIdentity();
       if (!identity) {
-        throw new Error("ログインが必要です");
+        throw new ConvexError("ログインが必要です");
       }
       await ctx.runQuery(internal.billing.assertProForAction, { userId: identity.subject });
 
       if (storageIds.length === 0 || storageIds.length > MAX_IMAGES) {
-        throw new Error("一度に取り込めるのは5枚までです");
+        throw new ConvexError("一度に取り込めるのは5枚までです");
       }
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        throw new Error("OCR機能が未設定です（管理者向け: GEMINI_API_KEY を設定してください）");
+        throw new ConvexError("OCR機能が未設定です（管理者向け: GEMINI_API_KEY を設定してください）");
       }
 
       const imageParts: { inlineData: { mimeType: string; data: string } }[] = [];
       for (const storageId of storageIds) {
         const blob = await ctx.storage.get(storageId);
         if (!blob) {
-          throw new Error("画像の取得に失敗しました");
+          throw new ConvexError("画像の取得に失敗しました");
         }
         if (!blob.type.startsWith("image/")) {
-          throw new Error("画像ファイルのみ対応しています");
+          throw new ConvexError("画像ファイルのみ対応しています");
         }
         if (blob.size > MAX_IMAGE_BYTES) {
-          throw new Error("画像は1枚あたり4MBまでにしてください");
+          throw new ConvexError("画像は1枚あたり4MBまでにしてください");
         }
         const buffer = await blob.arrayBuffer();
         const base64 = Buffer.from(buffer).toString("base64");
@@ -123,50 +141,58 @@ export const extractStatement = action({
 - UI要素・広告・合計行・見出しは無視してください。判読できない行は含めないでください。`;
 
       const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }, ...imageParts],
-          },
-        ],
-        config: {
-          temperature: 0,
-          responseMimeType: "application/json",
-          responseJsonSchema: {
-            type: "object",
-            properties: {
-              rows: {
-                type: "array",
-                items: {
-                  type: "object",
-                  properties: {
-                    date: { type: "string", description: "YYYY-MM-DD" },
-                    name: { type: "string" },
-                    kind: { type: "string", enum: ["income", "expense"] },
-                    amount: { type: "integer" },
-                    balanceAfter: { type: "integer" },
+      let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
+      try {
+        response = await ai.models.generateContent({
+          model: GEMINI_MODEL,
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }, ...imageParts],
+            },
+          ],
+          config: {
+            temperature: 0,
+            responseMimeType: "application/json",
+            responseJsonSchema: {
+              type: "object",
+              properties: {
+                rows: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      date: { type: "string", description: "YYYY-MM-DD" },
+                      name: { type: "string" },
+                      kind: { type: "string", enum: ["income", "expense"] },
+                      amount: { type: "integer" },
+                      balanceAfter: { type: "integer" },
+                    },
+                    required: ["date", "name", "kind", "amount"],
                   },
-                  required: ["date", "name", "kind", "amount"],
                 },
               },
+              required: ["rows"],
             },
-            required: ["rows"],
           },
-        },
-      });
+        });
+      } catch (err) {
+        // 元エラー（例: 429 RESOURCE_EXHAUSTED）はConvexログに残しつつ、
+        // ユーザーには分類済みの日本語メッセージだけを返す。
+        console.error("ocr: Gemini API呼び出しに失敗しました", err);
+        throw classifyGeminiError(err);
+      }
 
       const text = response.text;
       if (!text) {
-        throw new Error("OCR結果を取得できませんでした");
+        throw new ConvexError("OCR結果を取得できませんでした");
       }
 
       let parsed: unknown;
       try {
         parsed = JSON.parse(text);
       } catch {
-        throw new Error("OCR結果の解析に失敗しました");
+        throw new ConvexError("OCR結果の解析に失敗しました");
       }
 
       const rawRows =
