@@ -1,4 +1,5 @@
 import { ToastQueue } from '@heroui/react'
+import { ConvexError } from 'convex/values'
 
 // wrapUpdate をデフォルトの View Transitions ベースから同期実行に差し替える。
 // バックグラウンドタブ（document.visibilityState !== 'visible'）では
@@ -15,10 +16,23 @@ export function notifyDeleted(message = '削除しました') {
   notifyQueue.add({ title: message, variant: 'success' })
 }
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ConvexError) {
+    const data: unknown = err.data
+    if (typeof data === 'string' && data.length > 0) return data
+    if (data && typeof data === 'object' && 'message' in data) {
+      const message = (data as { message?: unknown }).message
+      if (typeof message === 'string' && message.length > 0) return message
+    }
+  }
+  if (err instanceof Error && err.message.length > 0) return err.message
+  return fallback
+}
+
 export function notifyError(err: unknown, fallback: string) {
   notifyQueue.add({
     title: 'エラー',
-    description: err instanceof Error ? err.message : fallback,
+    description: extractErrorMessage(err, fallback),
     variant: 'danger',
   })
 }
