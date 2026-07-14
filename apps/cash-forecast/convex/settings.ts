@@ -1,5 +1,5 @@
 import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { assertAnchorBalance, assertDateString, assertThreshold } from "./validate";
 
 const DEFAULT_THRESHOLD = 100_000;
@@ -24,7 +24,7 @@ export const setAnchor = mutation({
   handler: async (ctx, { anchorDate, anchorBalance }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
     assertDateString(anchorDate, "基準日");
     assertAnchorBalance(anchorBalance);
@@ -52,7 +52,7 @@ export const setThreshold = mutation({
   handler: async (ctx, { threshold }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
     assertThreshold(threshold);
 
@@ -61,7 +61,7 @@ export const setThreshold = mutation({
       .withIndex("by_user", (q) => q.eq("userId", identity.subject))
       .unique();
     if (!existing) {
-      throw new Error("先に残高の初期設定を行ってください");
+      throw new ConvexError("先に残高の初期設定を行ってください");
     }
     await ctx.db.patch(existing._id, { threshold });
   },

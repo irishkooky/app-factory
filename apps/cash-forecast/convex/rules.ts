@@ -36,7 +36,7 @@ export const create = mutation({
   handler: async (ctx, { name, kind, amount, dayOfMonth, endDate }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
 
     if (!(await isPro(ctx, identity.subject))) {
@@ -83,11 +83,11 @@ export const update = mutation({
   handler: async (ctx, { id, name, kind, amount, dayOfMonth, endDate }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
     const existing = await ctx.db.get(id);
     if (!existing || existing.userId !== identity.subject) {
-      throw new Error("権限がありません");
+      throw new ConvexError("権限がありません");
     }
     const trimmedName = assertName(name);
     assertAmount(amount);
@@ -112,11 +112,11 @@ export const remove = mutation({
   handler: async (ctx, { id }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("ログインが必要です");
+      throw new ConvexError("ログインが必要です");
     }
     const existing = await ctx.db.get(id);
     if (!existing || existing.userId !== identity.subject) {
-      throw new Error("権限がありません");
+      throw new ConvexError("権限がありません");
     }
 
     // このルールを参照する取引を月ごとに分類する。
