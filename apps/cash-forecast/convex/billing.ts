@@ -132,7 +132,7 @@ export const createCheckoutSession = action({
     });
 
     if (!session.url) {
-      throw new Error("Stripe Checkout Sessionの作成に失敗しました（urlがありません）");
+      throw new ConvexError("Stripe Checkout Sessionの作成に失敗しました（urlがありません）");
     }
     return session.url;
   },
