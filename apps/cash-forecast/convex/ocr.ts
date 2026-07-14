@@ -17,7 +17,9 @@ import { internal } from "./_generated/api";
 declare const process: { env: Record<string, string | undefined> };
 
 // 新しいFlash系モデルがGAになったらここだけ差し替える。
-const GEMINI_MODEL = "gemini-2.5-flash";
+// 注意: 古いモデルは新規Googleプロジェクトでは404になることがある
+// （gemini-2.5-flash は2026年時点で新規ユーザーに提供終了済み）。
+const GEMINI_MODEL = "gemini-3.5-flash";
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
@@ -61,6 +63,11 @@ function classifyGeminiError(err: unknown): ConvexError<string> {
   // 裸の400はペイロード過大等キーと無関係な理由でも返るため、キー無効とは断定しない
   if (/API_KEY_INVALID/.test(message) || /\b403\b/.test(message)) {
     return new ConvexError("Gemini APIキーが無効です。管理者向け: GEMINI_API_KEY を確認してください");
+  }
+  if (/NOT_FOUND/.test(message) || /\b404\b/.test(message)) {
+    return new ConvexError(
+      "OCRモデルが利用できません。管理者向け: convex/ocr.ts の GEMINI_MODEL を現行モデルに更新してください",
+    );
   }
   return new ConvexError("明細の読み取りに失敗しました。時間をおいて再度お試しください");
 }
