@@ -19,7 +19,11 @@ declare const process: { env: Record<string, string | undefined> };
 // 新しいFlash系モデルがGAになったらここだけ差し替える。
 // 注意: 古いモデルは新規Googleプロジェクトでは404になることがある
 // （gemini-2.5-flash は2026年時点で新規ユーザーに提供終了済み）。
-const GEMINI_MODEL = "gemini-3.5-flash";
+// 主モデルが混雑(503)しているときは軽量モデルへフォールバックする
+const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.1-flash-lite"] as const;
+
+// リトライ間隔。
+const RETRY_DELAY_MS = 2000;
 
 const MAX_IMAGES = 5;
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB
@@ -66,10 +70,27 @@ function classifyGeminiError(err: unknown): ConvexError<string> {
   }
   if (/NOT_FOUND/.test(message) || /\b404\b/.test(message)) {
     return new ConvexError(
-      "OCRモデルが利用できません。管理者向け: convex/ocr.ts の GEMINI_MODEL を現行モデルに更新してください",
+      "OCRモデルが利用できません。管理者向け: convex/ocr.ts の GEMINI_MODELS を現行モデルに更新してください",
     );
   }
+  if (/UNAVAILABLE/.test(message) || /\b503\b/.test(message) || /high demand|overloaded/i.test(message)) {
+    return new ConvexError("Gemini APIが混雑しています。1〜2分待ってから再度お試しください");
+  }
   return new ConvexError("明細の読み取りに失敗しました。時間をおいて再度お試しください");
+}
+
+// 一時的（リトライして解決しうる）エラーかどうか。429/RESOURCE_EXHAUSTED（クォータ枯渇）は
+// リトライしても状況は変わらずクォータを無駄に消費するだけなのでリトライ対象に含めない。
+// 対象は 503/UNAVAILABLE/overloaded 系と、ネットワーク起因の一時的な失敗のみ。
+function isTransientGeminiError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  if (/UNAVAILABLE/.test(message) || /\b503\b/.test(message) || /high demand|overloaded/i.test(message)) {
+    return true;
+  }
+  if (/fetch failed/i.test(message) || /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/.test(message)) {
+    return true;
+  }
+  return false;
 }
 
 // Geminiの出力（信頼できない）を1行ずつ再検証する。不正なら null を返し、呼び出し側で落とす。
@@ -148,46 +169,73 @@ export const extractStatement = action({
 - UI要素・広告・合計行・見出しは無視してください。判読できない行は含めないでください。`;
 
       const ai = new GoogleGenAI({ apiKey });
-      let response: Awaited<ReturnType<typeof ai.models.generateContent>>;
-      try {
-        response = await ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: prompt }, ...imageParts],
-            },
-          ],
-          config: {
-            temperature: 0,
-            responseMimeType: "application/json",
-            responseJsonSchema: {
-              type: "object",
-              properties: {
-                rows: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      date: { type: "string", description: "YYYY-MM-DD" },
-                      name: { type: "string" },
-                      kind: { type: "string", enum: ["income", "expense"] },
-                      amount: { type: "integer" },
-                      balanceAfter: { type: "integer" },
-                    },
-                    required: ["date", "name", "kind", "amount"],
+      const requestConfig = {
+        contents: [
+          {
+            role: "user" as const,
+            parts: [{ text: prompt }, ...imageParts],
+          },
+        ],
+        config: {
+          temperature: 0,
+          responseMimeType: "application/json",
+          responseJsonSchema: {
+            type: "object",
+            properties: {
+              rows: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    date: { type: "string", description: "YYYY-MM-DD" },
+                    name: { type: "string" },
+                    kind: { type: "string", enum: ["income", "expense"] },
+                    amount: { type: "integer" },
+                    balanceAfter: { type: "integer" },
                   },
+                  required: ["date", "name", "kind", "amount"],
                 },
               },
-              required: ["rows"],
             },
+            required: ["rows"],
           },
-        });
-      } catch (err) {
-        // 元エラー（例: 429 RESOURCE_EXHAUSTED）はConvexログに残しつつ、
-        // ユーザーには分類済みの日本語メッセージだけを返す。
-        console.error("ocr: Gemini API呼び出しに失敗しました", err);
-        throw classifyGeminiError(err);
+        },
+      };
+
+      // 試行順: 主モデル → (2秒待って)主モデル再試行 → フォールバックモデル →
+      // (2秒待って)フォールバックモデル再試行（最大4回）。
+      // 一時的エラー（503/UNAVAILABLE/overloaded系、ネットワーク起因の失敗）のみリトライする。
+      // 429(クォータ枯渇)等のリトライ対象外エラーは即座に分類してthrowする。
+      const [primaryModel, fallbackModel] = GEMINI_MODELS;
+      const attemptModels = [primaryModel, primaryModel, fallbackModel, fallbackModel];
+
+      let response: Awaited<ReturnType<typeof ai.models.generateContent>> | undefined;
+      let lastErr: unknown;
+      for (let attempt = 0; attempt < attemptModels.length; attempt++) {
+        const model = attemptModels[attempt];
+        if (attempt > 0 && attemptModels[attempt] === attemptModels[attempt - 1]) {
+          // 同一モデルへの再試行の前だけ待つ（モデル切り替え直後は待たない）。
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        }
+        try {
+          response = await ai.models.generateContent({ model, ...requestConfig });
+          lastErr = undefined;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.error(
+            `ocr: Gemini API呼び出しに失敗しました (model=${model}, attempt=${attempt + 1}/${attemptModels.length})`,
+            err,
+          );
+          if (!isTransientGeminiError(err)) {
+            // リトライ対象外（クォータ枯渇・キー無効等）は即座に分類してthrowする。
+            throw classifyGeminiError(err);
+          }
+        }
+      }
+      if (response === undefined) {
+        // 全試行が一時的エラーで尽きた場合。最後のエラーを分類してthrowする。
+        throw classifyGeminiError(lastErr);
       }
 
       const text = response.text;
