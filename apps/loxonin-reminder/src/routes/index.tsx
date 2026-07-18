@@ -16,13 +16,14 @@ import {
   Select,
   Stack,
   Text,
+  TextInput,
   Title,
   Tooltip,
 } from '@mantine/core'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { DEFAULT_NOTIFY_AFTER_MINUTES, NOTIFY_OPTIONS } from '../constants'
-import { formatDateTime, formatDuration, formatTime } from '../lib/format'
+import { formatDateTime, formatDuration, formatTime, toDatetimeLocalValue } from '../lib/format'
 import {
   getDeviceId,
   getExistingSubscription,
@@ -260,7 +261,13 @@ function TakeDoseSection({
   const [modalOpened, setModalOpened] = useState(false)
   const [isTaking, setIsTaking] = useState(false)
   const [justTaken, setJustTaken] = useState(false)
+  const [takeError, setTakeError] = useState<string | null>(null)
   const justTakenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [backfillModalOpened, setBackfillModalOpened] = useState(false)
+  const [backfillValue, setBackfillValue] = useState('')
+  const [backfillError, setBackfillError] = useState<string | null>(null)
+  const [isSubmittingBackfill, setIsSubmittingBackfill] = useState(false)
 
   const elapsedSinceLastMs = lastDose ? Date.now() - lastDose.takenAt : null
 
@@ -272,16 +279,24 @@ function TakeDoseSection({
     }
   }, [])
 
+  function showJustTaken() {
+    setJustTaken(true)
+    if (justTakenTimerRef.current) {
+      clearTimeout(justTakenTimerRef.current)
+    }
+    justTakenTimerRef.current = setTimeout(() => setJustTaken(false), 4000)
+  }
+
   async function recordDose() {
+    setTakeError(null)
     setIsTaking(true)
     try {
       await take({ deviceId })
       setModalOpened(false)
-      setJustTaken(true)
-      if (justTakenTimerRef.current) {
-        clearTimeout(justTakenTimerRef.current)
-      }
-      justTakenTimerRef.current = setTimeout(() => setJustTaken(false), 4000)
+      showJustTaken()
+    } catch (err) {
+      setModalOpened(false)
+      setTakeError(err instanceof Error ? err.message : '記録に失敗しました。')
     } finally {
       setIsTaking(false)
     }
@@ -295,14 +310,52 @@ function TakeDoseSection({
     }
   }
 
+  function openBackfillModal() {
+    setBackfillValue(toDatetimeLocalValue(Date.now()))
+    setBackfillError(null)
+    setBackfillModalOpened(true)
+  }
+
+  async function handleBackfillSubmit() {
+    setBackfillError(null)
+    const parsed = new Date(backfillValue).getTime()
+    if (Number.isNaN(parsed)) {
+      setBackfillError('日時を入力してください')
+      return
+    }
+    if (parsed > Date.now()) {
+      setBackfillError('未来の日時は指定できません')
+      return
+    }
+
+    setIsSubmittingBackfill(true)
+    try {
+      await take({ deviceId, takenAt: parsed })
+      setBackfillModalOpened(false)
+      showJustTaken()
+    } catch (err) {
+      setBackfillError(err instanceof Error ? err.message : '記録に失敗しました。')
+    } finally {
+      setIsSubmittingBackfill(false)
+    }
+  }
+
   return (
     <Stack gap="xs">
       <Button size="xl" fullWidth onClick={handleClick} loading={isTaking}>
         💊 いま飲んだ
       </Button>
+      <Button variant="subtle" size="xs" onClick={openBackfillModal}>
+        過去の服用を記録する
+      </Button>
       {justTaken && (
         <Text c="teal" size="sm" ta="center">
           記録しました
+        </Text>
+      )}
+      {takeError && (
+        <Text c="red" size="sm" ta="center">
+          {takeError}
         </Text>
       )}
 
@@ -317,6 +370,38 @@ function TakeDoseSection({
               やめる
             </Button>
             <Button color="red" onClick={recordDose} loading={isTaking}>
+              記録する
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      <Modal
+        opened={backfillModalOpened}
+        onClose={() => setBackfillModalOpened(false)}
+        title="過去の服用を記録する"
+      >
+        <Stack gap="md">
+          <TextInput
+            type="datetime-local"
+            label="服用した日時"
+            value={backfillValue}
+            onChange={(event) => setBackfillValue(event.currentTarget.value)}
+            max={toDatetimeLocalValue(Date.now())}
+          />
+          <Text size="xs" c="dimmed">
+            通知は最も新しい服用時刻を基準に送られます
+          </Text>
+          {backfillError && (
+            <Text c="red" size="sm">
+              {backfillError}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button variant="default" onClick={() => setBackfillModalOpened(false)}>
+              やめる
+            </Button>
+            <Button onClick={handleBackfillSubmit} loading={isSubmittingBackfill}>
               記録する
             </Button>
           </Group>
