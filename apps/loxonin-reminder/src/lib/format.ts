@@ -27,3 +27,14 @@ export function formatDateTime(epochMs: number): string {
   const day = date.getDate();
   return `${month}/${day} ${formatTime(epochMs)}`;
 }
+
+/** epoch ms を端末ローカル時刻の「YYYY-MM-DDTHH:mm」に整形する(datetime-local 入力用) */
+export function toDatetimeLocalValue(epochMs: number): string {
+  const date = new Date(epochMs);
+  const year = date.getFullYear().toString().padStart(4, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
