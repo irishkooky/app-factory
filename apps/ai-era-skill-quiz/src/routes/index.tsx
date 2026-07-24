@@ -218,7 +218,10 @@ function HomeComponent() {
                   variant={variant}
                   color={color}
                   onClick={() => handleSelect(idx, q)}
-                  disabled={isAnswered}
+                  // disabled にすると色付け（正解teal/不正解red）が打ち消されるため、
+                  // 色付きボタンは pointerEvents で操作だけ無効化する
+                  disabled={isAnswered && color === undefined}
+                  style={color !== undefined ? { pointerEvents: 'none' } : undefined}
                 >
                   {choice}
                 </Button>
