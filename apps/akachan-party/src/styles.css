@@ -1,0 +1,61 @@
+html,
+body {
+  background: radial-gradient(circle at 50% -10%, #2a1550 0%, #120821 45%, #05030a 100%);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@keyframes blobPulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes floatUp {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.blob-pulse {
+  animation: blobPulse 2.4s ease-in-out infinite alternate;
+}
+
+.pop-in {
+  animation: popIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.float-up {
+  animation: floatUp 0.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blob-pulse,
+  .pop-in,
+  .float-up {
+    animation: none !important;
+  }
+}
