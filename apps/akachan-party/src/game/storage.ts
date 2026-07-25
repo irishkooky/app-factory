@@ -13,15 +13,15 @@ function isValidSession(value: unknown): value is Session {
     return (
       typeof player.id === 'string' &&
       typeof player.name === 'string' &&
-      typeof player.colorIndex === 'number' &&
-      typeof player.score === 'number'
+      Number.isFinite(player.colorIndex) &&
+      Number.isFinite(player.score)
     )
   })
   if (!playersValid) return false
 
   if (typeof v.babyName !== 'string') return false
   if (typeof v.useBaby !== 'boolean') return false
-  if (typeof v.round !== 'number') return false
+  if (!Number.isFinite(v.round)) return false
 
   return true
 }

@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   Title,
+  UnstyledButton,
 } from '@mantine/core'
 import { OracleScreen } from '../components/OracleScreen'
 import { RevealScreen } from '../components/RevealScreen'
@@ -98,7 +99,11 @@ function IndexComponent() {
     const nextNum = playerCounter + 1
     const id: PlayerId = `p${nextNum}`
     setPlayerCounter(nextNum)
-    setPlayers((prev) => [...prev, { id, name, colorIndex: prev.length, score: 0 }])
+    setPlayers((prev) => {
+      // 途中で削除→追加すると colorIndex が重複しうるため、既存の最大値+1を採番する
+      const nextColorIndex = Math.max(-1, ...prev.map((p) => p.colorIndex)) + 1
+      return [...prev, { id, name, colorIndex: nextColorIndex, score: 0 }]
+    })
   }
 
   const removePlayer = (id: PlayerId) => {
@@ -139,6 +144,9 @@ function IndexComponent() {
   }
 
   const enterOracleOrAutoPick = () => {
+    // 参加者が0〜1人の状態でも呼ばれうる（例: あとから参加モーダルで消しきった直後の連打）ので、
+    // ここで必ず弾いておく。呼び出し元のボタンも disabled にしているが、保険として二重に守る。
+    if (players.length < 2) return
     if (useBaby) {
       setScreen('oracle')
       return
@@ -164,6 +172,8 @@ function IndexComponent() {
   }
 
   const handleSelectPointMode = () => {
+    if (players.length < 2) return
+    setMode('point')
     const { item, rest } = draw(pointBag, POINT_QUESTIONS)
     setPointBag(rest)
     setCurrentPointQuestion(item ?? POINT_QUESTIONS[0])
@@ -284,6 +294,7 @@ function IndexComponent() {
         onPlayerSelected={handleOraclePlayerSelected}
         onTimeout={handleOracleAutoPick}
         onAdultPick={handleOracleAutoPick}
+        onBack={() => setScreen('menu')}
       />
     )
   }
@@ -299,8 +310,20 @@ function IndexComponent() {
     )
   }
 
+  // どの分岐にも合致しない状態（例: 参加者が0〜1人になった状態で reveal/card/score に
+  // 迷い込んだ場合）を検知し、空白画面で詰まないよう最後の砦としてフォールバック画面を出す。
+  const validScreenRendered =
+    screen === 'setup' ||
+    screen === 'menu' ||
+    (screen === 'card' && Boolean(mode && selectedPlayer)) ||
+    screen === 'countdown' ||
+    (screen === 'score' && Boolean(selectedPlayer && babble)) ||
+    screen === 'award'
+
   return (
     <Container size="sm" px="md" py="xl">
+      {!validScreenRendered && <FallbackScreen onBackToMenu={() => setScreen('menu')} />}
+
       {screen === 'setup' && (
         <SetupScreen
           players={players}
@@ -345,7 +368,12 @@ function IndexComponent() {
       )}
 
       {screen === 'countdown' && (
-        <CountdownScreen question={currentPointQuestion} players={players} onResult={handleCountdownResult} />
+        <CountdownScreen
+          question={currentPointQuestion}
+          players={players}
+          onResult={handleCountdownResult}
+          onBack={() => setScreen('menu')}
+        />
       )}
 
       {screen === 'score' && selectedPlayer && babble && (
@@ -367,6 +395,26 @@ function IndexComponent() {
 }
 
 // ============================================================
+// フォールバック — どの画面条件にも合致しなかった場合の最後の砦
+// ============================================================
+
+function FallbackScreen({ onBackToMenu }: { onBackToMenu: () => void }) {
+  return (
+    <Stack gap="lg" align="center" py="xl">
+      <Title order={2} ta="center">
+        あれ、うまく表示できませんでした
+      </Title>
+      <Text c="dimmed" ta="center">
+        参加者が足りないか、状態が壊れてしまったようです。メニューからやり直してください。
+      </Text>
+      <Button size="xl" onClick={onBackToMenu}>
+        メニューに戻る
+      </Button>
+    </Stack>
+  )
+}
+
+// ============================================================
 // 参加者の追加フォーム（setup画面／あとから参加モーダルで共有）
 // ============================================================
 
@@ -374,10 +422,12 @@ function PlayerEntryForm({
   players,
   onAdd,
   onRemove,
+  allowRemove,
 }: {
   players: Player[]
   onAdd: (name: string) => void
   onRemove: (id: PlayerId) => void
+  allowRemove: boolean
 }) {
   const [name, setName] = useState('')
   const atLimit = players.length >= 20
@@ -425,16 +475,18 @@ function PlayerEntryForm({
             variant="filled"
             styles={{ root: { backgroundColor: colorOf(p.colorIndex), color: '#1a1a1a' } }}
             rightSection={
-              <ActionIcon
-                size="xs"
-                radius="xl"
-                variant="transparent"
-                color="dark"
-                aria-label={`${p.name}を削除`}
-                onClick={() => onRemove(p.id)}
-              >
-                ×
-              </ActionIcon>
+              allowRemove ? (
+                <ActionIcon
+                  size="xs"
+                  radius="xl"
+                  variant="transparent"
+                  color="dark"
+                  aria-label={`${p.name}を削除`}
+                  onClick={() => onRemove(p.id)}
+                >
+                  ×
+                </ActionIcon>
+              ) : undefined
             }
           >
             {p.name}
@@ -487,7 +539,7 @@ function SetupScreen({
         <Paper withBorder radius="lg" p="md">
           <Stack gap="xs">
             <Text size="sm">
-              前回の続きから（{savedSession.players.length}人・{savedSession.round}ラウンド）
+              前回の続きから（{savedSession.players.length}人・{savedSession.round}ラウンド終了時点）
             </Text>
             <Group gap="xs">
               <Button size="sm" variant="light" onClick={onContinue}>
@@ -502,7 +554,7 @@ function SetupScreen({
       )}
 
       <Paper withBorder radius="lg" p="md">
-        <PlayerEntryForm players={players} onAdd={onAdd} onRemove={onRemove} />
+        <PlayerEntryForm players={players} onAdd={onAdd} onRemove={onRemove} allowRemove />
       </Paper>
 
       <TextInput
@@ -565,6 +617,12 @@ function MenuScreen({
 
       <ScoreBoard players={players} />
 
+      {players.length < 2 && (
+        <Text size="sm" c="yellow.4" ta="center">
+          参加者が2人未満です。「＋ あとから参加」で追加してください
+        </Text>
+      )}
+
       <SimpleGrid cols={2} spacing="sm">
         {MODE_INFO.map((info) => (
           <Card
@@ -573,8 +631,14 @@ function MenuScreen({
             radius="lg"
             p="lg"
             component="button"
+            disabled={players.length < 2}
             onClick={() => onSelectMode(info.mode)}
-            style={{ cursor: 'pointer', textAlign: 'left', minHeight: 140 }}
+            style={{
+              cursor: players.length < 2 ? 'not-allowed' : 'pointer',
+              textAlign: 'left',
+              minHeight: 140,
+              opacity: players.length < 2 ? 0.5 : 1,
+            }}
           >
             <Stack gap={6}>
               <Text style={{ fontSize: '2.2rem' }}>{info.emoji}</Text>
@@ -602,7 +666,7 @@ function MenuScreen({
       </Stack>
 
       <Modal opened={addPlayerModalOpened} onClose={onCloseAddPlayer} title="あとから参加" centered>
-        <PlayerEntryForm players={players} onAdd={onAdd} onRemove={onRemove} />
+        <PlayerEntryForm players={players} onAdd={onAdd} onRemove={onRemove} allowRemove={false} />
       </Modal>
     </Stack>
   )
@@ -632,7 +696,7 @@ function CardScreen({
   const heading = mode === 'talk' ? 'お題トーク' : mode === 'mission' ? 'ミッション' : '赤ちゃん占い'
 
   return (
-    <Stack gap="lg" className="float-up">
+    <Stack gap="lg" justify="center" className="float-up" style={{ minHeight: '100dvh' }}>
       <Paper withBorder radius="lg" p="xl">
         <Stack gap="md" align="center">
           <Text fw={700} c={colorOf(player.colorIndex)} size="sm">
@@ -655,7 +719,7 @@ function CardScreen({
               </Alert>
             </Stack>
           ) : (
-            <Text fw={700} ta="center" style={{ fontSize: 'clamp(1.4rem, 6vw, 2.4rem)', lineHeight: 1.3 }}>
+            <Text fw={700} ta="center" style={{ fontSize: 'clamp(1.6rem, 7vw, 2.6rem)', lineHeight: 1.3 }}>
               {text}
             </Text>
           )}
@@ -688,27 +752,31 @@ function CountdownScreen({
   question,
   players,
   onResult,
+  onBack,
 }: {
   question: string
   players: Player[]
   onResult: (playerId: PlayerId | null) => void
+  onBack: () => void
 }) {
   const [phase, setPhase] = useState<CountdownPhase>('idle')
   const [count, setCount] = useState(3)
 
+  // カウントダウン: 1秒ごとに減算するだけの純粋な更新にする（setState updater 内で
+  // 別の state を更新しない）。0に達したフェーズ遷移は別の effect で行う。
   useEffect(() => {
     if (phase !== 'counting') return
     const id = setInterval(() => {
-      setCount((c) => {
-        if (c <= 1) {
-          setPhase('go')
-          return 0
-        }
-        return c - 1
-      })
+      setCount((c) => c - 1)
     }, 1000)
     return () => clearInterval(id)
   }, [phase])
+
+  useEffect(() => {
+    if (phase === 'counting' && count <= 0) {
+      setPhase('go')
+    }
+  }, [phase, count])
 
   const handleStart = () => {
     setCount(3)
@@ -716,7 +784,11 @@ function CountdownScreen({
   }
 
   return (
-    <Stack gap="lg" align="center">
+    <Stack gap="lg" align="center" justify="center" style={{ minHeight: '100dvh' }}>
+      <UnstyledButton onClick={onBack} style={{ opacity: 0.4, alignSelf: 'flex-start' }}>
+        <Text size="xs">← もどる</Text>
+      </UnstyledButton>
+
       <Text fw={700} ta="center" style={{ fontSize: 'clamp(1.4rem, 6vw, 2.2rem)', lineHeight: 1.3 }}>
         {question}
       </Text>
@@ -732,7 +804,7 @@ function CountdownScreen({
         </>
       )}
 
-      {phase === 'counting' && (
+      {phase === 'counting' && count > 0 && (
         <Text fw={900} className="pop-in" style={{ fontSize: 'clamp(4rem, 30vw, 10rem)' }}>
           {count}
         </Text>
@@ -784,15 +856,23 @@ function ScoreScreen({
   onScore: (delta: number) => void
 }) {
   return (
-    <Stack gap="lg">
+    <Stack gap="lg" justify="center" style={{ minHeight: '100dvh' }}>
       <Title order={2} ta="center">
         {player.name}のトーク、どうだった？
       </Title>
 
-      <Paper withBorder radius="lg" p="md">
-        <Text size="sm" fw={600}>
-          {babyName}の講評: 『{babble.voice}』（＝{babble.meaning}）
-        </Text>
+      <Paper withBorder radius="lg" p="lg" style={{ borderColor: 'var(--mantine-color-grape-5)', borderWidth: 2 }}>
+        <Stack gap={4} align="center">
+          <Text size="xs" c="dimmed">
+            {babyName}の講評
+          </Text>
+          <Text fw={900} ta="center" style={{ fontSize: 'clamp(1.8rem, 8vw, 3rem)', lineHeight: 1.2 }}>
+            『{babble.voice}』
+          </Text>
+          <Text size="md" c="dimmed" ta="center">
+            （＝ {babble.meaning}）
+          </Text>
+        </Stack>
       </Paper>
 
       <Stack gap="sm">
@@ -880,7 +960,7 @@ function AwardScreen({
 
       <Stack gap="sm" mt="md">
         <Button size="xl" color="grape" onClick={() => setResetModalOpened(true)}>
-          もう一回遊ぶ（スコアをリセット）
+          もう一回遊ぶ
         </Button>
         <Button size="md" variant="subtle" color="gray" onClick={onBackToMenu}>
           メニューに戻る

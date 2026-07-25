@@ -15,6 +15,9 @@ export function ScoreBoard({ players }: ScoreBoardProps) {
     return null
   }
 
+  // 全員0点のうちはメダルを付けない（まだ何も起きていないのに順位がついて見えるのを防ぐ）
+  const hasScore = sorted.some((p) => p.score > 0)
+
   return (
     <Paper withBorder radius="lg" p="sm">
       <Stack gap={6}>
@@ -22,7 +25,7 @@ export function ScoreBoard({ players }: ScoreBoardProps) {
           <Group key={player.id} justify="space-between" wrap="nowrap" gap="xs">
             <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
               <Text fw={700} w={26} ta="center" style={{ flexShrink: 0 }}>
-                {MEDALS[index] ?? index + 1}
+                {hasScore ? (MEDALS[index] ?? index + 1) : index + 1}
               </Text>
               <Box
                 style={{

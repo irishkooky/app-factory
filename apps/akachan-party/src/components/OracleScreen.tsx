@@ -5,9 +5,11 @@ import type { Player, PlayerId } from '../game/types'
 
 const TIMEOUT_MS = 20_000
 
+// 縦持ちスマホで円がなるべく大きくなるよう、列数は控えめに増やす
 function columnsFor(count: number): number {
-  if (count <= 4) return 2
-  if (count <= 9) return 3
+  if (count <= 2) return 1
+  if (count <= 8) return 2
+  if (count <= 15) return 3
   return 4
 }
 
@@ -17,9 +19,17 @@ type OracleScreenProps = {
   onPlayerSelected: (playerId: PlayerId) => void
   onTimeout: () => void
   onAdultPick: () => void
+  onBack: () => void
 }
 
-export function OracleScreen({ players, promptText, onPlayerSelected, onTimeout, onAdultPick }: OracleScreenProps) {
+export function OracleScreen({
+  players,
+  promptText,
+  onPlayerSelected,
+  onTimeout,
+  onAdultPick,
+  onBack,
+}: OracleScreenProps) {
   // 最初の1タッチ以降を完全に無視するロックフラグ。state は非同期更新なので使えない。
   const lockRef = useRef(false)
 
@@ -51,16 +61,22 @@ export function OracleScreen({ players, promptText, onPlayerSelected, onTimeout,
   }
 
   const cols = columnsFor(players.length)
+  const rows = Math.max(1, Math.ceil(players.length / cols))
 
   return (
     <Box style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
-      <Box style={{ textAlign: 'center', padding: '12px 16px 4px' }}>
-        <Text size="sm" c="dimmed">
-          {promptText}
-        </Text>
-        <Text size="xs" c="red.4" mt={2}>
-          ⚠️ 口に入れないよう見守ってください
-        </Text>
+      <Box style={{ padding: '8px 12px 4px' }}>
+        <UnstyledButton onClick={onBack} style={{ opacity: 0.4 }}>
+          <Text size="xs">← もどる</Text>
+        </UnstyledButton>
+        <Box style={{ textAlign: 'center', marginTop: 2 }}>
+          <Text size="sm" c="dimmed">
+            {promptText}
+          </Text>
+          <Text size="xs" c="red.4" mt={2}>
+            ⚠️ 口に入れないよう見守ってください
+          </Text>
+        </Box>
       </Box>
 
       <Box
@@ -68,8 +84,10 @@ export function OracleScreen({ players, promptText, onPlayerSelected, onTimeout,
           flex: 1,
           display: 'grid',
           gridTemplateColumns: `repeat(${cols}, 1fr)`,
-          gap: 10,
-          padding: 10,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
+          placeItems: 'center',
+          gap: 8,
+          padding: 8,
           touchAction: 'none',
           userSelect: 'none',
           WebkitTapHighlightColor: 'transparent',
@@ -83,8 +101,10 @@ export function OracleScreen({ players, promptText, onPlayerSelected, onTimeout,
             onPointerDown={() => handlePointerDown(player.id)}
             className="blob-pulse"
             style={{
+              height: '100%',
+              width: 'auto',
+              maxWidth: '100%',
               aspectRatio: '1',
-              width: '100%',
               borderRadius: '50%',
               border: 'none',
               padding: 0,
