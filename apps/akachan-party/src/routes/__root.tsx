@@ -1,4 +1,5 @@
 import '@mantine/core/styles.css'
+import '../styles.css'
 
 import type { ReactNode } from 'react'
 import {
@@ -18,10 +19,14 @@ export const Route = createRootRoute({
       },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        content: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover',
       },
       {
-        title: 'app-factory',
+        title: '赤ちゃんパーティー | 今日の主役は、いちばん小さい人',
+      },
+      {
+        name: 'description',
+        content: 'スマホ1台で遊べる飲み会ゲーム。次に誰がやるかは、赤ちゃんが決める。',
       },
     ],
   }),
@@ -40,11 +45,11 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="ja" {...mantineHtmlProps}>
       <head>
-        <ColorSchemeScript />
+        <ColorSchemeScript forceColorScheme="dark" />
         <HeadContent />
       </head>
       <body>
-        <MantineProvider theme={theme}>
+        <MantineProvider theme={theme} forceColorScheme="dark">
           {children}
         </MantineProvider>
         <Scripts />
