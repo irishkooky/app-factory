@@ -25,8 +25,27 @@ const MAX_ATTEMPTS = 8;
 // このファイル内でだけ使う最小限のアンビエント型をローカルに宣言する。
 declare const process: { env: Record<string, string | undefined> };
 
-/** AI生の出力から前置き・引用符・ラベル・改行を剥がし、40字以内に整える */
-function sanitizeAiText(raw: string): string {
+/**
+ * 話者名プレフィックスを剥がす（例:「しろいうま: パスタ」→「パスタ」）。
+ * モデルが過去回答の「仮名: 本文」形式を真似て自分や他人の仮名を名乗ってしまうケースへの防御。
+ * 1) 部屋の全席の仮名（自分・他人問わず）に完全一致するものを優先的に剥がす
+ * 2) それでも先頭が「なにか:」の形になっていたら、仮名リストに無い名前でも汎用的に剥がす
+ */
+function stripSpeakerPrefix(text: string, knownAliases: string[]): string {
+  for (const alias of knownAliases) {
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`^${escaped}\\s*[:：]\\s*`);
+    if (pattern.test(text)) {
+      return text.replace(pattern, "");
+    }
+  }
+  // 汎用防御: 仮名リストに無い名前を勝手に名乗るケースも剥がす。
+  // 「19:00に出た」のような時刻表現を壊さないよう、数字のみの前置きは剥がさない。
+  return text.replace(/^(?!\d+[:：])[^\s:：]{1,12}[:：]\s*/, "");
+}
+
+/** AI生の出力から話者名プレフィックス・前置き・引用符・ラベル・改行を剥がし、40字以内に整える */
+function sanitizeAiText(raw: string, knownAliases: string[]): string {
   let text = raw.trim();
   if (text.length === 0) return "";
 
@@ -36,6 +55,10 @@ function sanitizeAiText(raw: string): string {
     .map((line) => line.trim())
     .find((line) => line.length > 0);
   text = firstLine ?? "";
+  if (text.length === 0) return "";
+
+  // 話者名プレフィックス剥がしを最初に行う（「回答:」ラベル除去や引用符除去より前）
+  text = stripSpeakerPrefix(text, knownAliases).trim();
 
   // 「回答:」「回答：」等のラベルを除去
   text = text.replace(/^(回答|answer)\s*[:：]\s*/i, "");
@@ -148,6 +171,8 @@ export const getAiContext = internalQuery({
       // 現ラウンドで既に回答した人間の数と、部屋の人間の総席数（= seats - AI席1つ）
       humanAnsweredCount: currentRoundAnswers.length,
       humanSeatCount: seats.length - 1,
+      // 後処理（話者名プレフィックス剥がし）専用。部屋の全席の仮名（自分・他人問わず）
+      seatAliases: seats.map((seat) => seat.alias),
     };
   },
 });
@@ -259,7 +284,9 @@ export const generateAnswer = internalAction({
 - 40文字を超える回答
 - 3つ以上の列挙
 - 絵文字（他の参加者が使っていなければ0個にする）
-- 「AIとして」「私は」で始まる回答`;
+- 「AIとして」「私は」で始まる回答
+- 自分の仮名や話者名を回答の先頭に付けること（例:「${context.aiAlias}: ◯◯」のような形式は厳禁。
+  下の参考回答は表示のために「仮名: 本文」の形にしているだけで、あなたが出力してよいのは本文だけ）`;
 
     const pastAnswersText =
       context.pastAnswers.length > 0
@@ -268,11 +295,13 @@ export const generateAnswer = internalAction({
 
     const prompt = `お題: 「${context.promptText}」
 
-これまでの参加者の回答（文体の参考にすること）:
+これまでの参加者の回答（文体の参考にすること。「仮名: 本文」は表示用の形式であり、あなたが真似してよいのは本文の書き方だけ）:
 ${pastAnswersText}
 
 他の参加者の回答はだいたい${avgLength}文字前後です。この長さ感に寄せてください。
-あなたの仮名は「${context.aiAlias}」です。上のお題に対する、あなたの回答だけを1つ出力してください。`;
+あなたの仮名は「${context.aiAlias}」です。
+
+あなたの回答（本文のみ、40文字以内。先頭に仮名や名前を付けない）:`;
 
     let text = "";
     const endpoint = process.env.AI_ENDPOINT;
@@ -294,8 +323,8 @@ ${pastAnswersText}
           });
           if (res.ok) {
             const data = (await res.json()) as { text?: string };
-            const sanitized = sanitizeAiText(data.text ?? "");
-            // 短すぎる出力（切り詰めすぎ・意味のない断片）はフォールバック扱いにする
+            const sanitized = sanitizeAiText(data.text ?? "", context.seatAliases);
+            // 短すぎる出力（プレフィックス剥がし後の空文字・意味のない断片含む）はフォールバック扱いにする
             text = sanitized.length >= MIN_ANSWER_LENGTH ? sanitized : "";
           }
         } finally {
