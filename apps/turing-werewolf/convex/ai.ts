@@ -18,10 +18,14 @@ const MIN_ANSWER_LENGTH = 8;
 // 人間の回答が半分未満のうちは、AIの提出が早すぎて特定されないように自分を再スケジュールする。
 // ただし answering の締切(60秒)を跨いで saveAiAnswer が捨てられないよう、締切まで残り
 // AI_DEADLINE_SAFETY_MS 未満になったら待つのをやめて即生成する。
+// 安全域は「次に再スケジュールした場合、そこから15秒のfetchタイムアウトが走っても間に合うか」
+// で決める必要がある。再スケジュール自体が最大 ATTEMPT_DELAY_RANGE_MS 後ろにずれるため、
+// AI_TIMEOUT_MS + MIN_ATTEMPT_DELAY_MS + ATTEMPT_DELAY_RANGE_MS を安全域として確保する
+// （単純な AI_TIMEOUT_MS だけだと、ちょうど境界で再スケジュールした次の実行が締切を跨ぐ）。
 const MIN_ATTEMPT_DELAY_MS = 6_000;
 const ATTEMPT_DELAY_RANGE_MS = 6_000;
 const MAX_ATTEMPTS = 8;
-const AI_DEADLINE_SAFETY_MS = 20_000;
+const AI_DEADLINE_SAFETY_MS = AI_TIMEOUT_MS + MIN_ATTEMPT_DELAY_MS + ATTEMPT_DELAY_RANGE_MS; // = 27_000
 
 // discussion中のAI割り込み（maybeChime）用の定数
 const CHIME_MAX_LENGTH = 30;
@@ -52,16 +56,28 @@ function stripSpeakerPrefix(text: string, knownAliases: string[]): string {
     }
   }
   // 汎用防御: 仮名リストに無い名前を勝手に名乗るケースも剥がす。
-  // 「19:00に出た」のような時刻表現を壊さないよう、数字のみの前置きは剥がさない。
-  return text.replace(/^(?!\d+[:：])[^\s:：]{1,12}[:：]\s*/, "");
+  // 日本語には単語区切りの空白が無いため「文頭から13文字以内に:がある文」を巻き添えに
+  // しないよう、前置き部分に数字を一切含めない（「集合は18:00」「...19:00頃に...」等の
+  // 時刻表現は前置きに数字を含むので、この時点でマッチせず保護される）。
+  return text.replace(/^[^\s:：\d]{1,12}[:：]\s*/, "");
 }
 
 /**
  * AI生の出力から話者名プレフィックス・前置き・引用符・ラベル・改行を剥がし、maxLength字以内に整える。
  * maxLength未指定時は回答フェーズ用の40字（generateAnswerで使用）。discussionの割り込み（maybeChime）は
  * 30字を渡して使う。
+ *
+ * 下限チェック（minLengthIfTruncated）は「40字超で切り詰めが発生した場合」のみ適用する。
+ * 「カレー」「ラーメン」のような切り詰めていない自然な短答はそのまま採用してよい
+ * （むしろ短い自然な回答こそ人間らしく、逆に定型のフォールバック文が出る方がバレやすい）。
+ * 空文字・空白のみのときだけ常にフォールバック行き（""を返す）。
  */
-function sanitizeAiText(raw: string, knownAliases: string[], maxLength: number = MAX_ANSWER_LENGTH): string {
+function sanitizeAiText(
+  raw: string,
+  knownAliases: string[],
+  maxLength: number = MAX_ANSWER_LENGTH,
+  minLengthIfTruncated: number = MIN_ANSWER_LENGTH,
+): string {
   let text = raw.trim();
   if (text.length === 0) return "";
 
@@ -82,8 +98,11 @@ function sanitizeAiText(raw: string, knownAliases: string[], maxLength: number =
   // 前後の引用符を除去
   text = text.replace(/^["'「『“]+/, "").replace(/["'」』”]+$/, "");
   text = text.trim();
+  if (text.length === 0) return "";
 
+  let wasTruncated = false;
   if (text.length > maxLength) {
+    wasTruncated = true;
     const truncated = text.slice(0, maxLength);
     const lastPunctuationIndex = Math.max(
       truncated.lastIndexOf("。"),
@@ -95,8 +114,13 @@ function sanitizeAiText(raw: string, knownAliases: string[], maxLength: number =
         ? truncated.slice(0, lastPunctuationIndex + 1)
         : truncated;
   }
+  text = text.trim();
 
-  return text.trim();
+  if (text.length === 0) return "";
+  // 切り詰めが発生したときだけ下限を適用する（切り詰めていない短答はそのまま通す）
+  if (wasTruncated && text.length < minLengthIfTruncated) return "";
+
+  return text;
 }
 
 /** フォールバックを1つ保存しようと試みる（失敗してもthrowしない。呼び出し側の最後の砦） */

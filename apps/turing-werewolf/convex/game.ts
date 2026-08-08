@@ -473,19 +473,28 @@ export const forceAdvance = internalMutation({
           q.eq("roomId", args.roomId).eq("roundIndex", args.roundIndex),
         )
         .collect();
-      const aiAlreadyAnswered = currentAnswers.some((a) => a.seatId === secret.aiSeatId);
+      const aiAnswer = currentAnswers.find((a) => a.seatId === secret.aiSeatId);
       const humanAnswerCount = currentAnswers.filter((a) => a.seatId !== secret.aiSeatId).length;
-      // 人間の回答が0件のラウンドでAIだけ回答を入れると、本文が表示される唯一の席=AI席になり
-      // 秘密が完全に破れる。誰も回答していないラウンドはAIも無言のまま reveal へ進めてよい。
-      if (!aiAlreadyAnswered && humanAnswerCount > 0) {
-        const fallbacks = getFallbacksForPrompt(room.promptText ?? "");
-        const text = fallbacks[Math.floor(Math.random() * fallbacks.length)] ?? GENERIC_FALLBACK_TEXT;
-        await ctx.db.insert("answers", {
-          roomId: args.roomId,
-          roundIndex: args.roundIndex,
-          seatId: secret.aiSeatId,
-          text,
-        });
+
+      if (humanAnswerCount >= 2) {
+        // 本文が出る席が2つ以上あるので、AIも埋めて紛れ込ませる（未回答のままだと即バレ）
+        if (!aiAnswer) {
+          const fallbacks = getFallbacksForPrompt(room.promptText ?? "");
+          const text = fallbacks[Math.floor(Math.random() * fallbacks.length)] ?? GENERIC_FALLBACK_TEXT;
+          await ctx.db.insert("answers", {
+            roomId: args.roomId,
+            roundIndex: args.roundIndex,
+            seatId: secret.aiSeatId,
+            text,
+          });
+        }
+      } else {
+        // 回答者が少なすぎるラウンドはAIの回答も伏せる。本文が出る席が少数だとAI席が
+        // 特定されるため（0件なら唯一の回答者=AI、1件ならその人から見て他に本文が
+        // 出ている席=AIと即断できる）。AIが既に回答済みならここで削除して無回答に戻す。
+        if (aiAnswer) {
+          await ctx.db.delete(aiAnswer._id);
+        }
       }
     }
 
