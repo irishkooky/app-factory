@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation } from "./_generated/server";
 
 export const ALLOWED_EMOJIS = ["👍", "❤️", "😂", "🎉", "👀"];
@@ -11,16 +11,16 @@ export const toggle = mutation({
   },
   handler: async (ctx, args) => {
     if (!ALLOWED_EMOJIS.includes(args.emoji)) {
-      throw new Error("その絵文字は使えません");
+      throw new ConvexError("その絵文字は使えません");
     }
 
     const message = await ctx.db.get(args.messageId);
     if (message === null) {
-      throw new Error("メッセージが見つかりません");
+      throw new ConvexError("メッセージが見つかりません");
     }
     const member = await ctx.db.get(args.memberId);
-    if (member === null) {
-      throw new Error("メンバーが見つかりません");
+    if (member === null || member.isBot === true) {
+      throw new ConvexError("メンバーが見つかりません");
     }
 
     const existing = await ctx.db
