@@ -24,8 +24,19 @@ import {
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { getDeviceId } from '../lib/deviceId'
+import { useCountdownSeconds } from '../lib/useCountdown'
+
+type RoomSearch = { spectate?: boolean }
 
 export const Route = createFileRoute('/room/$code')({
+  // spectateはオプショナルにしておく（navigate({ to: '/room/$code', params }) 側でsearchを
+  // 必須にしないため。値なし＝falseとして扱うのでキー自体を省略してよい）
+  validateSearch: (search: Record<string, unknown>): RoomSearch => {
+    const raw = search.spectate
+    // ?spectate（値なし。URLSearchParamsでは空文字になる） と ?spectate=1 の両方をtrueとして扱う
+    const spectate = raw === '' || raw === '1' || raw === 1 || raw === true
+    return spectate ? { spectate: true } : {}
+  },
   component: RoomRoute,
 })
 
@@ -54,6 +65,7 @@ type PhaseProps = {
 
 function RoomRoute() {
   const { code } = Route.useParams()
+  const { spectate = false } = Route.useSearch()
   const { data: room } = useSuspenseQuery(convexQuery(api.rooms.getRoom, { code }))
 
   if (!room) {
@@ -70,6 +82,10 @@ function RoomRoute() {
         </Stack>
       </Container>
     )
+  }
+
+  if (spectate) {
+    return <SpectatorRoom code={code} room={room} />
   }
 
   return <RoomShell code={code} room={room} />
@@ -130,13 +146,9 @@ function RoomShell({ code, room }: { code: string; room: RoomDoc }) {
         {room.phase === 'lobby' && <LobbyPhase {...phaseProps} />}
         {room.phase === 'answering' && <AnsweringPhase {...phaseProps} />}
         {room.phase === 'reveal' && <RevealPhase {...phaseProps} />}
+        {room.phase === 'discussion' && <DiscussionPhase {...phaseProps} />}
         {room.phase === 'voting' && <VotingPhase {...phaseProps} />}
         {room.phase === 'result' && <ResultPhase {...phaseProps} />}
-        {room.phase === 'discussion' && (
-          <Alert color="blue" variant="light">
-            会話フェーズは今後のアップデートで実装予定です。
-          </Alert>
-        )}
       </Stack>
     </Container>
   )
@@ -191,6 +203,12 @@ function LobbyPhase({ code, room, seats, mySeat, deviceId }: PhaseProps) {
 
   const canStart = seats.length >= 2
 
+  // 観戦用URLはクライアント側でのみ組み立てる（SSRにはwindowが無い）
+  const [spectateUrl, setSpectateUrl] = useState('')
+  useEffect(() => {
+    setSpectateUrl(`${window.location.origin}/room/${code}?spectate=1`)
+  }, [code])
+
   async function handleStart() {
     setIsStarting(true)
     setErrorMessage(null)
@@ -213,13 +231,22 @@ function LobbyPhase({ code, room, seats, mySeat, deviceId }: PhaseProps) {
           <Title order={1} ta="center" style={{ letterSpacing: '0.3em' }}>
             {code}
           </Title>
-          <CopyButton value={code}>
-            {({ copied, copy }) => (
-              <Button size="xs" variant="light" onClick={copy}>
-                {copied ? 'コピーしました' : 'コードをコピー'}
-              </Button>
-            )}
-          </CopyButton>
+          <Group gap="xs">
+            <CopyButton value={code}>
+              {({ copied, copy }) => (
+                <Button size="xs" variant="light" onClick={copy}>
+                  {copied ? 'コピーしました' : 'コードをコピー'}
+                </Button>
+              )}
+            </CopyButton>
+            <CopyButton value={spectateUrl}>
+              {({ copied, copy }) => (
+                <Button size="xs" variant="subtle" onClick={copy} disabled={!spectateUrl}>
+                  {copied ? 'コピーしました' : '観戦用URLをコピー'}
+                </Button>
+              )}
+            </CopyButton>
+          </Group>
         </Stack>
       </Card>
 
@@ -269,6 +296,7 @@ function AnsweringPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
   const { data: answersResult } = useSuspenseQuery(
     convexQuery(api.game.listAnswers, { roomId: room._id, roundIndex: room.roundIndex }),
   )
+  const remainingSeconds = useCountdownSeconds(room.deadlineAt)
 
   const [text, setText] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -299,9 +327,16 @@ function AnsweringPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
     <Stack gap="md">
       <Card withBorder radius="md" padding="lg">
         <Stack gap="xs">
-          <Text size="sm" c="dimmed">
-            お題
-          </Text>
+          <Group justify="space-between" align="flex-start">
+            <Text size="sm" c="dimmed">
+              お題
+            </Text>
+            {remainingSeconds !== null && (
+              <Badge color={remainingSeconds <= 10 ? 'red' : 'gray'} variant="light">
+                残り{remainingSeconds}秒
+              </Badge>
+            )}
+          </Group>
           <Title order={2}>{room.promptText}</Title>
         </Stack>
       </Card>
@@ -418,19 +453,122 @@ function RevealPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
               {seat.alias}
               {seat.seatId === mySeat.seatId ? '（あなた）' : ''}
             </Text>
-            <Text mt={4}>{answersBySeat.get(seat.seatId) ?? '（回答なし）'}</Text>
+            <Text mt={4}>{answersBySeat.get(seat.seatId) ?? '（未回答）'}</Text>
           </Card>
         ))}
       </Stack>
 
       {mySeat.isHost ? (
         <Button size="lg" onClick={handleNext} loading={isAdvancing}>
-          {isLastRound ? '投票へ進む' : '次のラウンドへ'}
+          {isLastRound ? '次へ（自由会話へ）' : '次のラウンドへ'}
         </Button>
       ) : (
         <Alert color="gray" variant="light">
           ホストの操作を待っています…
         </Alert>
+      )}
+
+      {errorMessage && <Alert color="red">{errorMessage}</Alert>}
+    </Stack>
+  )
+}
+
+// ---------- discussion ----------
+
+function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
+  const nextRound = useMutation(api.game.nextRound)
+  const sendMessage = useMutation(api.game.sendMessage)
+  const { data: messages } = useSuspenseQuery(
+    convexQuery(api.game.listMessages, { roomId: room._id }),
+  )
+
+  const [text, setText] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [isAdvancing, setIsAdvancing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const aliasBySeat = new Map(seats.map((seat) => [seat.seatId, seat.alias]))
+
+  async function handleSend(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const trimmed = text.trim()
+    if (!trimmed || isSending) return
+    setIsSending(true)
+    setErrorMessage(null)
+    try {
+      await sendMessage({ roomId: room._id, deviceId, text: trimmed })
+      setText('')
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : '送信に失敗しました')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  async function handleAdvance() {
+    setIsAdvancing(true)
+    setErrorMessage(null)
+    try {
+      await nextRound({ roomId: room._id, deviceId })
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : '進行に失敗しました')
+    } finally {
+      setIsAdvancing(false)
+    }
+  }
+
+  return (
+    <Stack gap="md">
+      <Card withBorder radius="md" padding="lg">
+        <Text fw={600}>自由に会話しましょう。怪しいと思った人に探りを入れてみては？</Text>
+      </Card>
+
+      <Card withBorder radius="md" padding="md">
+        <Stack gap="sm" mah={360} style={{ overflowY: 'auto' }}>
+          {messages.length === 0 ? (
+            <Text size="sm" c="dimmed">
+              まだ発言がありません。最初のひとことをどうぞ。
+            </Text>
+          ) : (
+            messages.map((m) => (
+              <Stack key={`${m._creationTime}-${m.seatId}`} gap={0}>
+                <Text size="xs" c="dimmed">
+                  {aliasBySeat.get(m.seatId) ?? '?'}
+                  {m.seatId === mySeat.seatId ? '（あなた）' : ''}
+                </Text>
+                <Text style={{ whiteSpace: 'pre-wrap' }}>{m.text}</Text>
+              </Stack>
+            ))
+          )}
+        </Stack>
+      </Card>
+
+      <form onSubmit={handleSend}>
+        <Group gap="xs" wrap="nowrap" align="flex-end">
+          <Textarea
+            style={{ flex: 1 }}
+            placeholder="発言を入力（200文字以内）"
+            autosize
+            minRows={1}
+            maxRows={4}
+            maxLength={200}
+            value={text}
+            onChange={(event) => setText(event.currentTarget.value)}
+          />
+          <Button type="submit" loading={isSending} disabled={text.trim().length === 0}>
+            送信
+          </Button>
+        </Group>
+      </form>
+
+      {mySeat.isHost ? (
+        <Button variant="light" onClick={handleAdvance} loading={isAdvancing}>
+          投票へ進む
+        </Button>
+      ) : (
+        <Text size="xs" c="dimmed" ta="center">
+          時間になると自動で投票フェーズに進みます
+        </Text>
       )}
 
       {errorMessage && <Alert color="red">{errorMessage}</Alert>}
@@ -450,6 +588,7 @@ function VotingPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
   const { data: myVote } = useSuspenseQuery(
     convexQuery(api.game.getMyVote, { roomId: room._id, deviceId }),
   )
+  const remainingSeconds = useCountdownSeconds(room.deadlineAt)
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -468,7 +607,14 @@ function VotingPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
     <Stack gap="md">
       <Card withBorder radius="md" padding="lg">
         <Stack gap="xs">
-          <Text fw={600}>AI席だと思う席に投票してください</Text>
+          <Group justify="space-between" align="flex-start">
+            <Text fw={600}>AI席だと思う席に投票してください</Text>
+            {remainingSeconds !== null && (
+              <Badge color={remainingSeconds <= 10 ? 'red' : 'gray'} variant="light">
+                残り{remainingSeconds}秒
+              </Badge>
+            )}
+          </Group>
           <Text size="sm" c="dimmed">
             投票後も選び直せます
           </Text>
@@ -633,6 +779,232 @@ function ResultPhase({ room, seats, mySeat }: PhaseProps) {
       <Button component={Link} to="/" size="lg">
         トップへ戻る
       </Button>
+    </Stack>
+  )
+}
+
+// =====================================================================================
+// 観戦モード（?spectate）— プロジェクタに出す用。deviceIdを使わず、入力・投票UIを一切出さない。
+// =====================================================================================
+
+function SpectatorRoom({ code, room }: { code: string; room: RoomDoc }) {
+  const { data: seats } = useSuspenseQuery(
+    convexQuery(api.rooms.listSeats, { roomId: room._id }),
+  )
+
+  return (
+    <Container size="lg" py="xl">
+      <Stack gap="xl">
+        <SpectatorHeader code={code} room={room} />
+
+        {room.phase === 'lobby' && <SpectatorLobby seats={seats} />}
+        {room.phase === 'answering' && <SpectatorAnswering room={room} seats={seats} />}
+        {room.phase === 'reveal' && <SpectatorReveal room={room} seats={seats} />}
+        {room.phase === 'discussion' && <SpectatorDiscussion room={room} seats={seats} />}
+        {room.phase === 'voting' && <SpectatorVoting room={room} />}
+        {room.phase === 'result' && <SpectatorResult room={room} seats={seats} />}
+      </Stack>
+    </Container>
+  )
+}
+
+function SpectatorHeader({ code, room }: { code: string; room: RoomDoc }) {
+  return (
+    <Group justify="space-between" wrap="wrap" gap="sm">
+      <Group gap="sm">
+        <Badge size="lg" color="grape" variant="filled">
+          観戦モード
+        </Badge>
+        <Text fz={28} fw={800}>
+          ルーム {code}
+        </Text>
+      </Group>
+      <Badge size="lg" variant="light">
+        {PHASE_LABELS[room.phase]}
+        {room.phase !== 'lobby' ? `（ラウンド${room.roundIndex + 1}/${room.totalRounds}）` : ''}
+      </Badge>
+    </Group>
+  )
+}
+
+function SpectatorLobby({ seats }: { seats: SeatSummary[] }) {
+  return (
+    <Card withBorder radius="md" padding="xl">
+      <Stack gap="lg" align="center">
+        <Text fz={24} c="dimmed">
+          参加者（{seats.length}人）
+        </Text>
+        <Group gap="sm" justify="center">
+          {seats.map((seat) => (
+            <Badge key={seat.seatId} size="xl" variant="light">
+              {seat.alias}
+            </Badge>
+          ))}
+        </Group>
+      </Stack>
+    </Card>
+  )
+}
+
+function SpectatorAnswering({ room, seats }: { room: RoomDoc; seats: SeatSummary[] }) {
+  const { data: answersResult } = useSuspenseQuery(
+    convexQuery(api.game.listAnswers, { roomId: room._id, roundIndex: room.roundIndex }),
+  )
+  const submittedSeatIds =
+    answersResult.phase === 'hidden'
+      ? answersResult.submittedSeatIds
+      : answersResult.answers.map((a) => a.seatId)
+  const allSubmitted = submittedSeatIds.length === seats.length
+
+  return (
+    <Stack gap="xl" align="center">
+      <Text fz={40} fw={800} ta="center">
+        {room.promptText}
+      </Text>
+      <Text fz={32} fw={700} c={allSubmitted ? 'green' : undefined}>
+        {submittedSeatIds.length} / {seats.length} 人が回答済み
+      </Text>
+      <Group gap="sm" justify="center">
+        {seats.map((seat) => {
+          const submitted = submittedSeatIds.includes(seat.seatId)
+          return (
+            <Badge
+              key={seat.seatId}
+              size="xl"
+              variant={submitted ? 'filled' : 'outline'}
+              color={submitted ? 'green' : 'gray'}
+            >
+              {submitted ? '✓ ' : ''}
+              {seat.alias}
+            </Badge>
+          )
+        })}
+      </Group>
+    </Stack>
+  )
+}
+
+function SpectatorReveal({ room, seats }: { room: RoomDoc; seats: SeatSummary[] }) {
+  const { data: answersResult } = useSuspenseQuery(
+    convexQuery(api.game.listAnswers, { roomId: room._id, roundIndex: room.roundIndex }),
+  )
+  const answersBySeat = new Map<Id<'seats'>, string>(
+    answersResult.phase === 'open' ? answersResult.answers.map((a) => [a.seatId, a.text]) : [],
+  )
+
+  return (
+    <Stack gap="lg">
+      <Text fz={32} fw={800} ta="center">
+        {room.promptText}
+      </Text>
+      <Stack gap="md">
+        {seats.map((seat) => (
+          <Card key={seat.seatId} withBorder radius="md" padding="lg">
+            <Text fz={18} c="dimmed">
+              {seat.alias}
+            </Text>
+            <Text fz={28} fw={600}>
+              {answersBySeat.get(seat.seatId) ?? '（未回答）'}
+            </Text>
+          </Card>
+        ))}
+      </Stack>
+    </Stack>
+  )
+}
+
+function SpectatorDiscussion({ room, seats }: { room: RoomDoc; seats: SeatSummary[] }) {
+  const { data: messages } = useSuspenseQuery(
+    convexQuery(api.game.listMessages, { roomId: room._id }),
+  )
+  const aliasBySeat = new Map(seats.map((seat) => [seat.seatId, seat.alias]))
+  const recentMessages = messages.slice(-12)
+
+  return (
+    <Stack gap="md">
+      <Text fz={32} fw={800} ta="center">
+        自由会話中
+      </Text>
+      <Stack gap="sm">
+        {recentMessages.length === 0 ? (
+          <Text fz={20} c="dimmed" ta="center">
+            まだ発言がありません
+          </Text>
+        ) : (
+          recentMessages.map((m) => (
+            <Card key={`${m._creationTime}-${m.seatId}`} withBorder radius="md" padding="md">
+              <Text fz={14} c="dimmed">
+                {aliasBySeat.get(m.seatId) ?? '?'}
+              </Text>
+              <Text fz={22}>{m.text}</Text>
+            </Card>
+          ))
+        )}
+      </Stack>
+    </Stack>
+  )
+}
+
+function SpectatorVoting({ room }: { room: RoomDoc }) {
+  const { data: voteStatus } = useSuspenseQuery(
+    convexQuery(api.game.getVoteStatus, { roomId: room._id }),
+  )
+  return (
+    <Stack gap="xl" align="center">
+      <Text fz={32} fw={800}>
+        投票中
+      </Text>
+      <Text fz={56} fw={800}>
+        {voteStatus.votedCount} / {voteStatus.totalSeats}
+      </Text>
+      <Text fz={22} c="dimmed">
+        人が投票済み
+      </Text>
+    </Stack>
+  )
+}
+
+function SpectatorResult({ room, seats }: { room: RoomDoc; seats: SeatSummary[] }) {
+  const { data: result } = useSuspenseQuery(convexQuery(api.game.getResult, { roomId: room._id }))
+
+  if (!result) {
+    return (
+      <Center py="xl">
+        <Loader />
+      </Center>
+    )
+  }
+
+  const aiSeat = seats.find((seat) => seat.seatId === result.aiSeatId)
+
+  return (
+    <Stack gap="xl" align="center">
+      <Text fz={22} c="dimmed">
+        AIの正体は…
+      </Text>
+      <Text fz={56} fw={800} ta="center">
+        {aiSeat?.alias ?? '不明'}
+      </Text>
+      <Badge size="xl" color={result.humansWin ? 'green' : 'red'} variant="filled">
+        {result.humansWin ? '人間側の勝ち！' : 'AIの勝ち！'}
+      </Badge>
+      <Stack gap="xs" w="100%" maw={480}>
+        {result.tally.map((t) => {
+          const seat = seats.find((s) => s.seatId === t.seatId)
+          const isAi = t.seatId === result.aiSeatId
+          return (
+            <Group key={t.seatId} justify="space-between">
+              <Text fz={20} fw={isAi ? 700 : 400}>
+                {seat?.alias ?? '?'}
+                {isAi ? '（AI）' : ''}
+              </Text>
+              <Badge size="lg" color={isAi ? 'red' : 'gray'}>
+                {t.count}票
+              </Badge>
+            </Group>
+          )
+        })}
+      </Stack>
     </Stack>
   )
 }

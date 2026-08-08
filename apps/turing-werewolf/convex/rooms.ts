@@ -83,7 +83,7 @@ export const createRoom = mutation({
       code,
       phase: "lobby",
       roundIndex: 0,
-      totalRounds: 1,
+      totalRounds: 3,
     });
 
     const alias = pickAlias([]);

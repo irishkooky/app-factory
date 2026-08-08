@@ -1,8 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, type MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { pickAlias, pickAliases, pickPrompt } from "./prompts";
+import { GENERIC_FALLBACK_TEXT, getFallbacksForPrompt, pickAlias, pickAliases, pickPrompt } from "./prompts";
 import {
   advanceIfAllAnswered,
   advanceIfAllVoted,
@@ -12,9 +12,15 @@ import {
 } from "./lib";
 
 const ANSWER_DEADLINE_MS = 60_000;
+const FORCE_ADVANCE_DELAY_MS = 60_000; // answeringの時間切れ（deadlineAtと揃える）
 const VOTE_DEADLINE_MS = 45_000;
+const FORCE_END_VOTING_DELAY_MS = 45_000; // votingの時間切れ（deadlineAtと揃える）
+const DISCUSSION_DEADLINE_MS = 90_000;
+const FORCE_END_DISCUSSION_DELAY_MS = DISCUSSION_DEADLINE_MS;
 const AI_DELAY_MIN_MS = 8_000;
 const AI_DELAY_RANGE_MS = 25_000;
+const CHIME_DELAY_MIN_MS = 15_000;
+const CHIME_DELAY_RANGE_MS = 30_000;
 
 const OPEN_PHASES: Set<Doc<"rooms">["phase"]> = new Set([
   "reveal",
@@ -30,6 +36,60 @@ function compareSeatId(a: Id<"seats">, b: Id<"seats">): number {
 
 function scheduleAiDelayMs(): number {
   return AI_DELAY_MIN_MS + Math.floor(Math.random() * AI_DELAY_RANGE_MS);
+}
+
+function scheduleChimeDelayMs(): number {
+  return CHIME_DELAY_MIN_MS + Math.floor(Math.random() * CHIME_DELAY_RANGE_MS);
+}
+
+// ---------- フェーズ遷移の共通ヘルパー（複数の入口から呼ばれるため一箇所にまとめる） ----------
+
+/** answering フェーズに入る。AI回答の生成予約と時間切れ強制進行の予約を必ずセットで行う */
+async function enterAnsweringPhase(
+  ctx: MutationCtx,
+  roomId: Id<"rooms">,
+  roundIndex: number,
+  promptText: string,
+  usedPrompts: string[],
+): Promise<void> {
+  await ctx.db.patch(roomId, {
+    phase: "answering",
+    roundIndex,
+    promptText,
+    deadlineAt: Date.now() + ANSWER_DEADLINE_MS,
+    usedPrompts,
+  });
+  await ctx.scheduler.runAfter(scheduleAiDelayMs(), internal.ai.generateAnswer, {
+    roomId,
+    roundIndex,
+  });
+  await ctx.scheduler.runAfter(FORCE_ADVANCE_DELAY_MS, internal.game.forceAdvance, {
+    roomId,
+    roundIndex,
+  });
+}
+
+/** discussion フェーズに入る。時間切れ強制終了とAI割り込みの予約を行う */
+async function enterDiscussionPhase(ctx: MutationCtx, roomId: Id<"rooms">): Promise<void> {
+  await ctx.db.patch(roomId, {
+    phase: "discussion",
+    deadlineAt: Date.now() + DISCUSSION_DEADLINE_MS,
+  });
+  await ctx.scheduler.runAfter(FORCE_END_DISCUSSION_DELAY_MS, internal.game.forceEndDiscussion, {
+    roomId,
+  });
+  await ctx.scheduler.runAfter(scheduleChimeDelayMs(), internal.ai.maybeChime, { roomId });
+}
+
+/** voting フェーズに入る。時間切れ強制終了の予約を行う */
+async function enterVotingPhase(ctx: MutationCtx, roomId: Id<"rooms">): Promise<void> {
+  await ctx.db.patch(roomId, {
+    phase: "voting",
+    deadlineAt: Date.now() + VOTE_DEADLINE_MS,
+  });
+  await ctx.scheduler.runAfter(FORCE_END_VOTING_DELAY_MS, internal.game.forceEndVoting, {
+    roomId,
+  });
 }
 
 // ---------- 公開クエリ ----------
@@ -179,6 +239,24 @@ export const getResult = query({
   },
 });
 
+/**
+ * discussion中の自由会話ログ。[{ seatId, text, _creationTime }] を時系列（_creationTime昇順）で返す。
+ * 会話は時系列であること自体が本質なので _creationTime を含めてよい（他テーブルの生返し禁止とは別枠）。
+ */
+export const listMessages = query({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .collect();
+
+    return messages
+      .map((m) => ({ seatId: m.seatId, text: m.text, _creationTime: m._creationTime }))
+      .sort((a, b) => a._creationTime - b._creationTime);
+  },
+});
+
 // ---------- ミューテーション ----------
 
 /** ホストのみ・lobbyのみ・人間2席以上必須。AI席を作りorderをシャッフルして開始する */
@@ -226,18 +304,8 @@ export const startGame = mutation({
       ),
     );
 
-    const promptDef = pickPrompt(0);
-    await ctx.db.patch(args.roomId, {
-      phase: "answering",
-      roundIndex: 0,
-      promptText: promptDef.text,
-      deadlineAt: Date.now() + ANSWER_DEADLINE_MS,
-    });
-
-    await ctx.scheduler.runAfter(scheduleAiDelayMs(), internal.ai.generateAnswer, {
-      roomId: args.roomId,
-      roundIndex: 0,
-    });
+    const promptDef = pickPrompt(0, []);
+    await enterAnsweringPhase(ctx, args.roomId, 0, promptDef.text, [promptDef.text]);
   },
 });
 
@@ -277,7 +345,11 @@ export const submitAnswer = mutation({
   },
 });
 
-/** ホストのみ・reveal中のみ。次ラウンド or 投票フェーズへ */
+/**
+ * ホストのみ。
+ * - reveal中: 次ラウンドがあれば answering へ、最終ラウンドなら discussion へ
+ * - discussion中: 投票へ手動で進める（時間切れを待たずに host が早める場合）
+ */
 export const nextRound = mutation({
   args: { roomId: v.id("rooms"), deviceId: v.string() },
   handler: async (ctx, args) => {
@@ -287,30 +359,28 @@ export const nextRound = mutation({
     }
 
     const room = await requireRoom(ctx, args.roomId);
-    if (room.phase !== "reveal") {
-      throw new Error("いまは次に進めるタイミングではありません。");
+
+    if (room.phase === "reveal") {
+      if (room.roundIndex + 1 < room.totalRounds) {
+        const usedPrompts = room.usedPrompts ?? [];
+        const nextIndex = room.roundIndex + 1;
+        const promptDef = pickPrompt(nextIndex, usedPrompts);
+        await enterAnsweringPhase(ctx, args.roomId, nextIndex, promptDef.text, [
+          ...usedPrompts,
+          promptDef.text,
+        ]);
+      } else {
+        await enterDiscussionPhase(ctx, args.roomId);
+      }
+      return;
     }
 
-    if (room.roundIndex + 1 < room.totalRounds) {
-      const nextIndex = room.roundIndex + 1;
-      const promptDef = pickPrompt(nextIndex);
-      await ctx.db.patch(args.roomId, {
-        phase: "answering",
-        roundIndex: nextIndex,
-        promptText: promptDef.text,
-        deadlineAt: Date.now() + ANSWER_DEADLINE_MS,
-      });
-      await ctx.scheduler.runAfter(scheduleAiDelayMs(), internal.ai.generateAnswer, {
-        roomId: args.roomId,
-        roundIndex: nextIndex,
-      });
-    } else {
-      // MVPでは discussion を飛ばして投票へ
-      await ctx.db.patch(args.roomId, {
-        phase: "voting",
-        deadlineAt: Date.now() + VOTE_DEADLINE_MS,
-      });
+    if (room.phase === "discussion") {
+      await enterVotingPhase(ctx, args.roomId);
+      return;
     }
+
+    throw new Error("いまは次に進めるタイミングではありません。");
   },
 });
 
@@ -352,7 +422,7 @@ export const castVote = mutation({
   },
 });
 
-/** discussion中のみ（MVPのUIからは使わない。将来のdiscussionフェーズ実装用） */
+/** discussion中のみ。text 1〜200字 */
 export const sendMessage = mutation({
   args: { roomId: v.id("rooms"), deviceId: v.string(), text: v.string() },
   handler: async (ctx, args) => {
@@ -372,5 +442,76 @@ export const sendMessage = mutation({
       seatId: owner.seatId,
       text: trimmed,
     });
+  },
+});
+
+// ---------- 内部ミューテーション（時間切れ強制進行） ----------
+
+/**
+ * answering の時間切れ。冪等: 部屋が無い/answering以外/roundIndex不一致なら黙って return
+ * （既に全員回答してrevealに進んでいるケースを含む）。
+ * AI席が未回答のまま時間切れになるのは絶対に避ける（無言＝AI即バレ）ので、
+ * AIがまだ回答していなければここでフォールバック文を直接保存してから reveal へ進む。
+ * 人間の未回答者はそのまま「未回答」としてUIに残す（回答は作らない）。
+ */
+export const forceAdvance = internalMutation({
+  args: { roomId: v.id("rooms"), roundIndex: v.number() },
+  handler: async (ctx, args) => {
+    const room = await ctx.db.get(args.roomId);
+    if (!room || room.phase !== "answering" || room.roundIndex !== args.roundIndex) {
+      return;
+    }
+
+    const secret = await ctx.db
+      .query("roomSecrets")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .first();
+    if (secret) {
+      const currentAnswers = await ctx.db
+        .query("answers")
+        .withIndex("by_room_round", (q) =>
+          q.eq("roomId", args.roomId).eq("roundIndex", args.roundIndex),
+        )
+        .collect();
+      const aiAlreadyAnswered = currentAnswers.some((a) => a.seatId === secret.aiSeatId);
+      if (!aiAlreadyAnswered) {
+        const fallbacks = getFallbacksForPrompt(room.promptText ?? "");
+        const text = fallbacks[Math.floor(Math.random() * fallbacks.length)] ?? GENERIC_FALLBACK_TEXT;
+        await ctx.db.insert("answers", {
+          roomId: args.roomId,
+          roundIndex: args.roundIndex,
+          seatId: secret.aiSeatId,
+          text,
+        });
+      }
+    }
+
+    await ctx.db.patch(args.roomId, { phase: "reveal" });
+  },
+});
+
+/**
+ * voting の時間切れ。冪等: 部屋が無い/voting以外なら黙って return
+ * （既に全員投票してresultに進んでいるケースを含む）。未投票者は棄権扱いのまま result へ進む。
+ */
+export const forceEndVoting = internalMutation({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const room = await ctx.db.get(args.roomId);
+    if (!room || room.phase !== "voting") return;
+    await ctx.db.patch(args.roomId, { phase: "result" });
+  },
+});
+
+/**
+ * discussion の時間切れ。冪等: 部屋が無い/discussion以外なら黙って return
+ * （ホストが手動で投票へ進めた後のケースを含む）。voting へ進める。
+ */
+export const forceEndDiscussion = internalMutation({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const room = await ctx.db.get(args.roomId);
+    if (!room || room.phase !== "discussion") return;
+    await enterVotingPhase(ctx, args.roomId);
   },
 });

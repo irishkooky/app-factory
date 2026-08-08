@@ -20,6 +20,13 @@ const MIN_ATTEMPT_DELAY_MS = 6_000;
 const ATTEMPT_DELAY_RANGE_MS = 6_000;
 const MAX_ATTEMPTS = 8;
 
+// discussion中のAI割り込み（maybeChime）用の定数
+const CHIME_MAX_LENGTH = 30;
+const CHIME_MIN_LENGTH = 2;
+const CHIME_MIN_MESSAGES = 5;
+const CHIME_RETRY_DELAY_MS = 10_000;
+const CHIME_MAX_ATTEMPTS = 3;
+
 // Convexアクションのランタイムには process.env が生えているが、このアプリの
 // tsconfig.json は Node の型（@types/node）を含んでいない（共有設定のため変更しない）。
 // このファイル内でだけ使う最小限のアンビエント型をローカルに宣言する。
@@ -44,8 +51,12 @@ function stripSpeakerPrefix(text: string, knownAliases: string[]): string {
   return text.replace(/^(?!\d+[:：])[^\s:：]{1,12}[:：]\s*/, "");
 }
 
-/** AI生の出力から話者名プレフィックス・前置き・引用符・ラベル・改行を剥がし、40字以内に整える */
-function sanitizeAiText(raw: string, knownAliases: string[]): string {
+/**
+ * AI生の出力から話者名プレフィックス・前置き・引用符・ラベル・改行を剥がし、maxLength字以内に整える。
+ * maxLength未指定時は回答フェーズ用の40字（generateAnswerで使用）。discussionの割り込み（maybeChime）は
+ * 30字を渡して使う。
+ */
+function sanitizeAiText(raw: string, knownAliases: string[], maxLength: number = MAX_ANSWER_LENGTH): string {
   let text = raw.trim();
   if (text.length === 0) return "";
 
@@ -67,8 +78,8 @@ function sanitizeAiText(raw: string, knownAliases: string[]): string {
   text = text.replace(/^["'「『“]+/, "").replace(/["'」』”]+$/, "");
   text = text.trim();
 
-  if (text.length > MAX_ANSWER_LENGTH) {
-    const truncated = text.slice(0, MAX_ANSWER_LENGTH);
+  if (text.length > maxLength) {
+    const truncated = text.slice(0, maxLength);
     const lastPunctuationIndex = Math.max(
       truncated.lastIndexOf("。"),
       truncated.lastIndexOf("！"),
@@ -362,6 +373,207 @@ ${pastAnswersText}
       } catch (retryErr) {
         console.error("generateAnswer: saveAiAnswer の再試行にも失敗しました。", retryErr);
       }
+    }
+  },
+});
+
+/**
+ * maybeChime が必要とする情報一式。discussion中でなければ null（呼び出し側は何もしない）。
+ */
+export const getChimeContext = internalQuery({
+  args: { roomId: v.id("rooms") },
+  handler: async (ctx, args) => {
+    const room = await ctx.db.get(args.roomId);
+    if (!room || room.phase !== "discussion") return null;
+
+    const secret = await ctx.db
+      .query("roomSecrets")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .first();
+    if (!secret) return null;
+
+    const aiSeat = await ctx.db.get(secret.aiSeatId);
+    if (!aiSeat) return null;
+
+    const seats = await ctx.db
+      .query("seats")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .collect();
+    const aliasBySeat = new Map(seats.map((seat) => [seat._id, seat.alias]));
+
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .collect();
+    const chatLog = messages
+      .slice()
+      .sort((a, b) => a._creationTime - b._creationTime)
+      .map((m) => ({ alias: aliasBySeat.get(m.seatId) ?? "?", text: m.text }));
+
+    // 各ラウンドのお題（usedPromptsに順番どおり記録されている）と回答一覧
+    const usedPrompts = room.usedPrompts ?? [];
+    const roundsSummary: { promptText: string; answers: { alias: string; text: string }[] }[] = [];
+    for (let round = 0; round < room.totalRounds; round++) {
+      const roundAnswers = await ctx.db
+        .query("answers")
+        .withIndex("by_room_round", (q) => q.eq("roomId", args.roomId).eq("roundIndex", round))
+        .collect();
+      roundsSummary.push({
+        promptText: usedPrompts[round] ?? "",
+        answers: roundAnswers.map((a) => ({
+          alias: aliasBySeat.get(a.seatId) ?? "?",
+          text: a.text,
+        })),
+      });
+    }
+
+    return {
+      aiAlias: aiSeat.alias,
+      seatAliases: seats.map((seat) => seat.alias),
+      chatLog,
+      roundsSummary,
+      messageCount: messages.length,
+    };
+  },
+});
+
+/**
+ * AIの割り込み発言を保存する。冪等: 部屋が discussion 中でなければ黙って return。
+ */
+export const saveChime = internalMutation({
+  args: { roomId: v.id("rooms"), text: v.string() },
+  handler: async (ctx, args) => {
+    const room = await ctx.db.get(args.roomId);
+    if (!room || room.phase !== "discussion") return;
+
+    const secret = await ctx.db
+      .query("roomSecrets")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .first();
+    if (!secret) return;
+
+    await ctx.db.insert("messages", {
+      roomId: args.roomId,
+      seatId: secret.aiSeatId,
+      text: args.text,
+    });
+  },
+});
+
+/**
+ * discussion中にAIが短く割り込んで発言するかどうかを判断し、必要なら投稿する。
+ * phase !== "discussion" なら黙って return（冪等）。
+ * 会話が CHIME_MIN_MESSAGES 件未満のうちは、まだ盛り上がっていないと判断して
+ * 自分を再スケジュールして待つ（最大 CHIME_MAX_ATTEMPTS 回。上限に達したら諦めて return）。
+ * 回答フェーズと違い、割り込まないこと自体は不自然ではないため、生成失敗・空文字のときは
+ * 無理にフォールバック発言をせず黙って return してよい。
+ */
+export const maybeChime = internalAction({
+  args: { roomId: v.id("rooms"), attempt: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const attempt = args.attempt ?? 0;
+
+    let context;
+    try {
+      context = await ctx.runQuery(internal.ai.getChimeContext, { roomId: args.roomId });
+    } catch (err) {
+      console.error("maybeChime: getChimeContext の呼び出しに失敗しました。", err);
+      return;
+    }
+    if (context === null) return;
+
+    if (context.messageCount < CHIME_MIN_MESSAGES) {
+      if (attempt < CHIME_MAX_ATTEMPTS) {
+        await ctx.scheduler.runAfter(CHIME_RETRY_DELAY_MS, internal.ai.maybeChime, {
+          roomId: args.roomId,
+          attempt: attempt + 1,
+        });
+      }
+      return;
+    }
+
+    const system = `あなたは「チューリング人狼」という会話ゲームの自由会話フェーズに、参加者の一人として紛れ込んでいます。
+あなたの正体はAIですが、他の人間の参加者に絶対に気づかれてはいけません。
+
+いま進行中の雑談に、短く1回だけ割り込んでください。
+
+出力ルール（絶対厳守）:
+- 日本語で30文字以内、1文だけ
+- 発言本文のみを出力する（前置き・引用符・ラベル・説明を一切つけない）
+- 直前の会話の話題に具体的に触れること
+
+禁止事項:
+- 質問を質問で返すだけの発言
+- 「〜ですね!」「なるほど」「わかる」だけのような相槌のみで終わる発言
+- 「〜な面もありますが」のような両論併記や、一般論・教科書的な説明
+- 30文字を超える発言
+- 絵文字（他の参加者が使っていなければ0個にする）
+- 「AIとして」「私は」で始まる発言
+- 自分の仮名や話者名を発言の先頭に付けること`;
+
+    const chatLogText =
+      context.chatLog.length > 0
+        ? context.chatLog.map((m) => `- ${m.alias}: ${m.text}`).join("\n")
+        : "（まだ発言はありません）";
+    const roundsText = context.roundsSummary
+      .filter((r) => r.promptText.length > 0)
+      .map(
+        (r, i) =>
+          `ラウンド${i + 1}「${r.promptText}」\n${r.answers.map((a) => `- ${a.alias}: ${a.text}`).join("\n")}`,
+      )
+      .join("\n\n");
+
+    const prompt = `これまでのお題と回答（話題の参考にすること）:
+${roundsText}
+
+直前の自由会話ログ（新しい発言ほど下）:
+${chatLogText}
+
+あなたの仮名は「${context.aiAlias}」です。上の会話の直前の話題に短く割り込んでください。
+
+あなたの発言（本文のみ、30文字以内。先頭に仮名や名前を付けない）:`;
+
+    let text = "";
+    const endpoint = process.env.AI_ENDPOINT;
+    const secret = process.env.AI_ROUTE_SECRET;
+
+    if (endpoint && secret) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "x-ai-secret": secret,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ system, prompt }),
+            signal: controller.signal,
+          });
+          if (res.ok) {
+            const data = (await res.json()) as { text?: string };
+            const sanitized = sanitizeAiText(data.text ?? "", context.seatAliases, CHIME_MAX_LENGTH);
+            text = sanitized.length >= CHIME_MIN_LENGTH ? sanitized : "";
+          }
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      } catch {
+        // fetch失敗・タイムアウトの場合、割り込まないこと自体は不自然ではないので何もしない
+        text = "";
+      }
+    }
+
+    if (!text) {
+      // 生成できなかった場合は無理に発言しない（無言のままでも不自然ではないフェーズのため）
+      return;
+    }
+
+    try {
+      await ctx.runMutation(internal.ai.saveChime, { roomId: args.roomId, text });
+    } catch (err) {
+      console.error("maybeChime: saveChime に失敗しました。", err);
     }
   },
 });

@@ -15,7 +15,8 @@ export default defineSchema({
     roundIndex: v.number(), // 0 始まり
     totalRounds: v.number(), // MVPでは 1 で作成
     promptText: v.optional(v.string()), // 現ラウンドのお題
-    deadlineAt: v.optional(v.number()), // ms epoch（MVPでは未使用のままでよい）
+    deadlineAt: v.optional(v.number()), // ms epoch。answering/voting/discussionの時間切れに使う
+    usedPrompts: v.optional(v.array(v.string())), // 既に出題したお題テキスト（同じ部屋での重複出題を避ける）
   }).index("by_code", ["code"]),
 
   seats: defineTable({

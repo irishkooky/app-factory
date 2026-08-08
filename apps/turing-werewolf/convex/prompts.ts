@@ -72,11 +72,21 @@ export const PROMPTS: PromptDef[][] = [
   ],
 ];
 
-/** 難易度 = min(roundIndex, 2) からランダムに1つ選ぶ */
-export function pickPrompt(roundIndex: number): PromptDef {
+/** どのお題としても対応がつかない場合の最後の砦（本来到達しない想定） */
+export const GENERIC_FALLBACK_TEXT = "うーん、ちょっと迷い中です";
+
+/**
+ * 難易度 = min(roundIndex, 2) からランダムに1つ選ぶ。
+ * excludeTexts に含まれるテキストは避ける（同じ部屋で同じお題が2回出ないようにするため）。
+ * その難易度の全お題が使い尽くされている場合のみ重複を許す。
+ */
+export function pickPrompt(roundIndex: number, excludeTexts: string[] = []): PromptDef {
   const difficulty = Math.min(roundIndex, PROMPTS.length - 1);
   const pool = PROMPTS[difficulty];
-  return pool[Math.floor(Math.random() * pool.length)];
+  const excluded = new Set(excludeTexts);
+  const available = pool.filter((p) => !excluded.has(p.text));
+  const candidates = available.length > 0 ? available : pool;
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 /** promptText からフォールバック候補を逆引きする。見つからなければ汎用フォールバック */
@@ -87,7 +97,7 @@ export function getFallbacksForPrompt(promptText: string): string[] {
       return found.fallbacks;
     }
   }
-  return ["うーん、ちょっと迷い中です", "それ、あとで考えます"];
+  return [GENERIC_FALLBACK_TEXT, "それ、あとで考えます"];
 }
 
 // 「色/形容 + 動物」のひらがな仮名。部屋内で未使用のものをランダムに割り当てる。
