@@ -16,7 +16,7 @@ export const Route = createFileRoute('/why')({
   component: WhyComponent,
 })
 
-const LISTEN_BY_CHANNEL_SNIPPET = `export const listByChannel = query({
+const LIST_BY_CHANNEL_SNIPPET = `export const listByChannel = query({
   args: { channelId: v.id("channels") },
   handler: async (ctx, args) => {
     const recent = await ctx.db
@@ -138,7 +138,7 @@ function WhyComponent() {
             <Text size="sm" fw={600}>
               実コード: convex/messages.ts の listByChannel（抜粋）
             </Text>
-            <Code block>{LISTEN_BY_CHANNEL_SNIPPET}</Code>
+            <Code block>{LIST_BY_CHANNEL_SNIPPET}</Code>
             <Text size="sm" fw={600} mt="xs">
               このクエリを使う側（src/routes/index.tsx）
             </Text>

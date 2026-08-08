@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, startTransition, useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import type { ErrorComponentProps } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
@@ -7,6 +8,7 @@ import type { FunctionReturnType } from 'convex/server'
 import {
   Accordion,
   ActionIcon,
+  Alert,
   Anchor,
   Avatar,
   Badge,
@@ -19,6 +21,7 @@ import {
   NavLink,
   ScrollArea,
   Select,
+  Skeleton,
   Stack,
   Text,
   TextInput,
@@ -31,7 +34,25 @@ import { ALLOWED_EMOJIS } from '../lib/emojis'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
+  errorComponent: ErrorComponent,
 })
+
+function ErrorComponent({ reset }: ErrorComponentProps) {
+  return (
+    <Container size="sm" py="xl">
+      <Alert color="red" title="エラー">
+        <Stack gap="sm">
+          <Text size="sm">
+            バックエンドに接続できません。時間をおいて再読み込みしてください。
+          </Text>
+          <Button size="xs" variant="light" color="red" onClick={reset}>
+            再試行
+          </Button>
+        </Stack>
+      </Alert>
+    </Container>
+  )
+}
 
 type ChannelWithStats = FunctionReturnType<
   typeof api.channels.listWithStats
@@ -66,6 +87,12 @@ function HomeComponent() {
   const [updateCount, setUpdateCount] = useState(0)
 
   const activeChannelId = selectedChannelId ?? channelList[0]?._id ?? null
+
+  function handleSelectChannel(channelId: string) {
+    startTransition(() => {
+      setSelectedChannelId(channelId)
+    })
+  }
 
   if (channelList.length === 0) {
     return (
@@ -109,16 +136,19 @@ function HomeComponent() {
             <ChannelSidebar
               channels={channelList}
               activeChannelId={activeChannelId}
-              onSelect={setSelectedChannelId}
+              onSelect={handleSelectChannel}
             />
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 6 }}>
             {activeChannelId && (
-              <ChatPane
-                channelId={activeChannelId as Id<'channels'>}
-                members={members.data}
-                onDataUpdated={setUpdateCount}
-              />
+              <Suspense fallback={<Skeleton h={420} radius="md" />}>
+                <ChatPane
+                  key={activeChannelId}
+                  channelId={activeChannelId as Id<'channels'>}
+                  members={members.data}
+                  onDataUpdated={setUpdateCount}
+                />
+              </Suspense>
             )}
           </Grid.Col>
           <Grid.Col span={{ base: 12, md: 3 }}>
@@ -203,6 +233,15 @@ function ChatPane({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [botDisabled, setBotDisabled] = useState(false)
+  const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (botTimeoutRef.current !== null) {
+        clearTimeout(botTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const isBodyBlank = body.trim().length === 0
 
@@ -235,7 +274,7 @@ function ChatPane({
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Bot召喚に失敗しました')
     } finally {
-      setTimeout(() => setBotDisabled(false), 3000)
+      botTimeoutRef.current = setTimeout(() => setBotDisabled(false), 3000)
     }
   }
 
@@ -281,35 +320,45 @@ function ChatPane({
           </Stack>
         </ScrollArea>
 
-        <form onSubmit={handleSubmit}>
-          <Stack gap="xs">
-            <Group gap="xs" wrap="nowrap">
-              <Select
-                data={personaOptions}
-                value={activePersonaId}
-                onChange={setPersonaId}
-                allowDeselect={false}
-                w={160}
-                aria-label="投稿ペルソナ"
-              />
-              <TextInput
-                style={{ flex: 1 }}
-                placeholder="メッセージを入力…"
-                maxLength={500}
-                value={body}
-                onChange={(event) => setBody(event.currentTarget.value)}
-              />
-              <Button type="submit" loading={isSubmitting} disabled={isBodyBlank}>
-                送信
-              </Button>
-            </Group>
-            {errorMessage && (
-              <Text c="red" size="sm">
-                {errorMessage}
-              </Text>
-            )}
-          </Stack>
-        </form>
+        {nonBotMembers.length === 0 ? (
+          <Text c="dimmed" size="sm">
+            投稿できるメンバーがいません
+          </Text>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <Stack gap="xs">
+              <Group gap="xs" wrap="nowrap">
+                <Select
+                  data={personaOptions}
+                  value={activePersonaId}
+                  onChange={setPersonaId}
+                  allowDeselect={false}
+                  w={160}
+                  aria-label="投稿ペルソナ"
+                />
+                <TextInput
+                  style={{ flex: 1 }}
+                  placeholder="メッセージを入力…"
+                  maxLength={500}
+                  value={body}
+                  onChange={(event) => setBody(event.currentTarget.value)}
+                />
+                <Button
+                  type="submit"
+                  loading={isSubmitting}
+                  disabled={isBodyBlank || !activePersonaId}
+                >
+                  送信
+                </Button>
+              </Group>
+              {errorMessage && (
+                <Text c="red" size="sm">
+                  {errorMessage}
+                </Text>
+              )}
+            </Stack>
+          </form>
+        )}
 
         <Button
           variant="gradient"
