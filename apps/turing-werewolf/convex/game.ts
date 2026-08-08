@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
-import { pickAlias, pickPrompt } from "./prompts";
+import type { Doc, Id } from "./_generated/dataModel";
+import { pickAlias, pickAliases, pickPrompt } from "./prompts";
 import {
   advanceIfAllAnswered,
   advanceIfAllVoted,
@@ -16,7 +16,17 @@ const VOTE_DEADLINE_MS = 45_000;
 const AI_DELAY_MIN_MS = 8_000;
 const AI_DELAY_RANGE_MS = 25_000;
 
-const OPEN_PHASES = new Set<string>(["reveal", "discussion", "voting", "result"]);
+const OPEN_PHASES: Set<Doc<"rooms">["phase"]> = new Set([
+  "reveal",
+  "discussion",
+  "voting",
+  "result",
+]);
+
+/** seatId の文字列比較でソートする（提出/投票順から誰がAIかを推測されないようにするため） */
+function compareSeatId(a: Id<"seats">, b: Id<"seats">): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
 
 function scheduleAiDelayMs(): number {
   return AI_DELAY_MIN_MS + Math.floor(Math.random() * AI_DELAY_RANGE_MS);
@@ -47,18 +57,23 @@ export const listAnswers = query({
     if (isPastRound || isCurrentRoundOpen) {
       return {
         phase: "open" as const,
-        answers: answers.map((a) => ({ seatId: a.seatId, text: a.text })),
+        answers: answers
+          .map((a) => ({ seatId: a.seatId, text: a.text }))
+          .sort((a, b) => compareSeatId(a.seatId, b.seatId)),
       };
     }
 
     return {
       phase: "hidden" as const,
-      submittedSeatIds: answers.map((a) => a.seatId),
+      submittedSeatIds: answers.map((a) => a.seatId).sort(compareSeatId),
     };
   },
 });
 
-/** voting中は投票済み人数、result では全票も含める */
+/**
+ * voting中は投票済み人数のみ（result では全票も含める）。
+ * votedSeatIds は返さない: AIは投票しないため「投票済みでない席＝AI」と逆算されてしまうため。
+ */
 export const getVoteStatus = query({
   args: { roomId: v.id("rooms") },
   handler: async (ctx, args) => {
@@ -72,24 +87,18 @@ export const getVoteStatus = query({
     const totalSeats = seatOwners.length;
 
     if (room.phase !== "voting" && room.phase !== "result") {
-      return {
-        votedCount: 0,
-        totalSeats,
-        votedSeatIds: [] as Id<"seats">[],
-      };
+      return { votedCount: 0, totalSeats };
     }
 
     const votes = await ctx.db
       .query("votes")
       .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
       .collect();
-    const votedSeatIds = votes.map((vote) => vote.voterSeatId);
 
     if (room.phase === "result") {
       return {
         votedCount: votes.length,
         totalSeats,
-        votedSeatIds,
         allVotes: votes.map((vote) => ({
           voterSeatId: vote.voterSeatId,
           targetSeatId: vote.targetSeatId,
@@ -97,7 +106,35 @@ export const getVoteStatus = query({
       };
     }
 
-    return { votedCount: votes.length, totalSeats, votedSeatIds };
+    return { votedCount: votes.length, totalSeats };
+  },
+});
+
+/**
+ * 自分の投票先だけを返す。{ targetSeatId } | null。
+ * 自分の票しか読まないので、他人の投票先や誰が投票済みかは漏れない。
+ * リロード後も選択状態を復元するために使う。
+ */
+export const getMyVote = query({
+  args: { roomId: v.id("rooms"), deviceId: v.string() },
+  handler: async (ctx, args) => {
+    const owner = await ctx.db
+      .query("seatOwners")
+      .withIndex("by_room_device", (q) =>
+        q.eq("roomId", args.roomId).eq("deviceId", args.deviceId),
+      )
+      .first();
+    if (!owner) return null;
+
+    const vote = await ctx.db
+      .query("votes")
+      .withIndex("by_room_voter", (q) =>
+        q.eq("roomId", args.roomId).eq("voterSeatId", owner.seatId),
+      )
+      .first();
+    if (!vote) return null;
+
+    return { targetSeatId: vote.targetSeatId };
   },
 });
 
@@ -136,7 +173,7 @@ export const getResult = query({
 
     const maxCount = tally.reduce((max, t) => Math.max(max, t.count), 0);
     const aiCount = countBySeat.get(secret.aiSeatId) ?? 0;
-    const humansWin = aiCount === maxCount;
+    const humansWin = maxCount > 0 && aiCount === maxCount;
 
     return { aiSeatId: secret.aiSeatId, tally, humansWin };
   },
@@ -166,23 +203,27 @@ export const startGame = mutation({
       throw new Error("開始するには2人以上の参加者が必要です。");
     }
 
-    // AI席を1つ作成し、秘密テーブルに記録する
-    const aiAlias = pickAlias(humanSeats.map((seat) => seat.alias));
+    // AI席を1つ作成し、秘密テーブルに記録する（aliasはこの後すぐ全席分まとめて振り直すので仮でよい）
     const aiSeatId = await ctx.db.insert("seats", {
       roomId: args.roomId,
-      alias: aiAlias,
+      alias: pickAlias(humanSeats.map((seat) => seat.alias)),
       order: humanSeats.length,
     });
     await ctx.db.insert("roomSecrets", { roomId: args.roomId, aiSeatId });
 
-    // 全席（AI含む）の order をシャッフルして振り直す
+    // 全席（AI含む）の alias と order をまとめて新規に振り直す。
+    // ロビーで確定していた人間の仮名をそのまま残すと「ロビーに無かった仮名＝AI」で
+    // 一発でバレるため、開始時に全員分の仮名を新しく引き直す（表示順も同時にシャッフル）。
     const allSeats = await ctx.db
       .query("seats")
       .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
       .collect();
+    const newAliases = pickAliases(allSeats.length);
     const shuffledOrders = shuffle(allSeats.map((_, i) => i));
     await Promise.all(
-      allSeats.map((seat, i) => ctx.db.patch(seat._id, { order: shuffledOrders[i] })),
+      allSeats.map((seat, i) =>
+        ctx.db.patch(seat._id, { alias: newAliases[i], order: shuffledOrders[i] }),
+      ),
     );
 
     const promptDef = pickPrompt(0);

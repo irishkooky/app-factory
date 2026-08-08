@@ -1,5 +1,7 @@
 // お題・フォールバック回答・仮名の定数定義。DBには入れない。
 
+import { shuffle } from "./lib";
+
 export type PromptDef = { text: string; fallbacks: string[] };
 
 // PROMPTS[0] = 難易度1（易・人間有利）
@@ -124,4 +126,21 @@ export function pickAlias(usedAliases: string[]): string {
     return available[Math.floor(Math.random() * available.length)];
   }
   return `${ALIASES[Math.floor(Math.random() * ALIASES.length)]}${used.size + 1}`;
+}
+
+/**
+ * 重複なしで count 個の仮名をランダムに選ぶ（startGame で全席分を一括で振り直すために使う）。
+ * プールを使い切ったら連番を付けて衝突を避ける。
+ */
+export function pickAliases(count: number): string[] {
+  const shuffled = shuffle(ALIASES);
+  const result = shuffled.slice(0, count);
+  let extraIndex = 0;
+  while (result.length < count) {
+    const base = ALIASES[extraIndex % ALIASES.length];
+    const suffix = Math.floor(extraIndex / ALIASES.length) + 2;
+    result.push(`${base}${suffix}`);
+    extraIndex++;
+  }
+  return result;
 }

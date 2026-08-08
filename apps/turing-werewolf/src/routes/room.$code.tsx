@@ -306,6 +306,12 @@ function AnsweringPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
         </Stack>
       </Card>
 
+      {room.roundIndex === 0 && (
+        <Text size="xs" c="dimmed" ta="center">
+          ※ゲーム開始時に全員の仮名を振り直しました
+        </Text>
+      )}
+
       <Card withBorder radius="md" padding="lg">
         {hasSubmitted ? (
           <Alert color="green" variant="light">
@@ -439,12 +445,15 @@ function VotingPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
   const { data: voteStatus } = useSuspenseQuery(
     convexQuery(api.game.getVoteStatus, { roomId: room._id }),
   )
+  // 自分の投票先はサーバーの購読結果から表示する（ローカルstateだとリロードで消え、
+  // castVote失敗時に選択表示が実際とズレるため）。
+  const { data: myVote } = useSuspenseQuery(
+    convexQuery(api.game.getMyVote, { roomId: room._id, deviceId }),
+  )
 
-  const [selectedSeatId, setSelectedSeatId] = useState<Id<'seats'> | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   async function handleVote(targetSeatId: Id<'seats'>) {
-    setSelectedSeatId(targetSeatId)
     setErrorMessage(null)
     try {
       await castVote({ roomId: room._id, deviceId, targetSeatId })
@@ -473,16 +482,22 @@ function VotingPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
         {seats
           .filter((seat) => seat.seatId !== mySeat.seatId)
           .map((seat) => {
-            const isSelected = selectedSeatId === seat.seatId
+            const isSelected = myVote?.targetSeatId === seat.seatId
             return (
               <Card
                 key={seat.seatId}
+                component="button"
+                type="button"
                 withBorder
                 radius="md"
                 padding="md"
                 onClick={() => handleVote(seat.seatId)}
                 style={{
                   cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                  font: 'inherit',
+                  color: 'inherit',
                   borderColor: isSelected ? 'var(--mantine-primary-color-6)' : undefined,
                   borderWidth: isSelected ? 2 : undefined,
                 }}

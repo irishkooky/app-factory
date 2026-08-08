@@ -1,12 +1,24 @@
 import { v } from "convex/values";
-import { internalAction, internalMutation, internalQuery } from "./_generated/server";
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+  type ActionCtx,
+} from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { getFallbacksForPrompt } from "./prompts";
 import { advanceIfAllAnswered } from "./lib";
 
 const AI_TIMEOUT_MS = 15_000;
 const MAX_ANSWER_LENGTH = 40;
+const MIN_ANSWER_LENGTH = 8;
 const FALLBACK_TEXT = "うーん、ちょっと迷い中です";
+
+// 人間の回答が半分未満のうちは、AIの提出が早すぎて特定されないように自分を再スケジュールする。
+const MIN_ATTEMPT_DELAY_MS = 6_000;
+const ATTEMPT_DELAY_RANGE_MS = 6_000;
+const MAX_ATTEMPTS = 8;
 
 // Convexアクションのランタイムには process.env が生えているが、このアプリの
 // tsconfig.json は Node の型（@types/node）を含んでいない（共有設定のため変更しない）。
@@ -48,6 +60,20 @@ function sanitizeAiText(raw: string): string {
   return text.trim();
 }
 
+/** フォールバックを1つ保存しようと試みる（失敗してもthrowしない。呼び出し側の最後の砦） */
+async function trySaveFallback(
+  ctx: ActionCtx,
+  roomId: Id<"rooms">,
+  roundIndex: number,
+  text: string,
+): Promise<void> {
+  try {
+    await ctx.runMutation(internal.ai.saveAiAnswer, { roomId, roundIndex, text });
+  } catch (err) {
+    console.error("generateAnswer: フォールバック保存にも失敗しました。", err);
+  }
+}
+
 /**
  * generateAnswer が必要とする情報一式。
  * 部屋がanswering中でなかったり、AIが既に回答済みなら null（呼び出し側は何もしない）。
@@ -87,7 +113,7 @@ export const getAiContext = internalQuery({
     const aliasBySeat = new Map(seats.map((seat) => [seat._id, seat.alias]));
 
     // 過去〜現在ラウンドの全回答（alias つき）。文体を合わせるための参考情報
-    const pastAnswers: { alias: string; text: string }[] = [];
+    const allAnswers: { seatId: Id<"seats">; alias: string; text: string }[] = [];
     for (let round = 0; round <= args.roundIndex; round++) {
       const roundAnswers =
         round === args.roundIndex
@@ -99,20 +125,29 @@ export const getAiContext = internalQuery({
               )
               .collect();
       for (const answer of roundAnswers) {
-        pastAnswers.push({
+        allAnswers.push({
+          seatId: answer.seatId,
           alias: aliasBySeat.get(answer.seatId) ?? "?",
           text: answer.text,
         });
       }
     }
 
+    const pastAnswers = allAnswers.map(({ alias, text }) => ({ alias, text }));
+    // 文体統計（平均文字数など）はAI自身の過去回答を混ぜると偏るので人間分だけに絞る
+    const humanAnswerTexts = allAnswers
+      .filter((a) => a.seatId !== secret.aiSeatId)
+      .map((a) => a.text);
+
     return {
       phase: room.phase,
       promptText: room.promptText ?? "",
-      seatAliases: seats.map((seat) => ({ seatId: seat._id, alias: seat.alias })),
       aiAlias: aiSeat.alias,
       pastAnswers,
-      humanAnswerTexts: pastAnswers.map((a) => a.text),
+      humanAnswerTexts,
+      // 現ラウンドで既に回答した人間の数と、部屋の人間の総席数（= seats - AI席1つ）
+      humanAnsweredCount: currentRoundAnswers.length,
+      humanSeatCount: seats.length - 1,
     };
   },
 });
@@ -158,17 +193,45 @@ export const saveAiAnswer = internalMutation({
 
 /**
  * Convexアクション → 自アプリWorkerの /api/generate → Workers AI (llama-3.3-70b) の順でAI回答を生成する。
- * fetch失敗・非200・タイムアウト(15秒)・空文字の場合は必ずフォールバックへ回り、ゲームを止めない。
+ * fetch失敗・非200・タイムアウト(15秒)・空文字/短すぎる出力の場合は必ずフォールバックへ回り、ゲームを止めない。
+ *
+ * 人間の回答がまだ半分未満のうちは、提出が早すぎて特定されないように自分自身を
+ * 再スケジュール（attempt をインクリメントして runAfter）する。attempt が上限に達したら
+ * 人間が揃っていなくても構わず生成する（無言でゲームが止まるほうが最悪のため）。
  */
 export const generateAnswer = internalAction({
-  args: { roomId: v.id("rooms"), roundIndex: v.number() },
+  args: {
+    roomId: v.id("rooms"),
+    roundIndex: v.number(),
+    attempt: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
-    const context = await ctx.runQuery(internal.ai.getAiContext, {
-      roomId: args.roomId,
-      roundIndex: args.roundIndex,
-    });
+    const attempt = args.attempt ?? 0;
+
+    let context;
+    try {
+      context = await ctx.runQuery(internal.ai.getAiContext, {
+        roomId: args.roomId,
+        roundIndex: args.roundIndex,
+      });
+    } catch (err) {
+      console.error("generateAnswer: getAiContext の呼び出しに失敗しました。", err);
+      await trySaveFallback(ctx, args.roomId, args.roundIndex, FALLBACK_TEXT);
+      return;
+    }
     if (context === null) {
       // 部屋の状態が変わっている、もしくは既にAIが回答済み
+      return;
+    }
+
+    const notEnoughHumansYet =
+      context.humanAnsweredCount < Math.ceil(context.humanSeatCount / 2);
+    if (notEnoughHumansYet && attempt < MAX_ATTEMPTS) {
+      await ctx.scheduler.runAfter(
+        MIN_ATTEMPT_DELAY_MS + Math.floor(Math.random() * ATTEMPT_DELAY_RANGE_MS),
+        internal.ai.generateAnswer,
+        { roomId: args.roomId, roundIndex: args.roundIndex, attempt: attempt + 1 },
+      );
       return;
     }
 
@@ -231,7 +294,9 @@ ${pastAnswersText}
           });
           if (res.ok) {
             const data = (await res.json()) as { text?: string };
-            text = sanitizeAiText(data.text ?? "");
+            const sanitized = sanitizeAiText(data.text ?? "");
+            // 短すぎる出力（切り詰めすぎ・意味のない断片）はフォールバック扱いにする
+            text = sanitized.length >= MIN_ANSWER_LENGTH ? sanitized : "";
           }
         } finally {
           clearTimeout(timeoutId);
@@ -247,10 +312,27 @@ ${pastAnswersText}
       text = fallbacks[Math.floor(Math.random() * fallbacks.length)] ?? FALLBACK_TEXT;
     }
 
-    await ctx.runMutation(internal.ai.saveAiAnswer, {
-      roomId: args.roomId,
-      roundIndex: args.roundIndex,
-      text,
-    });
+    try {
+      await ctx.runMutation(internal.ai.saveAiAnswer, {
+        roomId: args.roomId,
+        roundIndex: args.roundIndex,
+        text,
+      });
+    } catch (err) {
+      console.error(
+        "generateAnswer: saveAiAnswer に失敗しました。2秒後に1回だけ再試行します。",
+        err,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      try {
+        await ctx.runMutation(internal.ai.saveAiAnswer, {
+          roomId: args.roomId,
+          roundIndex: args.roundIndex,
+          text,
+        });
+      } catch (retryErr) {
+        console.error("generateAnswer: saveAiAnswer の再試行にも失敗しました。", retryErr);
+      }
+    }
   },
 });
