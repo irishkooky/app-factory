@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useQuery, useSuspenseQuery } from '@tanstack/react-query'
+import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
@@ -94,23 +94,14 @@ function RoomRoute() {
 // ---------- 部屋の外枠（自席の解決） ----------
 
 function RoomShell({ code, room }: { code: string; room: RoomDoc }) {
+  // deviceId は localStorage 由来なのでクライアントでしか読めない。確定するまでは
+  // 自席のクエリを一切マウントせず、確定後に deviceId を key にして下位を作り直す。
   const [deviceId, setDeviceId] = useState<string | null>(null)
   useEffect(() => {
     setDeviceId(getDeviceId())
   }, [])
 
-  const { data: seats } = useSuspenseQuery(
-    convexQuery(api.rooms.listSeats, { roomId: room._id }),
-  )
-  const { data: mySeat } = useQuery({
-    ...convexQuery(api.rooms.getMySeat, {
-      roomId: room._id,
-      deviceId: deviceId ?? '',
-    }),
-    enabled: deviceId !== null,
-  })
-
-  if (deviceId === null || mySeat === undefined) {
+  if (deviceId === null) {
     return (
       <Container size="sm" py="xl">
         <Center py="xl">
@@ -119,6 +110,37 @@ function RoomShell({ code, room }: { code: string; room: RoomDoc }) {
       </Container>
     )
   }
+
+  return (
+    <Suspense
+      fallback={
+        <Container size="sm" py="xl">
+          <Center py="xl">
+            <Loader />
+          </Center>
+        </Container>
+      }
+    >
+      <RoomShellWithSeat key={deviceId} code={code} room={room} deviceId={deviceId} />
+    </Suspense>
+  )
+}
+
+function RoomShellWithSeat({
+  code,
+  room,
+  deviceId,
+}: {
+  code: string
+  room: RoomDoc
+  deviceId: string
+}) {
+  const { data: seats } = useSuspenseQuery(
+    convexQuery(api.rooms.listSeats, { roomId: room._id }),
+  )
+  const { data: mySeat } = useSuspenseQuery(
+    convexQuery(api.rooms.getMySeat, { roomId: room._id, deviceId }),
+  )
 
   if (mySeat === null) {
     return (
