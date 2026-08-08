@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 
@@ -79,20 +79,20 @@ export const send = mutation({
     const MAX_BODY_LENGTH = 500;
     const trimmed = args.body.trim();
     if (trimmed.length === 0) {
-      throw new Error("メッセージを入力してください");
+      throw new ConvexError("メッセージを入力してください");
     }
     if (trimmed.length > MAX_BODY_LENGTH) {
-      throw new Error("メッセージは500文字以内にしてください");
+      throw new ConvexError("メッセージは500文字以内にしてください");
     }
 
     const channel = await ctx.db.get(args.channelId);
     if (channel === null) {
-      throw new Error("チャンネルが見つかりません");
+      throw new ConvexError("チャンネルが見つかりません");
     }
 
     const author = await ctx.db.get(args.authorId);
     if (author === null || author.isBot === true) {
-      throw new Error("投稿者が不正です");
+      throw new ConvexError("投稿者が不正です");
     }
 
     await ctx.db.insert("messages", {
@@ -108,7 +108,7 @@ export const summonBot = mutation({
   handler: async (ctx, args) => {
     const channel = await ctx.db.get(args.channelId);
     if (channel === null) {
-      throw new Error("チャンネルが見つかりません");
+      throw new ConvexError("チャンネルが見つかりません");
     }
 
     const bot = await ctx.db
@@ -116,7 +116,7 @@ export const summonBot = mutation({
       .filter((q) => q.eq(q.field("isBot"), true))
       .first();
     if (bot === null) {
-      throw new Error("Botがまだ準備できていません");
+      throw new ConvexError("Botがまだ準備できていません");
     }
 
     await ctx.scheduler.runAfter(1500, internal.bot.reply, {

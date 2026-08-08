@@ -5,6 +5,7 @@ import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
 import { useMutation } from 'convex/react'
 import type { FunctionReturnType } from 'convex/server'
+import { ConvexError } from 'convex/values'
 import {
   Accordion,
   ActionIcon,
@@ -34,6 +35,15 @@ import { ALLOWED_EMOJIS } from '../lib/emojis'
 import { AVATAR_EMOJIS, MAX_NAME_LENGTH } from '../lib/avatars'
 
 const MEMBER_ID_STORAGE_KEY = 'convex-showcase:memberId'
+
+// ConvexError はペイロードが err.data に入り、err.message では読めない
+// （本番デプロイでは平メッセージの Error は "Server Error" に丸められる）
+function errorMessageOf(err: unknown, fallback: string): string {
+  if (err instanceof ConvexError) {
+    return typeof err.data === 'string' ? err.data : fallback
+  }
+  return err instanceof Error ? err.message : fallback
+}
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -92,13 +102,21 @@ function HomeComponent() {
   const [storedId, setStoredId] = useState<string | null>(null)
   const [identityLoaded, setIdentityLoaded] = useState(false)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setStoredId(window.localStorage.getItem(MEMBER_ID_STORAGE_KEY))
+    try {
+      if (typeof window !== 'undefined') {
+        setStoredId(window.localStorage.getItem(MEMBER_ID_STORAGE_KEY))
+      }
+    } catch {
+      // localStorage が無効な環境（プライベートモード等）でも参加モーダルは開けるようにする
+    } finally {
+      setIdentityLoaded(true)
     }
-    setIdentityLoaded(true)
   }, [])
 
   const me = members.data.find((m) => m._id === storedId && !m.isBot) ?? null
+  // join 直後、members クエリが me を解決するまでのラグ。この間は参加ボタンを
+  // loading のままにして二重送信（member の重複作成）を防ぐ
+  const joinPending = identityLoaded && storedId !== null && me === null
 
   const [renameModalOpen, setRenameModalOpen] = useState(false)
   const identityModalOpened = identityLoaded && (me === null || renameModalOpen)
@@ -109,10 +127,16 @@ function HomeComponent() {
 
   async function handleJoin(name: string, emoji: string) {
     const id = await join({ name, emoji })
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(MEMBER_ID_STORAGE_KEY, id)
-    }
+    // DB上はもう member が作られているので、localStorage への保存が失敗しても
+    // まずセッション内で使えるように storedId を先に確定させる
     setStoredId(id)
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(MEMBER_ID_STORAGE_KEY, id)
+      }
+    } catch {
+      // 保存できなくても今回のセッション中は参加済みとして扱う
+    }
   }
 
   async function handleRename(name: string, emoji: string) {
@@ -131,9 +155,17 @@ function HomeComponent() {
     })
   }
 
-  if (channelList.length === 0) {
-    return (
-      <Container size="lg" py="xl">
+  return (
+    <Container size="lg" py="xl">
+      <IdentityModal
+        opened={identityModalOpened}
+        mode={identityModalMode}
+        me={me}
+        pending={joinPending}
+        onClose={() => setRenameModalOpen(false)}
+        onSubmit={identityModalMode === 'join' ? handleJoin : handleRename}
+      />
+      {channelList.length === 0 ? (
         <Stack gap="lg">
           <Title order={1}>リアルタイム チームチャット</Title>
           <Card withBorder radius="md" padding="lg">
@@ -142,65 +174,54 @@ function HomeComponent() {
             </Text>
           </Card>
         </Stack>
-      </Container>
-    )
-  }
+      ) : (
+        <Stack gap="lg">
+          <Stack gap="xs">
+            <Title order={1}>リアルタイム チームチャット</Title>
+            <Text c="dimmed">
+              メッセージを送るとConvexのクエリ購読が自動で反応します。別タブを開いて、書き込みが即座に届く様子を確かめてみてください。
+            </Text>
+            <Group gap="sm">
+              <Badge color="green" variant="dot">
+                リアルタイム同期中 · 自動更新 {updateCount} 回受信
+              </Badge>
+              <Button
+                variant="light"
+                size="xs"
+                onClick={() => window.open(window.location.pathname, '_blank')}
+              >
+                別タブで開いて同期を体感
+              </Button>
+            </Group>
+          </Stack>
 
-  return (
-    <Container size="lg" py="xl">
-      <IdentityModal
-        opened={identityModalOpened}
-        mode={identityModalMode}
-        me={me}
-        onClose={() => setRenameModalOpen(false)}
-        onSubmit={identityModalMode === 'join' ? handleJoin : handleRename}
-      />
-      <Stack gap="lg">
-        <Stack gap="xs">
-          <Title order={1}>リアルタイム チームチャット</Title>
-          <Text c="dimmed">
-            メッセージを送るとConvexのクエリ購読が自動で反応します。別タブを開いて、書き込みが即座に届く様子を確かめてみてください。
-          </Text>
-          <Group gap="sm">
-            <Badge color="green" variant="dot">
-              リアルタイム同期中 · 自動更新 {updateCount} 回受信
-            </Badge>
-            <Button
-              variant="light"
-              size="xs"
-              onClick={() => window.open(window.location.pathname, '_blank')}
-            >
-              別タブで開いて同期を体感
-            </Button>
-          </Group>
+          <Grid>
+            <Grid.Col span={{ base: 12, md: 3 }}>
+              <ChannelSidebar
+                channels={channelList}
+                activeChannelId={activeChannelId}
+                onSelect={handleSelectChannel}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              {activeChannelId && (
+                <Suspense fallback={<Skeleton h={420} radius="md" />}>
+                  <ChatPane
+                    key={activeChannelId}
+                    channelId={activeChannelId as Id<'channels'>}
+                    me={me}
+                    onRequestRename={() => setRenameModalOpen(true)}
+                    onDataUpdated={setUpdateCount}
+                  />
+                </Suspense>
+              )}
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 3 }}>
+              <InfoPanel />
+            </Grid.Col>
+          </Grid>
         </Stack>
-
-        <Grid>
-          <Grid.Col span={{ base: 12, md: 3 }}>
-            <ChannelSidebar
-              channels={channelList}
-              activeChannelId={activeChannelId}
-              onSelect={handleSelectChannel}
-            />
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 6 }}>
-            {activeChannelId && (
-              <Suspense fallback={<Skeleton h={420} radius="md" />}>
-                <ChatPane
-                  key={activeChannelId}
-                  channelId={activeChannelId as Id<'channels'>}
-                  me={me}
-                  onRequestRename={() => setRenameModalOpen(true)}
-                  onDataUpdated={setUpdateCount}
-                />
-              </Suspense>
-            )}
-          </Grid.Col>
-          <Grid.Col span={{ base: 12, md: 3 }}>
-            <InfoPanel />
-          </Grid.Col>
-        </Grid>
-      </Stack>
+      )}
     </Container>
   )
 }
@@ -209,12 +230,14 @@ function IdentityModal({
   opened,
   mode,
   me,
+  pending,
   onClose,
   onSubmit,
 }: {
   opened: boolean
   mode: 'join' | 'rename'
   me: MemberDoc | null
+  pending: boolean
   onClose: () => void
   onSubmit: (name: string, emoji: string) => Promise<void>
 }) {
@@ -229,13 +252,15 @@ function IdentityModal({
       setEmoji(mode === 'rename' && me ? me.emoji : AVATAR_EMOJIS[0])
       setErrorMessage(null)
     }
-  }, [opened, mode, me])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opened, mode, me?._id])
 
+  const busy = isSubmitting || pending
   const isNameBlank = name.trim().length === 0
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (isNameBlank || isSubmitting) {
+    if (isNameBlank || busy) {
       return
     }
     setIsSubmitting(true)
@@ -243,7 +268,7 @@ function IdentityModal({
       await onSubmit(name, emoji)
       setErrorMessage(null)
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : '保存に失敗しました')
+      setErrorMessage(errorMessageOf(err, '保存に失敗しました'))
     } finally {
       setIsSubmitting(false)
     }
@@ -270,23 +295,28 @@ function IdentityModal({
             onChange={(event) => setName(event.currentTarget.value)}
           />
           <Group gap={6}>
-            {AVATAR_EMOJIS.map((candidate) => (
-              <Button
-                key={candidate}
-                type="button"
-                variant={emoji === candidate ? 'filled' : 'default'}
-                onClick={() => setEmoji(candidate)}
-              >
-                {candidate}
-              </Button>
-            ))}
+            {AVATAR_EMOJIS.map((candidate) => {
+              const selected = emoji === candidate
+              return (
+                <Button
+                  key={candidate}
+                  type="button"
+                  variant={selected ? 'filled' : 'default'}
+                  aria-label={`アバター ${candidate}`}
+                  aria-pressed={selected}
+                  onClick={() => setEmoji(candidate)}
+                >
+                  {candidate}
+                </Button>
+              )
+            })}
           </Group>
           {errorMessage && (
             <Text c="red" size="sm">
               {errorMessage}
             </Text>
           )}
-          <Button type="submit" loading={isSubmitting} disabled={isNameBlank || isSubmitting}>
+          <Button type="submit" loading={busy} disabled={isNameBlank || busy}>
             {mode === 'join' ? '参加する' : '変更する'}
           </Button>
         </Stack>
@@ -393,7 +423,7 @@ function ChatPane({
       setBody('')
       setErrorMessage(null)
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : '送信に失敗しました')
+      setErrorMessage(errorMessageOf(err, '送信に失敗しました'))
     } finally {
       setIsSubmitting(false)
     }
@@ -405,7 +435,7 @@ function ChatPane({
       await summonBot({ channelId })
       setErrorMessage(null)
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Bot召喚に失敗しました')
+      setErrorMessage(errorMessageOf(err, 'Bot召喚に失敗しました'))
     } finally {
       botTimeoutRef.current = setTimeout(() => setBotDisabled(false), 3000)
     }
@@ -422,7 +452,7 @@ function ChatPane({
         emoji,
       })
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'リアクションに失敗しました')
+      setErrorMessage(errorMessageOf(err, 'リアクションに失敗しました'))
     }
   }
 
