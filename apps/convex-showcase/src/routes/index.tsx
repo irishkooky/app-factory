@@ -18,9 +18,9 @@ import {
   Grid,
   Group,
   Menu,
+  Modal,
   NavLink,
   ScrollArea,
-  Select,
   Skeleton,
   Stack,
   Text,
@@ -31,6 +31,9 @@ import {
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import { ALLOWED_EMOJIS } from '../lib/emojis'
+import { AVATAR_EMOJIS, MAX_NAME_LENGTH } from '../lib/avatars'
+
+const MEMBER_ID_STORAGE_KEY = 'convex-showcase:memberId'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -86,6 +89,40 @@ function HomeComponent() {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null)
   const [updateCount, setUpdateCount] = useState(0)
 
+  const [storedId, setStoredId] = useState<string | null>(null)
+  const [identityLoaded, setIdentityLoaded] = useState(false)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setStoredId(window.localStorage.getItem(MEMBER_ID_STORAGE_KEY))
+    }
+    setIdentityLoaded(true)
+  }, [])
+
+  const me = members.data.find((m) => m._id === storedId && !m.isBot) ?? null
+
+  const [renameModalOpen, setRenameModalOpen] = useState(false)
+  const identityModalOpened = identityLoaded && (me === null || renameModalOpen)
+  const identityModalMode: 'join' | 'rename' = me === null ? 'join' : 'rename'
+
+  const join = useMutation(api.members.join)
+  const rename = useMutation(api.members.rename)
+
+  async function handleJoin(name: string, emoji: string) {
+    const id = await join({ name, emoji })
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(MEMBER_ID_STORAGE_KEY, id)
+    }
+    setStoredId(id)
+  }
+
+  async function handleRename(name: string, emoji: string) {
+    if (!me) {
+      return
+    }
+    await rename({ memberId: me._id, name, emoji })
+    setRenameModalOpen(false)
+  }
+
   const activeChannelId = selectedChannelId ?? channelList[0]?._id ?? null
 
   function handleSelectChannel(channelId: string) {
@@ -111,6 +148,13 @@ function HomeComponent() {
 
   return (
     <Container size="lg" py="xl">
+      <IdentityModal
+        opened={identityModalOpened}
+        mode={identityModalMode}
+        me={me}
+        onClose={() => setRenameModalOpen(false)}
+        onSubmit={identityModalMode === 'join' ? handleJoin : handleRename}
+      />
       <Stack gap="lg">
         <Stack gap="xs">
           <Title order={1}>リアルタイム チームチャット</Title>
@@ -145,7 +189,8 @@ function HomeComponent() {
                 <ChatPane
                   key={activeChannelId}
                   channelId={activeChannelId as Id<'channels'>}
-                  members={members.data}
+                  me={me}
+                  onRequestRename={() => setRenameModalOpen(true)}
                   onDataUpdated={setUpdateCount}
                 />
               </Suspense>
@@ -157,6 +202,96 @@ function HomeComponent() {
         </Grid>
       </Stack>
     </Container>
+  )
+}
+
+function IdentityModal({
+  opened,
+  mode,
+  me,
+  onClose,
+  onSubmit,
+}: {
+  opened: boolean
+  mode: 'join' | 'rename'
+  me: MemberDoc | null
+  onClose: () => void
+  onSubmit: (name: string, emoji: string) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState<string>(AVATAR_EMOJIS[0])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (opened) {
+      setName(mode === 'rename' && me ? me.name : '')
+      setEmoji(mode === 'rename' && me ? me.emoji : AVATAR_EMOJIS[0])
+      setErrorMessage(null)
+    }
+  }, [opened, mode, me])
+
+  const isNameBlank = name.trim().length === 0
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (isNameBlank || isSubmitting) {
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      await onSubmit(name, emoji)
+      setErrorMessage(null)
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : '保存に失敗しました')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const closeable = mode === 'rename'
+
+  return (
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title={mode === 'join' ? 'チャットに参加' : '表示名を変更'}
+      withCloseButton={closeable}
+      closeOnClickOutside={closeable}
+      closeOnEscape={closeable}
+    >
+      <form onSubmit={handleSubmit}>
+        <Stack gap="sm">
+          <TextInput
+            label="名前"
+            placeholder="たろう"
+            maxLength={MAX_NAME_LENGTH}
+            value={name}
+            onChange={(event) => setName(event.currentTarget.value)}
+          />
+          <Group gap={6}>
+            {AVATAR_EMOJIS.map((candidate) => (
+              <Button
+                key={candidate}
+                type="button"
+                variant={emoji === candidate ? 'filled' : 'default'}
+                onClick={() => setEmoji(candidate)}
+              >
+                {candidate}
+              </Button>
+            ))}
+          </Group>
+          {errorMessage && (
+            <Text c="red" size="sm">
+              {errorMessage}
+            </Text>
+          )}
+          <Button type="submit" loading={isSubmitting} disabled={isNameBlank || isSubmitting}>
+            {mode === 'join' ? '参加する' : '変更する'}
+          </Button>
+        </Stack>
+      </form>
+    </Modal>
   )
 }
 
@@ -198,11 +333,13 @@ function ChannelSidebar({
 
 function ChatPane({
   channelId,
-  members,
+  me,
+  onRequestRename,
   onDataUpdated,
 }: {
   channelId: Id<'channels'>
-  members: MemberDoc[]
+  me: MemberDoc | null
+  onRequestRename: () => void
   onDataUpdated: (count: number) => void
 }) {
   const messages = useSuspenseQuery(convexQuery(api.messages.listByChannel, { channelId }))
@@ -225,10 +362,6 @@ function ChatPane({
     }
   }, [messages.data])
 
-  const nonBotMembers = members.filter((member) => !member.isBot)
-  const [personaId, setPersonaId] = useState<string | null>(null)
-  const activePersonaId = personaId ?? nonBotMembers[0]?._id ?? null
-
   const [body, setBody] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -247,14 +380,14 @@ function ChatPane({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (isBodyBlank || isSubmitting || !activePersonaId) {
+    if (isBodyBlank || isSubmitting || !me) {
       return
     }
     setIsSubmitting(true)
     try {
       await send({
         channelId,
-        authorId: activePersonaId as Id<'members'>,
+        authorId: me._id,
         body,
       })
       setBody('')
@@ -279,24 +412,19 @@ function ChatPane({
   }
 
   async function handleToggleReaction(messageId: Id<'messages'>, emoji: string) {
-    if (!activePersonaId) {
+    if (!me) {
       return
     }
     try {
       await toggleReaction({
         messageId,
-        memberId: activePersonaId as Id<'members'>,
+        memberId: me._id,
         emoji,
       })
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'リアクションに失敗しました')
     }
   }
-
-  const personaOptions = nonBotMembers.map((member) => ({
-    value: member._id,
-    label: `${member.emoji} ${member.name}`,
-  }))
 
   return (
     <Card withBorder radius="md" padding="md">
@@ -312,7 +440,7 @@ function ChatPane({
                 <MessageRow
                   key={message._id}
                   message={message}
-                  activePersonaId={activePersonaId}
+                  meId={me?._id ?? null}
                   onToggleReaction={handleToggleReaction}
                 />
               ))
@@ -320,51 +448,48 @@ function ChatPane({
           </Stack>
         </ScrollArea>
 
-        {nonBotMembers.length === 0 ? (
-          <Text c="dimmed" size="sm">
-            投稿できるメンバーがいません
-          </Text>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <Stack gap="xs">
-              <Group gap="xs" wrap="nowrap">
-                <Select
-                  data={personaOptions}
-                  value={activePersonaId}
-                  onChange={setPersonaId}
-                  allowDeselect={false}
-                  w={160}
-                  aria-label="投稿ペルソナ"
-                />
-                <TextInput
-                  style={{ flex: 1 }}
-                  placeholder="メッセージを入力…"
-                  maxLength={500}
-                  value={body}
-                  onChange={(event) => setBody(event.currentTarget.value)}
-                />
-                <Button
-                  type="submit"
-                  loading={isSubmitting}
-                  disabled={isBodyBlank || !activePersonaId}
-                >
-                  送信
-                </Button>
-              </Group>
-              {errorMessage && (
-                <Text c="red" size="sm">
-                  {errorMessage}
-                </Text>
+        <form onSubmit={handleSubmit}>
+          <Stack gap="xs">
+            <Group gap="xs" wrap="nowrap">
+              {me ? (
+                <Group gap={4} wrap="nowrap">
+                  <Badge size="lg" variant="light">
+                    {me.emoji} {me.name}
+                  </Badge>
+                  <Button variant="subtle" size="compact-sm" type="button" onClick={onRequestRename}>
+                    変更
+                  </Button>
+                </Group>
+              ) : (
+                <Badge size="lg" variant="light" color="gray">
+                  未参加
+                </Badge>
               )}
-            </Stack>
-          </form>
-        )}
+              <TextInput
+                style={{ flex: 1 }}
+                placeholder="メッセージを入力…"
+                maxLength={500}
+                value={body}
+                onChange={(event) => setBody(event.currentTarget.value)}
+                disabled={!me}
+              />
+              <Button type="submit" loading={isSubmitting} disabled={isBodyBlank || !me}>
+                送信
+              </Button>
+            </Group>
+            {errorMessage && (
+              <Text c="red" size="sm">
+                {errorMessage}
+              </Text>
+            )}
+          </Stack>
+        </form>
 
         <Button
           variant="gradient"
           gradient={{ from: 'indigo', to: 'grape' }}
           onClick={handleSummonBot}
-          disabled={botDisabled}
+          disabled={botDisabled || !me}
         >
           🤖 Convex Botを召喚（1.5秒後にサーバーから返信が届く）
         </Button>
@@ -378,11 +503,11 @@ function ChatPane({
 
 function MessageRow({
   message,
-  activePersonaId,
+  meId,
   onToggleReaction,
 }: {
   message: MessageWithMeta
-  activePersonaId: string | null
+  meId: string | null
   onToggleReaction: (messageId: Id<'messages'>, emoji: string) => void
 }) {
   return (
@@ -408,9 +533,7 @@ function MessageRow({
               <Button
                 size="compact-xs"
                 variant={
-                  activePersonaId && reaction.memberIds.includes(activePersonaId)
-                    ? 'filled'
-                    : 'default'
+                  meId && reaction.memberIds.includes(meId) ? 'filled' : 'default'
                 }
                 onClick={() => onToggleReaction(message._id, reaction.emoji)}
               >
