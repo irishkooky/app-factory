@@ -523,10 +523,15 @@ function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
 
   const aliasBySeat = new Map(seats.map((seat) => [seat.seatId, seat.alias]))
 
-  // 新着メッセージが来たら自動で一番下までスクロールする
-  const logEndRef = useRef<HTMLDivElement>(null)
+  // 新着メッセージが来たらログ欄だけを一番下までスクロールする。
+  // scrollIntoView は祖先（ページ全体）まで動かしてしまい、モバイルで入力中に画面が
+  // 飛ぶ問題があるため、ログ用コンテナ自身の scrollTop を直接操作する。
+  const logContainerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ block: 'end' })
+    const container = logContainerRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [messages.length])
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
@@ -571,7 +576,7 @@ function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
       </Card>
 
       <Card withBorder radius="md" padding="md">
-        <Stack gap="sm" mah={360} style={{ overflowY: 'auto' }}>
+        <Stack ref={logContainerRef} gap="sm" mah={360} style={{ overflowY: 'auto' }}>
           {messages.length === 0 ? (
             <Text size="sm" c="dimmed">
               まだ発言がありません。最初のひとことをどうぞ。
@@ -587,7 +592,6 @@ function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
               </Stack>
             ))
           )}
-          <div ref={logEndRef} />
         </Stack>
       </Card>
 
@@ -718,7 +722,8 @@ function VotingPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
                   roomId={room._id}
                   roundIndex={roundIndex}
                   seats={seats}
-                  isCurrent={roundIndex === room.roundIndex}
+                  // votingフェーズに「今回のラウンド」の概念は無い（全ラウンド終了後なので）
+                  isCurrent={false}
                 />
               ))}
             </Accordion>

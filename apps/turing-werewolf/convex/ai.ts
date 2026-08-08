@@ -358,7 +358,11 @@ ${pastAnswersText}
     const endpoint = process.env.AI_ENDPOINT;
     const secret = process.env.AI_ROUTE_SECRET;
 
-    if (endpoint && secret) {
+    if (!endpoint || !secret) {
+      console.warn(
+        "generateAnswer: AI_ENDPOINT/AI_ROUTE_SECRET が未設定のため、AI生成をスキップしてフォールバックを使用します。",
+      );
+    } else {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
@@ -378,15 +382,36 @@ ${pastAnswersText}
               typeof data === "object" && data !== null && typeof (data as { text?: unknown }).text === "string"
                 ? (data as { text: string }).text
                 : "";
-            const sanitized = sanitizeAiText(rawText, context.seatAliases);
-            // 短すぎる出力（プレフィックス剥がし後の空文字・意味のない断片含む）はフォールバック扱いにする
-            text = sanitized.length >= MIN_ANSWER_LENGTH ? sanitized : "";
+            if (!rawText) {
+              console.warn(
+                "generateAnswer: /api/generate のレスポンスに text が含まれていません。フォールバックを使用します。",
+              );
+            }
+            // 下限チェックは切り詰めが発生した場合のみ効く（sanitizeAiText内で判定）。
+            // 「カレー」のような自然な短答はそのまま採用される。
+            text = sanitizeAiText(rawText, context.seatAliases);
+            if (rawText && !text) {
+              console.warn(
+                `generateAnswer: 生成結果のサニタイズ後が空になったためフォールバックを使用します（raw="${rawText.slice(0, 80)}"）。`,
+              );
+            }
+          } else {
+            const bodyText = await res.text().catch(() => "");
+            console.error(
+              `generateAnswer: /api/generate が非200を返しました（status=${res.status}, body="${bodyText.slice(0, 200)}"）。フォールバックを使用します。`,
+            );
           }
         } finally {
           clearTimeout(timeoutId);
         }
-      } catch {
+      } catch (err) {
         // fetch失敗・タイムアウト（AbortError含む）はフォールバックへ
+        const isAbort = err instanceof Error && err.name === "AbortError";
+        console.error(
+          `generateAnswer: /api/generate の呼び出しに失敗しました（${isAbort ? "タイムアウト" : "fetch例外"}: ${
+            err instanceof Error ? err.message : String(err)
+          }）。フォールバックを使用します。`,
+        );
         text = "";
       }
     }
@@ -454,15 +479,21 @@ export const getChimeContext = internalQuery({
       .sort((a, b) => a._creationTime - b._creationTime)
       .map((m) => ({ alias: aliasBySeat.get(m.seatId) ?? "?", text: m.text }));
 
-    // 各ラウンドのお題（usedPromptsに順番どおり記録されている）と回答一覧
+    // 各ラウンドのお題（usedPromptsに順番どおり記録されている）と回答一覧。
+    // roundIndexを保持しておく（表示側でフィルタすると配列添字だけではラウンド番号がズレるため）。
     const usedPrompts = room.usedPrompts ?? [];
-    const roundsSummary: { promptText: string; answers: { alias: string; text: string }[] }[] = [];
+    const roundsSummary: {
+      roundIndex: number;
+      promptText: string;
+      answers: { alias: string; text: string }[];
+    }[] = [];
     for (let round = 0; round < room.totalRounds; round++) {
       const roundAnswers = await ctx.db
         .query("answers")
         .withIndex("by_room_round", (q) => q.eq("roomId", args.roomId).eq("roundIndex", round))
         .collect();
       roundsSummary.push({
+        roundIndex: round,
         promptText: usedPrompts[round] ?? "",
         answers: roundAnswers.map((a) => ({
           alias: aliasBySeat.get(a.seatId) ?? "?",
@@ -572,8 +603,12 @@ export const maybeChime = internalAction({
     // お題欄は「ラウンドN」で代替し、AIが全ラウンドの文脈を失わないようにする。
     const roundsText = context.roundsSummary
       .filter((r) => r.answers.length > 0)
-      .map((r, i) => {
-        const heading = r.promptText.length > 0 ? `ラウンド${i + 1}「${r.promptText}」` : `ラウンド${i + 1}`;
+      .map((r) => {
+        // roundIndexはフィルタ前の元の番号を保持しているので、回答0件のラウンドがあっても
+        // 表示上の「ラウンドN」がズレない
+        const roundNumber = r.roundIndex + 1;
+        const heading =
+          r.promptText.length > 0 ? `ラウンド${roundNumber}「${r.promptText}」` : `ラウンド${roundNumber}`;
         return `${heading}\n${r.answers.map((a) => `- ${a.alias}: ${a.text}`).join("\n")}`;
       })
       .join("\n\n");
@@ -612,13 +647,19 @@ ${chatLogText}
               typeof data === "object" && data !== null && typeof (data as { text?: unknown }).text === "string"
                 ? (data as { text: string }).text
                 : "";
-            const sanitized = sanitizeAiText(rawText, context.seatAliases, CHIME_MAX_LENGTH);
-            text = sanitized.length >= CHIME_MIN_LENGTH ? sanitized : "";
+            // 下限チェックは切り詰めが発生した場合のみ効く（sanitizeAiText内で判定）。
+            // 短い相槌でも空でなければ採用してよい（割り込み発言は短くて自然）。
+            text = sanitizeAiText(rawText, context.seatAliases, CHIME_MAX_LENGTH, CHIME_MIN_LENGTH);
+          } else {
+            console.warn(`maybeChime: /api/generate が非200を返しました（status=${res.status}）。`);
           }
         } finally {
           clearTimeout(timeoutId);
         }
-      } catch {
+      } catch (err) {
+        console.warn(
+          `maybeChime: /api/generate の呼び出しに失敗しました（${err instanceof Error ? err.message : String(err)}）。`,
+        );
         // fetch失敗・タイムアウトの場合、割り込まないこと自体は不自然ではないので何もしない
         text = "";
       }
