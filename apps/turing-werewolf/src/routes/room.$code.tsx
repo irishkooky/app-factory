@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { convexQuery } from '@convex-dev/react-query'
@@ -165,12 +165,22 @@ function RoomShellWithSeat({
       <Stack gap="lg">
         <RoomHeader code={code} room={room} mySeat={mySeat} />
 
-        {room.phase === 'lobby' && <LobbyPhase {...phaseProps} />}
-        {room.phase === 'answering' && <AnsweringPhase {...phaseProps} />}
-        {room.phase === 'reveal' && <RevealPhase {...phaseProps} />}
-        {room.phase === 'discussion' && <DiscussionPhase {...phaseProps} />}
-        {room.phase === 'voting' && <VotingPhase {...phaseProps} />}
-        {room.phase === 'result' && <ResultPhase {...phaseProps} />}
+        {/* フェーズが変わるたびに新しいuseSuspenseQueryが走ってヘッダごと消えないよう、
+            本文だけをSuspenseで囲む（ヘッダはSuspenseの外に残す） */}
+        <Suspense
+          fallback={
+            <Center py="xl">
+              <Loader />
+            </Center>
+          }
+        >
+          {room.phase === 'lobby' && <LobbyPhase {...phaseProps} />}
+          {room.phase === 'answering' && <AnsweringPhase {...phaseProps} />}
+          {room.phase === 'reveal' && <RevealPhase {...phaseProps} />}
+          {room.phase === 'discussion' && <DiscussionPhase {...phaseProps} />}
+          {room.phase === 'voting' && <VotingPhase {...phaseProps} />}
+          {room.phase === 'result' && <ResultPhase {...phaseProps} />}
+        </Suspense>
       </Stack>
     </Container>
   )
@@ -206,7 +216,8 @@ function RoomHeader({
       <Divider my="xs" />
       <Group justify="space-between">
         <Badge variant="light">{PHASE_LABELS[room.phase]}</Badge>
-        {room.phase !== 'lobby' && (
+        {/* discussion/voting/resultは「ラウンドN」の対象が無くフェーズ名と紛らわしいので出さない */}
+        {(room.phase === 'answering' || room.phase === 'reveal') && (
           <Text size="xs" c="dimmed">
             ラウンド {room.roundIndex + 1} / {room.totalRounds}
           </Text>
@@ -503,6 +514,7 @@ function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
   const { data: messages } = useSuspenseQuery(
     convexQuery(api.game.listMessages, { roomId: room._id }),
   )
+  const remainingSeconds = useCountdownSeconds(room.deadlineAt)
 
   const [text, setText] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -510,6 +522,12 @@ function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const aliasBySeat = new Map(seats.map((seat) => [seat.seatId, seat.alias]))
+
+  // 新着メッセージが来たら自動で一番下までスクロールする
+  const logEndRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ block: 'end' })
+  }, [messages.length])
 
   async function handleSend(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -542,7 +560,14 @@ function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
   return (
     <Stack gap="md">
       <Card withBorder radius="md" padding="lg">
-        <Text fw={600}>自由に会話しましょう。怪しいと思った人に探りを入れてみては？</Text>
+        <Group justify="space-between" align="flex-start">
+          <Text fw={600}>自由に会話しましょう。怪しいと思った人に探りを入れてみては？</Text>
+          {remainingSeconds !== null && (
+            <Badge color={remainingSeconds <= 10 ? 'red' : 'gray'} variant="light">
+              残り{remainingSeconds}秒
+            </Badge>
+          )}
+        </Group>
       </Card>
 
       <Card withBorder radius="md" padding="md">
@@ -562,6 +587,7 @@ function DiscussionPhase({ room, seats, mySeat, deviceId }: PhaseProps) {
               </Stack>
             ))
           )}
+          <div ref={logEndRef} />
         </Stack>
       </Card>
 
@@ -819,18 +845,29 @@ function SpectatorRoom({ code, room }: { code: string; room: RoomDoc }) {
       <Stack gap="xl">
         <SpectatorHeader code={code} room={room} />
 
-        {room.phase === 'lobby' && <SpectatorLobby seats={seats} />}
-        {room.phase === 'answering' && <SpectatorAnswering room={room} seats={seats} />}
-        {room.phase === 'reveal' && <SpectatorReveal room={room} seats={seats} />}
-        {room.phase === 'discussion' && <SpectatorDiscussion room={room} seats={seats} />}
-        {room.phase === 'voting' && <SpectatorVoting room={room} />}
-        {room.phase === 'result' && <SpectatorResult room={room} seats={seats} />}
+        {/* フェーズが変わるたびに新しいuseSuspenseQueryが走ってヘッダごと消えないよう、
+            本文だけをSuspenseで囲む（ヘッダはSuspenseの外に残す） */}
+        <Suspense
+          fallback={
+            <Center py="xl">
+              <Loader />
+            </Center>
+          }
+        >
+          {room.phase === 'lobby' && <SpectatorLobby seats={seats} />}
+          {room.phase === 'answering' && <SpectatorAnswering room={room} seats={seats} />}
+          {room.phase === 'reveal' && <SpectatorReveal room={room} seats={seats} />}
+          {room.phase === 'discussion' && <SpectatorDiscussion room={room} seats={seats} />}
+          {room.phase === 'voting' && <SpectatorVoting room={room} seats={seats} />}
+          {room.phase === 'result' && <SpectatorResult room={room} seats={seats} />}
+        </Suspense>
       </Stack>
     </Container>
   )
 }
 
 function SpectatorHeader({ code, room }: { code: string; room: RoomDoc }) {
+  const showRound = room.phase === 'answering' || room.phase === 'reveal'
   return (
     <Group justify="space-between" wrap="wrap" gap="sm">
       <Group gap="sm">
@@ -843,7 +880,7 @@ function SpectatorHeader({ code, room }: { code: string; room: RoomDoc }) {
       </Group>
       <Badge size="lg" variant="light">
         {PHASE_LABELS[room.phase]}
-        {room.phase !== 'lobby' ? `（ラウンド${room.roundIndex + 1}/${room.totalRounds}）` : ''}
+        {showRound ? `（ラウンド${room.roundIndex + 1}/${room.totalRounds}）` : ''}
       </Badge>
     </Group>
   )
@@ -872,6 +909,7 @@ function SpectatorAnswering({ room, seats }: { room: RoomDoc; seats: SeatSummary
   const { data: answersResult } = useSuspenseQuery(
     convexQuery(api.game.listAnswers, { roomId: room._id, roundIndex: room.roundIndex }),
   )
+  const remainingSeconds = useCountdownSeconds(room.deadlineAt)
   const submittedSeatIds =
     answersResult.phase === 'hidden'
       ? answersResult.submittedSeatIds
@@ -880,6 +918,11 @@ function SpectatorAnswering({ room, seats }: { room: RoomDoc; seats: SeatSummary
 
   return (
     <Stack gap="xl" align="center">
+      {remainingSeconds !== null && (
+        <Badge size="xl" color={remainingSeconds <= 10 ? 'red' : 'gray'} variant="light">
+          残り{remainingSeconds}秒
+        </Badge>
+      )}
       <Text fz={40} fw={800} ta="center">
         {room.promptText}
       </Text>
@@ -939,14 +982,22 @@ function SpectatorDiscussion({ room, seats }: { room: RoomDoc; seats: SeatSummar
   const { data: messages } = useSuspenseQuery(
     convexQuery(api.game.listMessages, { roomId: room._id }),
   )
+  const remainingSeconds = useCountdownSeconds(room.deadlineAt)
   const aliasBySeat = new Map(seats.map((seat) => [seat.seatId, seat.alias]))
   const recentMessages = messages.slice(-12)
 
   return (
     <Stack gap="md">
-      <Text fz={32} fw={800} ta="center">
-        自由会話中
-      </Text>
+      <Group justify="center" gap="md">
+        <Text fz={32} fw={800} ta="center">
+          自由会話中
+        </Text>
+        {remainingSeconds !== null && (
+          <Badge size="xl" color={remainingSeconds <= 10 ? 'red' : 'gray'} variant="light">
+            残り{remainingSeconds}秒
+          </Badge>
+        )}
+      </Group>
       <Stack gap="sm">
         {recentMessages.length === 0 ? (
           <Text fz={20} c="dimmed" ta="center">
@@ -967,12 +1018,20 @@ function SpectatorDiscussion({ room, seats }: { room: RoomDoc; seats: SeatSummar
   )
 }
 
-function SpectatorVoting({ room }: { room: RoomDoc }) {
+function SpectatorVoting({ room, seats }: { room: RoomDoc; seats: SeatSummary[] }) {
   const { data: voteStatus } = useSuspenseQuery(
     convexQuery(api.game.getVoteStatus, { roomId: room._id }),
   )
+  const remainingSeconds = useCountdownSeconds(room.deadlineAt)
+  const roundIndices = Array.from({ length: room.totalRounds }, (_, i) => i)
+
   return (
     <Stack gap="xl" align="center">
+      {remainingSeconds !== null && (
+        <Badge size="xl" color={remainingSeconds <= 10 ? 'red' : 'gray'} variant="light">
+          残り{remainingSeconds}秒
+        </Badge>
+      )}
       <Text fz={32} fw={800}>
         投票中
       </Text>
@@ -982,6 +1041,26 @@ function SpectatorVoting({ room }: { room: RoomDoc }) {
       <Text fz={22} c="dimmed">
         人が投票済み
       </Text>
+
+      {/* プロジェクタで議論の材料になるよう、過去ラウンドの回答も見返せるようにする */}
+      <Stack gap="sm" w="100%" maw={640}>
+        <Text fz={20} fw={700} ta="center">
+          これまでの回答
+        </Text>
+        <Suspense fallback={<Loader size="sm" />}>
+          <Accordion variant="separated">
+            {roundIndices.map((roundIndex) => (
+              <RoundAnswersItem
+                key={roundIndex}
+                roomId={room._id}
+                roundIndex={roundIndex}
+                seats={seats}
+                isCurrent={false}
+              />
+            ))}
+          </Accordion>
+        </Suspense>
+      </Stack>
     </Stack>
   )
 }

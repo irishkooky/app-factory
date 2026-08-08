@@ -62,7 +62,7 @@ export async function advanceIfAllAnswered(
     .collect();
 
   if (answers.length >= seats.length) {
-    await ctx.db.patch(roomId, { phase: "reveal" });
+    await ctx.db.patch(roomId, { phase: "reveal", deadlineAt: undefined });
   }
 }
 
@@ -89,7 +89,7 @@ export async function advanceIfAllVoted(
     .collect();
 
   if (votes.length >= seatOwners.length) {
-    await ctx.db.patch(roomId, { phase: "result" });
+    await ctx.db.patch(roomId, { phase: "result", deadlineAt: undefined });
   }
 }
 

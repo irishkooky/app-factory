@@ -474,7 +474,10 @@ export const forceAdvance = internalMutation({
         )
         .collect();
       const aiAlreadyAnswered = currentAnswers.some((a) => a.seatId === secret.aiSeatId);
-      if (!aiAlreadyAnswered) {
+      const humanAnswerCount = currentAnswers.filter((a) => a.seatId !== secret.aiSeatId).length;
+      // 人間の回答が0件のラウンドでAIだけ回答を入れると、本文が表示される唯一の席=AI席になり
+      // 秘密が完全に破れる。誰も回答していないラウンドはAIも無言のまま reveal へ進めてよい。
+      if (!aiAlreadyAnswered && humanAnswerCount > 0) {
         const fallbacks = getFallbacksForPrompt(room.promptText ?? "");
         const text = fallbacks[Math.floor(Math.random() * fallbacks.length)] ?? GENERIC_FALLBACK_TEXT;
         await ctx.db.insert("answers", {
@@ -486,7 +489,7 @@ export const forceAdvance = internalMutation({
       }
     }
 
-    await ctx.db.patch(args.roomId, { phase: "reveal" });
+    await ctx.db.patch(args.roomId, { phase: "reveal", deadlineAt: undefined });
   },
 });
 
@@ -499,7 +502,7 @@ export const forceEndVoting = internalMutation({
   handler: async (ctx, args) => {
     const room = await ctx.db.get(args.roomId);
     if (!room || room.phase !== "voting") return;
-    await ctx.db.patch(args.roomId, { phase: "result" });
+    await ctx.db.patch(args.roomId, { phase: "result", deadlineAt: undefined });
   },
 });
 

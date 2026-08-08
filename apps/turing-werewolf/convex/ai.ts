@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { FunctionReturnType } from "convex/server";
 import {
   internalAction,
   internalMutation,
@@ -7,18 +8,20 @@ import {
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { getFallbacksForPrompt } from "./prompts";
+import { GENERIC_FALLBACK_TEXT, getFallbacksForPrompt } from "./prompts";
 import { advanceIfAllAnswered } from "./lib";
 
 const AI_TIMEOUT_MS = 15_000;
 const MAX_ANSWER_LENGTH = 40;
 const MIN_ANSWER_LENGTH = 8;
-const FALLBACK_TEXT = "うーん、ちょっと迷い中です";
 
 // 人間の回答が半分未満のうちは、AIの提出が早すぎて特定されないように自分を再スケジュールする。
+// ただし answering の締切(60秒)を跨いで saveAiAnswer が捨てられないよう、締切まで残り
+// AI_DEADLINE_SAFETY_MS 未満になったら待つのをやめて即生成する。
 const MIN_ATTEMPT_DELAY_MS = 6_000;
 const ATTEMPT_DELAY_RANGE_MS = 6_000;
 const MAX_ATTEMPTS = 8;
+const AI_DEADLINE_SAFETY_MS = 20_000;
 
 // discussion中のAI割り込み（maybeChime）用の定数
 const CHIME_MAX_LENGTH = 30;
@@ -26,6 +29,8 @@ const CHIME_MIN_LENGTH = 2;
 const CHIME_MIN_MESSAGES = 5;
 const CHIME_RETRY_DELAY_MS = 10_000;
 const CHIME_MAX_ATTEMPTS = 3;
+// 将来複数回の割り込みを許可する拡張に備えた冪等ガード（現時点では1回のみ）
+const MAX_CHIME_MESSAGES_PER_ROOM = 1;
 
 // Convexアクションのランタイムには process.env が生えているが、このアプリの
 // tsconfig.json は Node の型（@types/node）を含んでいない（共有設定のため変更しない）。
@@ -184,6 +189,8 @@ export const getAiContext = internalQuery({
       humanSeatCount: seats.length - 1,
       // 後処理（話者名プレフィックス剥がし）専用。部屋の全席の仮名（自分・他人問わず）
       seatAliases: seats.map((seat) => seat.alias),
+      // answeringの締切。残り時間が少ないのに人間待ちを続けて生成が締切を跨がないようにするため
+      deadlineAt: room.deadlineAt,
     };
   },
 });
@@ -244,7 +251,7 @@ export const generateAnswer = internalAction({
   handler: async (ctx, args) => {
     const attempt = args.attempt ?? 0;
 
-    let context;
+    let context: FunctionReturnType<typeof internal.ai.getAiContext>;
     try {
       context = await ctx.runQuery(internal.ai.getAiContext, {
         roomId: args.roomId,
@@ -252,7 +259,7 @@ export const generateAnswer = internalAction({
       });
     } catch (err) {
       console.error("generateAnswer: getAiContext の呼び出しに失敗しました。", err);
-      await trySaveFallback(ctx, args.roomId, args.roundIndex, FALLBACK_TEXT);
+      await trySaveFallback(ctx, args.roomId, args.roundIndex, GENERIC_FALLBACK_TEXT);
       return;
     }
     if (context === null) {
@@ -260,9 +267,18 @@ export const generateAnswer = internalAction({
       return;
     }
 
+    const remainingUntilDeadlineMs =
+      context.deadlineAt !== undefined ? context.deadlineAt - Date.now() : undefined;
+    // 締切が迫っている（生成15秒＋保存の余裕が無い）ときは、人間が半数揃っていなくても
+    // 待つのをやめて即生成する。待ち続けて生成が締切を跨ぐと saveAiAnswer が
+    // phase不一致で捨てられ、forceAdvance側の「人間0件ならAIも無言」判定と噛み合って
+    // AI席が特定される確率を上げてしまうため。
+    const deadlineIsNear =
+      remainingUntilDeadlineMs !== undefined && remainingUntilDeadlineMs < AI_DEADLINE_SAFETY_MS;
+
     const notEnoughHumansYet =
       context.humanAnsweredCount < Math.ceil(context.humanSeatCount / 2);
-    if (notEnoughHumansYet && attempt < MAX_ATTEMPTS) {
+    if (notEnoughHumansYet && attempt < MAX_ATTEMPTS && !deadlineIsNear) {
       await ctx.scheduler.runAfter(
         MIN_ATTEMPT_DELAY_MS + Math.floor(Math.random() * ATTEMPT_DELAY_RANGE_MS),
         internal.ai.generateAnswer,
@@ -333,8 +349,12 @@ ${pastAnswersText}
             signal: controller.signal,
           });
           if (res.ok) {
-            const data = (await res.json()) as { text?: string };
-            const sanitized = sanitizeAiText(data.text ?? "", context.seatAliases);
+            const data: unknown = await res.json();
+            const rawText =
+              typeof data === "object" && data !== null && typeof (data as { text?: unknown }).text === "string"
+                ? (data as { text: string }).text
+                : "";
+            const sanitized = sanitizeAiText(rawText, context.seatAliases);
             // 短すぎる出力（プレフィックス剥がし後の空文字・意味のない断片含む）はフォールバック扱いにする
             text = sanitized.length >= MIN_ANSWER_LENGTH ? sanitized : "";
           }
@@ -349,7 +369,7 @@ ${pastAnswersText}
 
     if (!text) {
       const fallbacks = getFallbacksForPrompt(context.promptText);
-      text = fallbacks[Math.floor(Math.random() * fallbacks.length)] ?? FALLBACK_TEXT;
+      text = fallbacks[Math.floor(Math.random() * fallbacks.length)] ?? GENERIC_FALLBACK_TEXT;
     }
 
     try {
@@ -452,6 +472,15 @@ export const saveChime = internalMutation({
       .first();
     if (!secret) return;
 
+    // 将来複数回の割り込みを許可する拡張に備えた冪等ガード（現時点では1回のみ）。
+    // maybeChimeは通常discussionにつき1回しか呼ばれないが、念のため件数で二重投稿を防ぐ。
+    const existingChimes = await ctx.db
+      .query("messages")
+      .withIndex("by_room", (q) => q.eq("roomId", args.roomId))
+      .filter((q) => q.eq(q.field("seatId"), secret.aiSeatId))
+      .collect();
+    if (existingChimes.length >= MAX_CHIME_MESSAGES_PER_ROOM) return;
+
     await ctx.db.insert("messages", {
       roomId: args.roomId,
       seatId: secret.aiSeatId,
@@ -473,7 +502,7 @@ export const maybeChime = internalAction({
   handler: async (ctx, args) => {
     const attempt = args.attempt ?? 0;
 
-    let context;
+    let context: FunctionReturnType<typeof internal.ai.getChimeContext>;
     try {
       context = await ctx.runQuery(internal.ai.getChimeContext, { roomId: args.roomId });
     } catch (err) {
@@ -515,12 +544,14 @@ export const maybeChime = internalAction({
       context.chatLog.length > 0
         ? context.chatLog.map((m) => `- ${m.alias}: ${m.text}`).join("\n")
         : "（まだ発言はありません）";
+    // お題テキストが空（usedPromptsが無い古い部屋データ等）でも回答自体は捨てない。
+    // お題欄は「ラウンドN」で代替し、AIが全ラウンドの文脈を失わないようにする。
     const roundsText = context.roundsSummary
-      .filter((r) => r.promptText.length > 0)
-      .map(
-        (r, i) =>
-          `ラウンド${i + 1}「${r.promptText}」\n${r.answers.map((a) => `- ${a.alias}: ${a.text}`).join("\n")}`,
-      )
+      .filter((r) => r.answers.length > 0)
+      .map((r, i) => {
+        const heading = r.promptText.length > 0 ? `ラウンド${i + 1}「${r.promptText}」` : `ラウンド${i + 1}`;
+        return `${heading}\n${r.answers.map((a) => `- ${a.alias}: ${a.text}`).join("\n")}`;
+      })
       .join("\n\n");
 
     const prompt = `これまでのお題と回答（話題の参考にすること）:
@@ -552,8 +583,12 @@ ${chatLogText}
             signal: controller.signal,
           });
           if (res.ok) {
-            const data = (await res.json()) as { text?: string };
-            const sanitized = sanitizeAiText(data.text ?? "", context.seatAliases, CHIME_MAX_LENGTH);
+            const data: unknown = await res.json();
+            const rawText =
+              typeof data === "object" && data !== null && typeof (data as { text?: unknown }).text === "string"
+                ? (data as { text: string }).text
+                : "";
+            const sanitized = sanitizeAiText(rawText, context.seatAliases, CHIME_MAX_LENGTH);
             text = sanitized.length >= CHIME_MIN_LENGTH ? sanitized : "";
           }
         } finally {
