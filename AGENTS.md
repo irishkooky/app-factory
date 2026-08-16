@@ -68,7 +68,7 @@ Claude Code on the web（クラウドサンドボックス）から使われる�
 2. `vp run build`
 3. `wrangler deploy`
 4. 見た目が大きく変わったなら、ポータルのサムネイルを撮り直す
-   （`cd apps/lab && vp run shots -- --only <name>`）
+   （`cd apps/lab && vp run shots --only <name>`）
 5. `commit` & `push`
 6. PRを作成し、マージまで行う（下記「PRとマージの運用」参照）
 7. URLとマージ結果を報告する

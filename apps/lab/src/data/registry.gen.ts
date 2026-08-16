@@ -20,7 +20,7 @@ export type RegistryEntry = {
 }
 
 export const SUBDOMAIN = "ichigoooo"
-export const GENERATED_AT = "2026-08-16T11:10:52.019Z"
+export const GENERATED_AT = "2026-08-16T12:58:22.545Z"
 
 export const REGISTRY: RegistryEntry[] = [
   {
@@ -99,7 +99,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://lab.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-08-16T11:00:36.351525Z",
-    modifiedAt: "2026-08-16T11:06:52.241384Z",
+    modifiedAt: "2026-08-16T11:14:43.16138Z",
     hasShot: false,
     binding: null,
   },

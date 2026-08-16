@@ -5,14 +5,18 @@
 // 使い方: node scripts/sync.mjs
 // 必要な環境変数: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
 
-import { readFile, writeFile, readdir, stat } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { writeFile, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import {
+  APP_DIR,
+  APPS_DIR,
+  bindingNameFor,
+  fetchCloudflareState,
+  listAppSlugs,
+  readWorkerName,
+  scriptsById,
+} from './lib.mjs'
 
-const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
-const APP_DIR = path.resolve(SCRIPT_DIR, '..') // apps/lab
-const APPS_DIR = path.resolve(APP_DIR, '..') // apps/
 const SHOTS_DIR = path.join(APP_DIR, 'public', 'shots')
 const REGISTRY_OUTPUT_PATH = path.join(APP_DIR, 'src', 'data', 'registry.gen.ts')
 const WRANGLER_OUTPUT_PATH = path.join(APP_DIR, 'wrangler.jsonc')
@@ -23,130 +27,10 @@ function fail(message) {
   process.exitCode = 1
 }
 
-/**
- * slug から Service Binding 名を決定する。sync.mjs（wrangler.jsonc の services）と
- * registry.gen.ts（RegistryEntry.binding）で必ず同じ規則を使うこと。
- */
-function bindingNameFor(slug) {
-  return 'APP_' + slug.toUpperCase().replace(/[^A-Z0-9]/g, '_')
-}
-
 // バインディング名は `env.<NAME>` として参照する識別子である必要がある。
 // 現在の formula は先頭に必ず 'APP_' を付けるため実質的には発生しないが、
 // 将来 formula が変わっても壊れた wrangler.jsonc を書き出さないよう防御的に検証する。
 const VALID_BINDING_NAME = /^[A-Z_][A-Z0-9_]*$/
-
-/**
- * JSONC のコメント（`//` 行コメント / `/* ... *\/` ブロックコメント）を取り除く。
- * 文字列リテラル内の `//` を誤って消さないよう、1文字ずつ状態（文字列内/コメント内）を
- * 追跡する小さな状態機械として実装する。素朴な正規表現置換は使わない。
- */
-function stripJsonComments(input) {
-  let out = ''
-  let i = 0
-  const len = input.length
-  let inString = false
-  let stringQuote = ''
-  let inLineComment = false
-  let inBlockComment = false
-
-  while (i < len) {
-    const ch = input[i]
-    const next = i + 1 < len ? input[i + 1] : ''
-
-    if (inLineComment) {
-      if (ch === '\n') {
-        inLineComment = false
-        out += ch
-      }
-      i++
-      continue
-    }
-
-    if (inBlockComment) {
-      if (ch === '*' && next === '/') {
-        inBlockComment = false
-        i += 2
-        continue
-      }
-      i++
-      continue
-    }
-
-    if (inString) {
-      out += ch
-      if (ch === '\\' && i + 1 < len) {
-        // エスケープシーケンスの次の1文字はそのまま出力し、引用符終端の誤判定を避ける
-        out += next
-        i += 2
-        continue
-      }
-      if (ch === stringQuote) {
-        inString = false
-      }
-      i++
-      continue
-    }
-
-    if (ch === '"' || ch === "'") {
-      inString = true
-      stringQuote = ch
-      out += ch
-      i++
-      continue
-    }
-
-    if (ch === '/' && next === '/') {
-      inLineComment = true
-      i += 2
-      continue
-    }
-
-    if (ch === '/' && next === '*') {
-      inBlockComment = true
-      i += 2
-      continue
-    }
-
-    out += ch
-    i++
-  }
-
-  return out
-}
-
-/** wrangler.jsonc から name を読む。読めない・パースできない場合は slug をそのまま使い、警告を出す */
-async function readWorkerName(appDir, slug) {
-  const wranglerPath = path.join(appDir, 'wrangler.jsonc')
-  try {
-    const raw = await readFile(wranglerPath, 'utf8')
-    const stripped = stripJsonComments(raw)
-    const parsed = JSON.parse(stripped)
-    if (parsed && typeof parsed === 'object' && typeof parsed.name === 'string' && parsed.name.length > 0) {
-      return parsed.name
-    }
-    console.warn(`${slug}: wrangler.jsonc の解析に失敗したため name に slug を使用`)
-  } catch {
-    console.warn(`${slug}: wrangler.jsonc の解析に失敗したため name に slug を使用`)
-  }
-  return slug
-}
-
-/** apps/<slug>/wrangler.jsonc を持つディレクトリ名（slug）一覧を辞書順で返す */
-async function listAppSlugs() {
-  const entries = await readdir(APPS_DIR, { withFileTypes: true })
-  const slugs = []
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue
-    const wranglerPath = path.join(APPS_DIR, entry.name, 'wrangler.jsonc')
-    if (existsSync(wranglerPath)) {
-      slugs.push(entry.name)
-    }
-  }
-  // localeCompare はICU/ロケール依存で環境により結果が揺れるため、コードポイント比較にする
-  slugs.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-  return slugs
-}
 
 async function hasShot(slug) {
   try {
@@ -155,16 +39,6 @@ async function hasShot(slug) {
   } catch {
     return false
   }
-}
-
-async function fetchCloudflareJson(url, token) {
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) {
-    throw new Error(`${url} -> HTTP ${res.status}`)
-  }
-  return res.json()
 }
 
 function formatRegistryFile(subdomain, entries) {
@@ -242,27 +116,9 @@ async function main() {
   let scripts
 
   try {
-    const subdomainBody = await fetchCloudflareJson(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`,
-      token,
-    )
-    const fetchedSubdomain = subdomainBody?.result?.subdomain
-    // success !== true や result.subdomain が文字列でない場合は「200だが想定外のボディ」として
-    // 異常系扱いにする（黙って空値のまま registry を壊さないため）
-    if (subdomainBody?.success !== true || typeof fetchedSubdomain !== 'string' || fetchedSubdomain.length === 0) {
-      throw new Error('workers/subdomain のレスポンスが想定外の形式です（success !== true または subdomain が文字列でない）')
-    }
-    subdomain = fetchedSubdomain
-
-    const scriptsBody = await fetchCloudflareJson(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
-      token,
-    )
-    // success !== true や result が配列でない場合も同様に異常系扱いにする
-    if (scriptsBody?.success !== true || !Array.isArray(scriptsBody?.result)) {
-      throw new Error('workers/scripts のレスポンスが想定外の形式です（success !== true または result が配列でない）')
-    }
-    scripts = scriptsBody.result
+    const state = await fetchCloudflareState(accountId, token)
+    subdomain = state.subdomain
+    scripts = state.scripts
   } catch (err) {
     fail(
       `Cloudflare API の取得に失敗しました（${err instanceof Error ? err.message : String(err)}）。既存の registry.gen.ts は変更せず終了します。`,
@@ -270,12 +126,7 @@ async function main() {
     return
   }
 
-  const scriptsByName = new Map()
-  for (const script of scripts) {
-    if (script && typeof script === 'object' && typeof script.id === 'string') {
-      scriptsByName.set(script.id, script)
-    }
-  }
+  const scriptsByName = scriptsById(scripts)
 
   const slugs = await listAppSlugs()
 
