@@ -15,7 +15,6 @@ const APP_DIR = path.resolve(SCRIPT_DIR, '..') // apps/lab
 const APPS_DIR = path.resolve(APP_DIR, '..') // apps/
 const SHOTS_DIR = path.join(APP_DIR, 'public', 'shots')
 const OUTPUT_PATH = path.join(APP_DIR, 'src', 'data', 'registry.gen.ts')
-const SUBDOMAIN_FALLBACK = 'ichigoooo'
 
 function fail(message) {
   console.error(`sync.mjs: ${message}`)
@@ -101,7 +100,7 @@ function stripJsonComments(input) {
   return out
 }
 
-/** wrangler.jsonc から name を読む。読めない・パースできない場合は slug をそのまま使う */
+/** wrangler.jsonc から name を読む。読めない・パースできない場合は slug をそのまま使い、警告を出す */
 async function readWorkerName(appDir, slug) {
   const wranglerPath = path.join(appDir, 'wrangler.jsonc')
   try {
@@ -111,8 +110,9 @@ async function readWorkerName(appDir, slug) {
     if (parsed && typeof parsed === 'object' && typeof parsed.name === 'string' && parsed.name.length > 0) {
       return parsed.name
     }
+    console.warn(`${slug}: wrangler.jsonc の解析に失敗したため name に slug を使用`)
   } catch {
-    // 読み取り・パース失敗時は slug をそのまま workerName として扱う
+    console.warn(`${slug}: wrangler.jsonc の解析に失敗したため name に slug を使用`)
   }
   return slug
 }
@@ -128,7 +128,8 @@ async function listAppSlugs() {
       slugs.push(entry.name)
     }
   }
-  slugs.sort((a, b) => a.localeCompare(b))
+  // localeCompare はICU/ロケール依存で環境により結果が揺れるため、コードポイント比較にする
+  slugs.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
   return slugs
 }
 
@@ -203,8 +204,8 @@ async function main() {
     return
   }
 
-  let subdomain = SUBDOMAIN_FALLBACK
-  let scripts = []
+  let subdomain
+  let scripts
 
   try {
     const subdomainBody = await fetchCloudflareJson(
@@ -212,16 +213,22 @@ async function main() {
       token,
     )
     const fetchedSubdomain = subdomainBody?.result?.subdomain
-    if (typeof fetchedSubdomain === 'string' && fetchedSubdomain.length > 0) {
-      subdomain = fetchedSubdomain
+    // success !== true や result.subdomain が文字列でない場合は「200だが想定外のボディ」として
+    // 異常系扱いにする（黙って空値のまま registry を壊さないため）
+    if (subdomainBody?.success !== true || typeof fetchedSubdomain !== 'string' || fetchedSubdomain.length === 0) {
+      throw new Error('workers/subdomain のレスポンスが想定外の形式です（success !== true または subdomain が文字列でない）')
     }
+    subdomain = fetchedSubdomain
 
     const scriptsBody = await fetchCloudflareJson(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
       token,
     )
-    // result が配列でない（API仕様変更・エラーレスポンス等）場合も落ちないようにガードする
-    scripts = Array.isArray(scriptsBody?.result) ? scriptsBody.result : []
+    // success !== true や result が配列でない場合も同様に異常系扱いにする
+    if (scriptsBody?.success !== true || !Array.isArray(scriptsBody?.result)) {
+      throw new Error('workers/scripts のレスポンスが想定外の形式です（success !== true または result が配列でない）')
+    }
+    scripts = scriptsBody.result
   } catch (err) {
     fail(
       `Cloudflare API の取得に失敗しました（${err instanceof Error ? err.message : String(err)}）。既存の registry.gen.ts は変更せず終了します。`,

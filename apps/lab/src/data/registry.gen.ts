@@ -18,7 +18,7 @@ export type RegistryEntry = {
 }
 
 export const SUBDOMAIN = "ichigoooo"
-export const GENERATED_AT = "2026-08-16T10:47:39.914Z"
+export const GENERATED_AT = "2026-08-16T10:58:48.242Z"
 
 export const REGISTRY: RegistryEntry[] = [
   {

@@ -31,6 +31,10 @@ function formatNo(no: number): string {
 }
 
 export function AppCard({ item, status }: Props) {
+  // 未デプロイは「停止」ではなく「まだ無い」ので、渡された status（liveness上は'down'）を
+  // カード表示上は常に unknown（灰）として扱う
+  const effectiveStatus: Props['status'] = item.deployed ? status : 'unknown'
+
   const body = (
     <>
       <Box style={{ aspectRatio: '16 / 10', overflow: 'hidden', background: '#eceae4' }}>
@@ -62,8 +66,8 @@ export function AppCard({ item, status }: Props) {
             <Box
               w={8}
               h={8}
-              title={STATUS_LABEL[status]}
-              style={{ borderRadius: '50%', background: STATUS_COLOR[status], flexShrink: 0 }}
+              title={STATUS_LABEL[effectiveStatus]}
+              style={{ borderRadius: '50%', background: STATUS_COLOR[effectiveStatus], flexShrink: 0 }}
             />
           </Group>
         </Group>
@@ -90,8 +94,9 @@ export function AppCard({ item, status }: Props) {
   )
 
   if (!item.deployed) {
+    // リンクではないのでホバーで浮き上がる演出（classes.card）は当てない
     return (
-      <Card withBorder radius="lg" padding={0} className={classes.card} style={{ overflow: 'hidden', opacity: 0.55 }}>
+      <Card withBorder radius="lg" padding={0} style={{ overflow: 'hidden', opacity: 0.55 }}>
         {body}
       </Card>
     )
