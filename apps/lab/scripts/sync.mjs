@@ -1,0 +1,270 @@
+#!/usr/bin/env node
+// apps/ を走査し、Cloudflare Workers API からデプロイ状況を取得して
+// src/data/registry.gen.ts を再生成する。
+//
+// 使い方: node scripts/sync.mjs
+// 必要な環境変数: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+
+import { readFile, writeFile, readdir, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
+const APP_DIR = path.resolve(SCRIPT_DIR, '..') // apps/lab
+const APPS_DIR = path.resolve(APP_DIR, '..') // apps/
+const SHOTS_DIR = path.join(APP_DIR, 'public', 'shots')
+const OUTPUT_PATH = path.join(APP_DIR, 'src', 'data', 'registry.gen.ts')
+const SUBDOMAIN_FALLBACK = 'ichigoooo'
+
+function fail(message) {
+  console.error(`sync.mjs: ${message}`)
+  process.exitCode = 1
+}
+
+/**
+ * JSONC のコメント（`//` 行コメント / `/* ... *\/` ブロックコメント）を取り除く。
+ * 文字列リテラル内の `//` を誤って消さないよう、1文字ずつ状態（文字列内/コメント内）を
+ * 追跡する小さな状態機械として実装する。素朴な正規表現置換は使わない。
+ */
+function stripJsonComments(input) {
+  let out = ''
+  let i = 0
+  const len = input.length
+  let inString = false
+  let stringQuote = ''
+  let inLineComment = false
+  let inBlockComment = false
+
+  while (i < len) {
+    const ch = input[i]
+    const next = i + 1 < len ? input[i + 1] : ''
+
+    if (inLineComment) {
+      if (ch === '\n') {
+        inLineComment = false
+        out += ch
+      }
+      i++
+      continue
+    }
+
+    if (inBlockComment) {
+      if (ch === '*' && next === '/') {
+        inBlockComment = false
+        i += 2
+        continue
+      }
+      i++
+      continue
+    }
+
+    if (inString) {
+      out += ch
+      if (ch === '\\' && i + 1 < len) {
+        // エスケープシーケンスの次の1文字はそのまま出力し、引用符終端の誤判定を避ける
+        out += next
+        i += 2
+        continue
+      }
+      if (ch === stringQuote) {
+        inString = false
+      }
+      i++
+      continue
+    }
+
+    if (ch === '"' || ch === "'") {
+      inString = true
+      stringQuote = ch
+      out += ch
+      i++
+      continue
+    }
+
+    if (ch === '/' && next === '/') {
+      inLineComment = true
+      i += 2
+      continue
+    }
+
+    if (ch === '/' && next === '*') {
+      inBlockComment = true
+      i += 2
+      continue
+    }
+
+    out += ch
+    i++
+  }
+
+  return out
+}
+
+/** wrangler.jsonc から name を読む。読めない・パースできない場合は slug をそのまま使う */
+async function readWorkerName(appDir, slug) {
+  const wranglerPath = path.join(appDir, 'wrangler.jsonc')
+  try {
+    const raw = await readFile(wranglerPath, 'utf8')
+    const stripped = stripJsonComments(raw)
+    const parsed = JSON.parse(stripped)
+    if (parsed && typeof parsed === 'object' && typeof parsed.name === 'string' && parsed.name.length > 0) {
+      return parsed.name
+    }
+  } catch {
+    // 読み取り・パース失敗時は slug をそのまま workerName として扱う
+  }
+  return slug
+}
+
+/** apps/<slug>/wrangler.jsonc を持つディレクトリ名（slug）一覧を辞書順で返す */
+async function listAppSlugs() {
+  const entries = await readdir(APPS_DIR, { withFileTypes: true })
+  const slugs = []
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    const wranglerPath = path.join(APPS_DIR, entry.name, 'wrangler.jsonc')
+    if (existsSync(wranglerPath)) {
+      slugs.push(entry.name)
+    }
+  }
+  slugs.sort((a, b) => a.localeCompare(b))
+  return slugs
+}
+
+async function hasShot(slug) {
+  try {
+    const st = await stat(path.join(SHOTS_DIR, `${slug}.jpg`))
+    return st.isFile()
+  } catch {
+    return false
+  }
+}
+
+async function fetchCloudflareJson(url, token) {
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    throw new Error(`${url} -> HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+function formatRegistryFile(subdomain, entries) {
+  const lines = []
+  lines.push('// このファイルは scripts/sync.mjs が生成します。手で編集しないでください。')
+  lines.push('')
+  lines.push('export type RegistryEntry = {')
+  lines.push('  /** apps/ 配下のディレクトリ名 */')
+  lines.push('  slug: string')
+  lines.push('  /** wrangler.jsonc の name（= workers.dev のサブドメイン） */')
+  lines.push('  workerName: string')
+  lines.push('  /** 公開URL */')
+  lines.push('  url: string')
+  lines.push('  /** Cloudflare 上に Worker が存在するか */')
+  lines.push('  deployed: boolean')
+  lines.push('  /** Worker の作成日時 ISO8601。未デプロイなら null */')
+  lines.push('  createdAt: string | null')
+  lines.push('  /** Worker の最終更新日時 ISO8601。未デプロイなら null */')
+  lines.push('  modifiedAt: string | null')
+  lines.push('  /** public/shots/<slug>.jpg が存在するか */')
+  lines.push('  hasShot: boolean')
+  lines.push('}')
+  lines.push('')
+  lines.push(`export const SUBDOMAIN = ${JSON.stringify(subdomain)}`)
+  lines.push(`export const GENERATED_AT = ${JSON.stringify(new Date().toISOString())}`)
+  lines.push('')
+  lines.push('export const REGISTRY: RegistryEntry[] = [')
+  for (const entry of entries) {
+    lines.push('  {')
+    lines.push(`    slug: ${JSON.stringify(entry.slug)},`)
+    lines.push(`    workerName: ${JSON.stringify(entry.workerName)},`)
+    lines.push(`    url: ${JSON.stringify(entry.url)},`)
+    lines.push(`    deployed: ${entry.deployed ? 'true' : 'false'},`)
+    lines.push(`    createdAt: ${entry.createdAt === null ? 'null' : JSON.stringify(entry.createdAt)},`)
+    lines.push(`    modifiedAt: ${entry.modifiedAt === null ? 'null' : JSON.stringify(entry.modifiedAt)},`)
+    lines.push(`    hasShot: ${entry.hasShot ? 'true' : 'false'},`)
+    lines.push('  },')
+  }
+  lines.push(']')
+  lines.push('')
+  return lines.join('\n')
+}
+
+async function main() {
+  const token = process.env.CLOUDFLARE_API_TOKEN
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+
+  if (!token || !accountId) {
+    fail(
+      'CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID が設定されていません。既存の registry.gen.ts は変更せず終了します。',
+    )
+    return
+  }
+
+  let subdomain = SUBDOMAIN_FALLBACK
+  let scripts = []
+
+  try {
+    const subdomainBody = await fetchCloudflareJson(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/subdomain`,
+      token,
+    )
+    const fetchedSubdomain = subdomainBody?.result?.subdomain
+    if (typeof fetchedSubdomain === 'string' && fetchedSubdomain.length > 0) {
+      subdomain = fetchedSubdomain
+    }
+
+    const scriptsBody = await fetchCloudflareJson(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts`,
+      token,
+    )
+    // result が配列でない（API仕様変更・エラーレスポンス等）場合も落ちないようにガードする
+    scripts = Array.isArray(scriptsBody?.result) ? scriptsBody.result : []
+  } catch (err) {
+    fail(
+      `Cloudflare API の取得に失敗しました（${err instanceof Error ? err.message : String(err)}）。既存の registry.gen.ts は変更せず終了します。`,
+    )
+    return
+  }
+
+  const scriptsByName = new Map()
+  for (const script of scripts) {
+    if (script && typeof script === 'object' && typeof script.id === 'string') {
+      scriptsByName.set(script.id, script)
+    }
+  }
+
+  const slugs = await listAppSlugs()
+
+  const entries = []
+  for (const slug of slugs) {
+    const appDir = path.join(APPS_DIR, slug)
+    const workerName = await readWorkerName(appDir, slug)
+    const script = scriptsByName.get(workerName)
+    const deployed = Boolean(script)
+    const createdAt = typeof script?.created_on === 'string' ? script.created_on : null
+    const modifiedAt = typeof script?.modified_on === 'string' ? script.modified_on : null
+    const shot = await hasShot(slug)
+
+    entries.push({
+      slug,
+      workerName,
+      url: `https://${workerName}.${subdomain}.workers.dev`,
+      deployed,
+      createdAt,
+      modifiedAt,
+      hasShot: shot,
+    })
+  }
+
+  const output = formatRegistryFile(subdomain, entries)
+  await writeFile(OUTPUT_PATH, output, 'utf8')
+
+  const deployedCount = entries.filter((e) => e.deployed).length
+  const shotCount = entries.filter((e) => e.hasShot).length
+  console.log(`${entries.length}件（デプロイ済み ${deployedCount}件 / スクショ ${shotCount}件）を書き出しました`)
+}
+
+await main()
