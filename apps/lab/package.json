@@ -9,7 +9,8 @@
     "deploy": "vp run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "sync": "node scripts/sync.mjs",
-    "release": "node scripts/sync.mjs && wrangler types && vp run build && wrangler deploy"
+    "shots": "NODE_USE_ENV_PROXY=1 node scripts/shots.mjs",
+    "release": "node scripts/sync.mjs && NODE_USE_ENV_PROXY=1 node scripts/shots.mjs && wrangler types && vp run build && wrangler deploy"
   },
   "dependencies": {
     "@tanstack/react-start": "^1.168.27",
