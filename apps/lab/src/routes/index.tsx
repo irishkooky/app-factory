@@ -16,7 +16,7 @@ import {
 } from '@mantine/core'
 import { AppCard } from '../components/AppCard'
 import { StatBlock } from '../components/StatBlock'
-import { CATALOG, CATEGORY_COUNTS, TOTAL_COUNT, ACTIVE_CATEGORY_COUNT, type CatalogItem } from '../data/catalog'
+import { CATALOG, TOTAL_COUNT, ACTIVE_CATEGORY_COUNT, type CatalogItem } from '../data/catalog'
 import { CATEGORY_LABELS, CATEGORY_ORDER, type Category } from '../data/meta'
 import { checkLiveness } from '../server/liveness'
 
@@ -28,6 +28,12 @@ type CategoryFilter = 'all' | Category
 type LiveStatus = 'up' | 'down'
 
 const GITHUB_URL = 'https://github.com/irishkooky/app-factory'
+
+/** 'all' か CATEGORY_ORDER に含まれる値かを判定する型ガード（`as` を避けるため） */
+function isCategoryFilter(value: string): value is CategoryFilter {
+  if (value === 'all') return true
+  return (CATEGORY_ORDER as string[]).includes(value)
+}
 
 /** 検索語の前後空白をtrimし、空白区切りをAND条件のトークン配列にする */
 function toSearchTokens(raw: string): string[] {
@@ -91,13 +97,19 @@ function HomeComponent() {
     [searchFiltered, category],
   )
 
-  const checkedCount = Object.keys(live).length
-  const upCount = Object.values(live).filter((s) => s === 'up').length
+  // 稼働状況の分母・分子は「デプロイ済み」のものだけで数える（未デプロイは「落ちている」のではなく「まだ無い」ため）
+  const deployedSlugs = CATALOG.filter((item) => item.deployed).map((item) => item.slug)
+  const checkedCount = deployedSlugs.filter((slug) => live[slug] !== undefined).length
+  const upCount = deployedSlugs.filter((slug) => live[slug] === 'up').length
 
   let liveValue: string
   let liveColor: string | undefined
   if (!checked) {
     liveValue = 'CHECKING'
+    liveColor = 'var(--mantine-color-gray-5)'
+  } else if (deployedSlugs.length > 0 && checkedCount === 0) {
+    // checkLiveness() 自体が失敗した（reject した）ケース。落ちているのではなく確認不能。
+    liveValue = 'UNKNOWN'
     liveColor = 'var(--mantine-color-gray-5)'
   } else if (checkedCount > 0 && upCount === checkedCount) {
     liveValue = 'ALL LIVE'
@@ -146,12 +158,17 @@ function HomeComponent() {
             maw={520}
             value={searchValue}
             onChange={(e) => setSearchValue(e.currentTarget.value)}
+            rightSectionPointerEvents="all"
             rightSection={
               searchValue.length > 0 ? <CloseButton onClick={() => setSearchValue('')} aria-label="検索語をクリア" /> : null
             }
           />
 
-          <Tabs value={category} onChange={(value) => setCategory((value as CategoryFilter) ?? 'all')} variant="default">
+          <Tabs
+            value={category}
+            onChange={(value) => setCategory(value !== null && isCategoryFilter(value) ? value : 'all')}
+            variant="default"
+          >
             <Tabs.List>
               <Tabs.Tab
                 value="all"
