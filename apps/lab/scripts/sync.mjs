@@ -14,12 +14,27 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const APP_DIR = path.resolve(SCRIPT_DIR, '..') // apps/lab
 const APPS_DIR = path.resolve(APP_DIR, '..') // apps/
 const SHOTS_DIR = path.join(APP_DIR, 'public', 'shots')
-const OUTPUT_PATH = path.join(APP_DIR, 'src', 'data', 'registry.gen.ts')
+const REGISTRY_OUTPUT_PATH = path.join(APP_DIR, 'src', 'data', 'registry.gen.ts')
+const WRANGLER_OUTPUT_PATH = path.join(APP_DIR, 'wrangler.jsonc')
+const SELF_SLUG = 'lab'
 
 function fail(message) {
   console.error(`sync.mjs: ${message}`)
   process.exitCode = 1
 }
+
+/**
+ * slug から Service Binding 名を決定する。sync.mjs（wrangler.jsonc の services）と
+ * registry.gen.ts（RegistryEntry.binding）で必ず同じ規則を使うこと。
+ */
+function bindingNameFor(slug) {
+  return 'APP_' + slug.toUpperCase().replace(/[^A-Z0-9]/g, '_')
+}
+
+// バインディング名は `env.<NAME>` として参照する識別子である必要がある。
+// 現在の formula は先頭に必ず 'APP_' を付けるため実質的には発生しないが、
+// 将来 formula が変わっても壊れた wrangler.jsonc を書き出さないよう防御的に検証する。
+const VALID_BINDING_NAME = /^[A-Z_][A-Z0-9_]*$/
 
 /**
  * JSONC のコメント（`//` 行コメント / `/* ... *\/` ブロックコメント）を取り除く。
@@ -171,6 +186,8 @@ function formatRegistryFile(subdomain, entries) {
   lines.push('  modifiedAt: string | null')
   lines.push('  /** public/shots/<slug>.jpg が存在するか */')
   lines.push('  hasShot: boolean')
+  lines.push('  /** wrangler.jsonc の services に登録した Service Binding 名。deployed かつ lab 自身以外のときだけ入る */')
+  lines.push('  binding: string | null')
   lines.push('}')
   lines.push('')
   lines.push(`export const SUBDOMAIN = ${JSON.stringify(subdomain)}`)
@@ -186,11 +203,28 @@ function formatRegistryFile(subdomain, entries) {
     lines.push(`    createdAt: ${entry.createdAt === null ? 'null' : JSON.stringify(entry.createdAt)},`)
     lines.push(`    modifiedAt: ${entry.modifiedAt === null ? 'null' : JSON.stringify(entry.modifiedAt)},`)
     lines.push(`    hasShot: ${entry.hasShot ? 'true' : 'false'},`)
+    lines.push(`    binding: ${entry.binding === null ? 'null' : JSON.stringify(entry.binding)},`)
     lines.push('  },')
   }
   lines.push(']')
   lines.push('')
   return lines.join('\n')
+}
+
+/** wrangler.jsonc を丸ごと生成する。services は deployed かつ lab 以外の Worker だけを含む */
+function formatWranglerJsonc(services) {
+  const config = {
+    $schema: 'node_modules/wrangler/config-schema.json',
+    name: SELF_SLUG,
+    compatibility_date: '2026-07-01',
+    compatibility_flags: ['nodejs_compat'],
+    main: '@tanstack/react-start/server-entry',
+  }
+  if (services.length > 0) {
+    config.services = services
+  }
+  const header = '// このファイルは scripts/sync.mjs が生成します。手で編集しないでください。\n'
+  return header + JSON.stringify(config, null, 2) + '\n'
 }
 
 async function main() {
@@ -254,6 +288,9 @@ async function main() {
     const createdAt = typeof script?.created_on === 'string' ? script.created_on : null
     const modifiedAt = typeof script?.modified_on === 'string' ? script.modified_on : null
     const shot = await hasShot(slug)
+    // Service Binding は「実在する（deployed）」かつ「自分自身ではない」ときだけ割り当てる。
+    // 未デプロイの Worker を services に書くと wrangler deploy が失敗するため
+    const binding = deployed && slug !== SELF_SLUG ? bindingNameFor(slug) : null
 
     entries.push({
       slug,
@@ -263,15 +300,48 @@ async function main() {
       createdAt,
       modifiedAt,
       hasShot: shot,
+      binding,
     })
   }
 
-  const output = formatRegistryFile(subdomain, entries)
-  await writeFile(OUTPUT_PATH, output, 'utf8')
+  // wrangler.jsonc / registry.gen.ts のどちらも書き出す前に、バインディング名の
+  // 妥当性・重複を検証する（片方だけ書き換わる中途半端な状態を作らないため）
+  const bindingOwners = new Map()
+  for (const entry of entries) {
+    if (entry.binding === null) continue
+    if (!VALID_BINDING_NAME.test(entry.binding)) {
+      fail(
+        `${entry.slug}: バインディング名 "${entry.binding}" が識別子として不正です。wrangler.jsonc / registry.gen.ts は変更せず終了します。`,
+      )
+      return
+    }
+    const owners = bindingOwners.get(entry.binding) ?? []
+    owners.push(entry.slug)
+    bindingOwners.set(entry.binding, owners)
+  }
+  for (const [bindingName, owners] of bindingOwners) {
+    if (owners.length > 1) {
+      fail(
+        `バインディング名 "${bindingName}" が重複しています（${owners.join(', ')}）。wrangler.jsonc / registry.gen.ts は変更せず終了します。`,
+      )
+      return
+    }
+  }
+
+  // 両方の出力内容を先に組み立ててから、まとめて書き出す
+  const registryOutput = formatRegistryFile(subdomain, entries)
+  const services = entries
+    .filter((e) => e.binding !== null)
+    .map((e) => ({ binding: e.binding, service: e.workerName }))
+  const wranglerOutput = formatWranglerJsonc(services)
+
+  await writeFile(REGISTRY_OUTPUT_PATH, registryOutput, 'utf8')
+  await writeFile(WRANGLER_OUTPUT_PATH, wranglerOutput, 'utf8')
 
   const deployedCount = entries.filter((e) => e.deployed).length
   const shotCount = entries.filter((e) => e.hasShot).length
   console.log(`${entries.length}件（デプロイ済み ${deployedCount}件 / スクショ ${shotCount}件）を書き出しました`)
+  console.log(`バインディング ${services.length}件を wrangler.jsonc に書き出しました`)
 }
 
 await main()

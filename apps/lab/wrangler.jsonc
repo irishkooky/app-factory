@@ -1,7 +1,84 @@
+// このファイルは scripts/sync.mjs が生成します。手で編集しないでください。
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "lab",
   "compatibility_date": "2026-07-01",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry"
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "main": "@tanstack/react-start/server-entry",
+  "services": [
+    {
+      "binding": "APP_AI_ERA_SKILL_QUIZ",
+      "service": "ai-era-skill-quiz"
+    },
+    {
+      "binding": "APP_AKACHAN_PARTY",
+      "service": "akachan-party"
+    },
+    {
+      "binding": "APP_AUTH_DEMO",
+      "service": "auth-demo"
+    },
+    {
+      "binding": "APP_CASH_FORECAST",
+      "service": "cash-forecast"
+    },
+    {
+      "binding": "APP_CONVEX_SHOWCASE",
+      "service": "convex-showcase"
+    },
+    {
+      "binding": "APP_GUESTBOOK",
+      "service": "guestbook"
+    },
+    {
+      "binding": "APP_HELLO",
+      "service": "hello"
+    },
+    {
+      "binding": "APP_LOOP_ENGINEERING_DEMO",
+      "service": "loop-engineering-demo"
+    },
+    {
+      "binding": "APP_LOXONIN_REMINDER",
+      "service": "loxonin-reminder"
+    },
+    {
+      "binding": "APP_PITCH_BATTLE",
+      "service": "pitch-battle"
+    },
+    {
+      "binding": "APP_PITCH_ROULETTE",
+      "service": "pitch-roulette"
+    },
+    {
+      "binding": "APP_SALON_BOOKING",
+      "service": "salon-booking"
+    },
+    {
+      "binding": "APP_TOKEN_COST_CHECKER",
+      "service": "token-cost-checker"
+    },
+    {
+      "binding": "APP_TOKEN_COST_CHECKER_B",
+      "service": "token-cost-checker-b"
+    },
+    {
+      "binding": "APP_TOKEN_COST_CHECKER_FABLE_ONLY",
+      "service": "token-cost-checker-fable-only"
+    },
+    {
+      "binding": "APP_TOKEN_COST_CHECKER_FABLE_ORCHESTRATION",
+      "service": "token-cost-checker-fable-orchestration"
+    },
+    {
+      "binding": "APP_TOKYO_OUTFIT",
+      "service": "tokyo-outfit"
+    },
+    {
+      "binding": "APP_TURING_WEREWOLF",
+      "service": "turing-werewolf"
+    }
+  ]
 }

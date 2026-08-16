@@ -13,6 +13,7 @@ export type CatalogItem = {
   createdAt: string | null
   modifiedAt: string | null
   shotUrl: string | null // '/shots/<slug>.jpg' or null
+  binding: string | null // Service Binding 名。deployed かつ lab 自身以外のときだけ入る
 }
 
 const DEFAULT_DESCRIPTION = '説明が未設定のアプリです。'
@@ -59,6 +60,7 @@ const merged: MergedEntry[] = REGISTRY.filter((entry) => META[entry.slug]?.hidde
     createdAt: entry.createdAt,
     modifiedAt: entry.modifiedAt,
     shotUrl: entry.hasShot ? `/shots/${entry.slug}.jpg` : null,
+    binding: entry.binding,
   }
 })
 
