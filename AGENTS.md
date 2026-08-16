@@ -41,18 +41,37 @@ Claude Code on the web（クラウドサンドボックス）から使われる�
 5. `vp run build` が通ることを確認する
 6. `wrangler deploy` でデプロイする
    （`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` は環境変数として供給済み）
-7. `git commit` して `push` する
-8. PRを作成し、マージまで行う（下記「PRとマージの運用」参照）
-9. **最後に必ずデプロイURL（`https://<name>.<account>.workers.dev`）とマージ結果を報告して終了する**
+7. **作品一覧ポータルを更新する**（下記「作品一覧ポータル（apps/lab）」参照）
+8. `git commit` して `push` する
+9. PRを作成し、マージまで行う（下記「PRとマージの運用」参照）
+10. **最後に必ずデプロイURL（`https://<name>.<account>.workers.dev`）とマージ結果を報告して終了する**
+
+### 作品一覧ポータル（apps/lab）
+
+`apps/` 配下の全アプリを一覧・検索できるポータル: https://lab.ichigoooo.workers.dev
+
+アプリを新規追加したとき、および既存アプリの見た目を大きく変えたときは、最後にポータルを更新する:
+
+1. `apps/lab/src/data/meta.ts` に表示名・説明・カテゴリ（`tool` / `game` / `demo`）・タグを追記する
+   - 書かなくても一覧には出るが、slug がそのまま表示され説明が既定文になる
+2. `cd apps/lab && vp run release` を実行する
+   （一覧の再生成 → スクショ撮影 → 型生成 → build → deploy を一括で行う）
+3. 生成物（`wrangler.jsonc` / `src/data/registry.gen.ts` / `public/shots/*.jpg` /
+   `worker-configuration.d.ts`）を一緒にコミットする
+
+一覧の順番と `No.` はWorkerの作成日から自動で決まるので手で振らない。
+自動生成ファイルは手で編集しない。
 
 ## 5. 既存アプリの修正
 
 1. `apps/<name>` で作業する
 2. `vp run build`
 3. `wrangler deploy`
-4. `commit` & `push`
-5. PRを作成し、マージまで行う（下記「PRとマージの運用」参照）
-6. URLとマージ結果を報告する
+4. 見た目が大きく変わったなら、ポータルのサムネイルを撮り直す
+   （`cd apps/lab && vp run shots -- --only <name>`）
+5. `commit` & `push`
+6. PRを作成し、マージまで行う（下記「PRとマージの運用」参照）
+7. URLとマージ結果を報告する
 
 ### PRとマージの運用
 
@@ -127,6 +146,11 @@ Claude Code on the web（クラウドサンドボックス）から使われる�
   （実装エージェントが内部で再委任して途中停止し、進行が約10分空転した事故があった）
 - 差し戻し・追加修正は新規エージェントを起動せず、同じエージェントに SendMessage で続きを依頼する
   （コンテキストを引き継げるため速い）。完了報告を受けたら鵜呑みにせず、対象ファイルを grep で実在確認する
+- サブエージェントの「ツールが無いのでできませんでした」という報告を鵜呑みにしない。
+  実際には使えることがある（実例: 「Playwrightが未導入なのでスクショ確認は省略した」と報告されたが
+  グローバルに導入済みだった）。省略された検証はマネージャー自身がやり直す
+- サブエージェントは中断されると通知が来ないまま消えることがある。
+  待っても完了通知が来ない場合は `ListAgents` で生存を確認し、消えていたら投げ直す
 
 ## 10. 実装・検証の知見（過去のトラブルからのルール）
 
@@ -137,6 +161,14 @@ Claude Code on the web（クラウドサンドボックス）から使われる�
   （学習カットオフ後にAPIが変わっていることが多いため）
 - `researcher` と `reviewer` はツールが制限されておりMCPツールを持たないため、
   Context7での確認はマネージャー自身か `implementer` が行う
+
+### Mantine v9 の落とし穴
+- `TextInput` などの `rightSection` に置いたボタンは、既定で `pointer-events: none` が効いて
+  **表示はされるがクリックできない**。`rightSectionPointerEvents="all"` を明示すること
+  （見た目だけの確認では気づけない。実際にクリックして検証する）
+- `Badge` は既定で中身を大文字化する。日本語は影響ないが英字は `Convex` → `CONVEX` になる。
+  元の表記を保ちたいときは `tt="none"`
+- `AspectRatio` コンポーネントは無い。`<Box style={{ aspectRatio: '16 / 10' }}>` で作る
 
 ### 外部APIの扱い
 - 外部APIのレスポンスのフィールドは **null・欠落がありうる前提** で実装する
@@ -155,14 +187,40 @@ Claude Code on the web（クラウドサンドボックス）から使われる�
    （デプロイ直後は一時的に404になることがある。数十秒おいて再試行してから調査する）
 4. **見た目のスクリーンショット確認**: `vp dev` を起動し、ヘッドレスChromium（プロキシ設定なし）で
    `http://localhost:<port>` を撮影して目視確認する。SSR済みページなので外部通信の細工は不要
-5. **ブラウザでの操作E2E（クリック〜フォーム送信）は既定では行わない**。
+5. **本番URLをブラウザで開いての確認**（クライアント側の処理がある場合は必須）:
+   `docs/e2e.md` の「全リクエストリレー」で本番URLを開いて撮影する。低コストなので惜しまず使う。
+   **手順3の `curl` はSSRされたHTMLしか見ないため、マウント後に走る処理
+   （サーバー関数の呼び出し、クライアントfetch）は一切検証できない。**
+   ローカルの `vp dev` は実ネットワークに出られるので、本番でのみ壊れる不具合が素通りする
+   （実例: Worker間の直接fetchが本番だけ `error code: 1042` で全滅していたのを、
+   ローカル検証では緑表示のまま見逃した。下記「Cloudflare Workers の制約」参照）
+6. **ブラウザでの操作E2E（クリック〜フォーム送信）は既定では行わない**。
    ユーザーが明示的に求めた場合や、クライアント側にしかないロジックが重要な場合のみ、
    `docs/e2e.md` の手順（WebSocketリレー）で行う
+
+### Cloudflare Workers の制約（本番でしか出ない類のもの）
+- **Workerから同一ゾーンの他の `*.workers.dev` への `fetch()` は失敗する。**
+  `HTTP 404` ＋ ボディに `error code: 1042` が返る。Cloudflareが Worker間サブリクエストを
+  許可していないため。**ローカルの `vp dev` は実ネットワークに出るので成功してしまい、
+  本番デプロイ後にしか露見しない**
+- 他のアプリを叩く必要がある場合は **Service Bindings** を使う。
+  `wrangler.jsonc` の `services` に `{ "binding": "APP_XXX", "service": "<worker名>" }` を並べ、
+  `import { env } from 'cloudflare:workers'` して `env.APP_XXX.fetch(new Request(url))` を呼ぶ。
+  実装例は `apps/lab/src/server/liveness.ts` と `apps/lab/scripts/sync.mjs`（services を自動生成している）
+- `services` に**存在しないWorkerを書くと `wrangler deploy` が失敗する**。
+  未デプロイのものを混ぜないこと
+- バインディングを足したら `wrangler types` で `worker-configuration.d.ts` を再生成し、
+  `tsconfig.json` の `include` に加える（既定の `["src"]` では拾われず `tsc` が落ちる）
+- 生成される `Env` 型には index signature が無いため `const r: Record<string, unknown> = env` は
+  型エラーになる。バインディング名を動的に引くときは `Reflect.get(env, name)` を使う
 
 ### ブラウザ・プロキシの制約（ハマりどころ）
 - **このサンドボックスの egress はヘッドレスChromiumの外部TLSを遮断する**（直接アクセスも
   プロキシ経由CONNECTも接続リセット。example.com ですら失敗する）。ブラウザから外部に出る検証は
   そのままでは不可能で、外部通信はすべてNode側にリレーする必要がある（詳細は `docs/e2e.md`）
+- ただし `page.route('**/*')` で**全リクエストをNode側 `fetch` にリレー**すれば、
+  本番URLのページを画像込みで開いて撮影できる（`docs/e2e.md` 前半）。
+  `vp dev` を立てる必要がなく低コストなので、本番確認では積極的に使う
 - ヘッドレスChromiumにプロキシを直接設定してはいけない
   （localhostへのページ読み込みまでプロキシに送られ405になる。bypass設定も効かない）
 - 外部REST APIだけなら `page.route('https://api.example.com/**', ...)` でインターセプトして
