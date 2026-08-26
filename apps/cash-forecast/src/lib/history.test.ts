@@ -81,4 +81,28 @@ describe("buildHistoryRows", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].balance).toBe(1234);
   });
+
+  it("名前なしアドオンの履歴行は表示名が「上乗せ」・rawNameが空文字・isAddonがtrueになる", () => {
+    const rows = buildHistoryRows({
+      anchorBalance: 1000,
+      txs: [
+        makeTx({ date: "2026-07-01", name: "", kind: "expense", amount: 500, addon: true, ruleId: "rule_1" as Doc<"rules">["_id"], ruleMonth: "2026-07" }),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe("上乗せ");
+    expect(rows[0].rawName).toBe("");
+    expect(rows[0].isAddon).toBe(true);
+  });
+
+  it("通常の実績行はnameが素通しでisAddonがfalseになる", () => {
+    const rows = buildHistoryRows({
+      anchorBalance: 1000,
+      txs: [makeTx({ date: "2026-07-01", name: "家賃", kind: "expense", amount: 500 })],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe("家賃");
+    expect(rows[0].rawName).toBe("家賃");
+    expect(rows[0].isAddon).toBe(false);
+  });
 });

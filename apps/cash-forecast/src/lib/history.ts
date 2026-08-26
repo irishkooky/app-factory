@@ -1,9 +1,12 @@
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import { addonDisplayName } from "./forecast";
 
 export type HistoryRow = {
   txId: Id<"transactions">;
   date: string;
   name: string;
+  rawName: string; // 保存されている生の名前（編集フォームの初期値用。アドオンで未入力なら ""）
+  isAddon: boolean;
   kind: "income" | "expense";
   amount: number;
   balance: number; // この行適用後の残高
@@ -38,7 +41,9 @@ export function buildHistoryRows(input: {
     return {
       txId: tx._id,
       date: tx.date,
-      name: tx.name,
+      name: tx.addon === true ? addonDisplayName(tx.name) : tx.name,
+      rawName: tx.name,
+      isAddon: tx.addon === true,
       kind: tx.kind,
       amount: tx.amount,
       balance,

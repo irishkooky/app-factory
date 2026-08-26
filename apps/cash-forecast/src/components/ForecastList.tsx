@@ -3,6 +3,7 @@ import { Chip, Separator } from '@heroui/react'
 import { IconChevronRight } from '@tabler/icons-react'
 import type { ForecastRow } from '../lib/forecast'
 import type { HistoryRow } from '../lib/history'
+import { buildForecastListItems, type CurrentPosition } from '../lib/forecastList'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { summarizeByMonth, type MonthSummary } from '../lib/summary'
@@ -10,43 +11,23 @@ import { summarizeByMonth, type MonthSummary } from '../lib/summary'
 type ForecastListProps = {
   rows: ForecastRow[]
   today: string
+  anchorDate: string
+  anchorBalance: number
   onRowClick: (row: ForecastRow) => void
   historyRows?: HistoryRow[]
   onHistoryRowClick?: (row: HistoryRow) => void
 }
 
-type ListItem =
-  | { type: 'month'; key: string; month: string }
-  | { type: 'today'; key: string }
-  | { type: 'row'; key: string; row: ForecastRow }
-
-function buildItems(rows: ForecastRow[], today: string): ListItem[] {
-  const items: ListItem[] = []
-  let currentMonth: string | null = null
-  let todayInserted = false
-
-  for (const row of rows) {
-    const month = monthOf(row.date)
-    if (month !== currentMonth) {
-      items.push({ type: 'month', key: `month-${month}`, month })
-      currentMonth = month
-    }
-    if (!todayInserted && row.date > today) {
-      items.push({ type: 'today', key: 'today' })
-      todayInserted = true
-    }
-    items.push({ type: 'row', key: row.key, row })
-  }
-
-  if (!todayInserted) {
-    items.push({ type: 'today', key: 'today' })
-  }
-
-  return items
-}
-
-export function ForecastList({ rows, today, onRowClick, historyRows, onHistoryRowClick }: ForecastListProps) {
-  const items = buildItems(rows, today)
+export function ForecastList({
+  rows,
+  today,
+  anchorDate,
+  anchorBalance,
+  onRowClick,
+  historyRows,
+  onHistoryRowClick,
+}: ForecastListProps) {
+  const items = buildForecastListItems({ rows, today, anchorDate, anchorBalance })
   const monthSummaries = useMemo(() => {
     const map = new Map<string, MonthSummary>()
     for (const summary of summarizeByMonth(rows)) {
@@ -79,15 +60,16 @@ export function ForecastList({ rows, today, onRowClick, historyRows, onHistoryRo
           )
         }
         if (item.type === 'today') {
-          return (
-            <div key={item.key} className="my-1.5 flex items-center gap-2">
-              <Separator className="flex-1" />
-              <span className="text-sm text-accent">今日</span>
-              <Separator className="flex-1" />
-            </div>
-          )
+          return <TodayMarker key={item.key} today={item.today} position={item.position} />
         }
-        return <ForecastListRow key={item.key} row={item.row} onClick={() => onRowClick(item.row)} />
+        return (
+          <ForecastListRow
+            key={item.key}
+            row={item.row}
+            isToday={item.isToday}
+            onClick={() => onRowClick(item.row)}
+          />
+        )
       })}
     </div>
   )
@@ -222,22 +204,60 @@ function MonthDividerLabel({ month, summary }: { month: string; summary: MonthSu
   )
 }
 
-function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => void }) {
+// 「今日」の位置を示すマーカー。しきい値割れ（黄色系）と衝突しないよう、
+// 今日の強調にはグラフの線と同じ --accent（青紫）を使う。
+function TodayMarker({ today, position }: { today: string; position: CurrentPosition }) {
+  return (
+    <div className="my-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2">
+      <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
+        今日
+      </span>
+      <span className="text-sm font-medium tabular-nums">{formatDateShort(today)}</span>
+      <div className="ml-auto flex flex-col items-end">
+        <span className={`text-base font-bold tabular-nums ${position.balance < 0 ? 'text-red-600' : ''}`}>
+          {formatYen(position.balance)}
+        </span>
+        <span className="text-xs text-muted">
+          {/* OCR照合等で anchorDate > today になり得る異常データでは asOfDate が未来日になり得るため、
+              hasTodayRows または asOfDate >= today のときは「◯◯から変動なし」ではなく「現在の残高」とする。 */}
+          {position.hasTodayRows || position.asOfDate >= today
+            ? '現在の残高'
+            : `${formatDateShort(position.asOfDate)} から変動なし`}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function ForecastListRow({
+  row,
+  isToday,
+  onClick,
+}: {
+  row: ForecastRow
+  isToday: boolean
+  onClick: () => void
+}) {
   const amountColor = row.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
   const amountSign = row.kind === 'expense' ? '-' : '+'
   const balanceColor = row.balance < 0 ? 'text-red-600' : undefined
   const isConfirmed = !row.isVirtual && row.ruleId !== undefined
   const addonCount = row.addons?.length ?? 0
+  // 背景は排他にする。Tailwind は同じプロパティのユーティリティを併記しても
+  // クラス文字列の順序では解決されないため、三項で1つだけ選ぶこと。
+  const bg = row.belowThreshold ? 'bg-warning-soft' : isToday ? 'bg-accent/10' : ''
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-3 py-2 text-left ${row.belowThreshold ? 'bg-warning-soft' : ''}`}
+      className={`rounded-md border-l-2 px-3 py-2 text-left ${isToday ? 'border-accent' : 'border-transparent'} ${bg}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
-          <span className="w-10 shrink-0 text-sm text-muted">{formatDateShort(row.date)}</span>
+          <span className={`w-10 shrink-0 text-sm ${isToday ? 'font-semibold text-accent' : 'text-muted'}`}>
+            {formatDateShort(row.date)}
+          </span>
           <div className="flex min-w-0 flex-col gap-0">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm">{row.name}</span>
@@ -260,7 +280,9 @@ function ForecastListRow({ row, onClick }: { row: ForecastRow; onClick: () => vo
             {amountSign}
             {formatYen(row.amount)}
           </span>
-          <span className={`text-xs tabular-nums ${balanceColor ?? ''}`}>{formatYen(row.balance)}</span>
+          <span className={`text-xs tabular-nums ${isToday ? 'font-bold' : ''} ${balanceColor ?? ''}`}>
+            {formatYen(row.balance)}
+          </span>
         </div>
       </div>
     </button>

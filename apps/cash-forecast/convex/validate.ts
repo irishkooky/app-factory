@@ -49,3 +49,15 @@ export function assertName(name: string): string {
   }
   return trimmed;
 }
+
+/**
+ * 名前の任意入力版。trim 後が空文字なら空文字を返す（上乗せなど名前が無くてよい行のため）。
+ * 空でない場合の上限は assertName と同じ100文字。
+ */
+export function assertOptionalName(name: string): string {
+  const trimmed = name.trim();
+  if (trimmed.length > 100) {
+    throw new ConvexError("名前は100文字以内で入力してください");
+  }
+  return trimmed;
+}
