@@ -61,7 +61,7 @@ function HistoryEditForm({
 
   const [submitting, setSubmitting] = useState(false)
   const [date, setDate] = useState(target.date)
-  const [name, setName] = useState(target.name)
+  const [name, setName] = useState(target.rawName ?? target.name)
   const [amount, setAmount] = useState<number | undefined>(target.amount)
   const [kind, setKind] = useState<'income' | 'expense'>(target.kind)
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
@@ -69,7 +69,8 @@ function HistoryEditForm({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const nextErrors: typeof errors = {}
-    if (name.trim().length === 0) nextErrors.name = '名前を入力してください'
+    // アドオン由来の実績行は名前が無くてよい（サーバー側もアドオン行の空名を許容済み）。
+    if (!target.isAddon && name.trim().length === 0) nextErrors.name = '名前を入力してください'
     if (amount === undefined) nextErrors.amount = '金額を入力してください'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0 || amount === undefined) return

@@ -203,7 +203,7 @@ function AddonForm({
   const updateTx = useMutation(api.transactions.update)
   const [submitting, setSubmitting] = useState(false)
 
-  const [name, setName] = useState(addon?.name ?? '')
+  const [name, setName] = useState(addon?.rawName ?? '')
   const [amount, setAmount] = useState<number | undefined>(addon?.amount)
   const [kind, setKind] = useState<'income' | 'expense'>(addon?.kind ?? 'expense')
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
@@ -211,7 +211,6 @@ function AddonForm({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const nextErrors: typeof errors = {}
-    if (name.trim().length === 0) nextErrors.name = '名前を入力してください'
     if (amount === undefined) nextErrors.amount = '金額を入力してください'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0 || amount === undefined) return
@@ -245,8 +244,8 @@ function AddonForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <TextField isInvalid={!!errors.name} isDisabled={submitting}>
-        <Label>名前</Label>
-        <Input placeholder="例: ピーリング" value={name} onChange={(e) => setName(e.target.value)} />
+        <Label>名前（任意）</Label>
+        <Input placeholder="例: ピーリング（空欄可）" value={name} onChange={(e) => setName(e.target.value)} />
         {errors.name && <FieldError>{errors.name}</FieldError>}
       </TextField>
 
@@ -449,7 +448,7 @@ function TransactionForm({
   const [deletingAddonId, setDeletingAddonId] = useState<string | null>(null)
 
   const [date, setDate] = useState(initialDate)
-  const [name, setName] = useState(target?.name ?? '')
+  const [name, setName] = useState(target?.rawName ?? target?.name ?? '')
   const [amount, setAmount] = useState<number | undefined>(target?.amount)
   const [kind, setKind] = useState<'income' | 'expense'>(target?.kind ?? 'expense')
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Doc } from "../../convex/_generated/dataModel";
 import { addMonthsToDateClamped, todayJST } from "./date";
-import { buildForecast } from "./forecast";
+import { addonDisplayName, buildForecast } from "./forecast";
 
 // Convex の生成型に依存させず、テストに必要な最小限のフィールドだけを埋めたダミーを作る。
 let ruleSeq = 0;
@@ -406,5 +406,274 @@ describe("buildForecast: アドオン", () => {
     expect(row?.amount).toBe(250_000);
     expect(row?.addons).toHaveLength(2);
     expect(row?.addons?.map((a) => a.name)).toEqual(["ピーリング", "外食"]);
+  });
+});
+
+describe("buildForecast: historyTransactions（実績化済みの確定判定）", () => {
+  it("historyTransactionsに含まれる上書き行(addonなし)の月は、仮想行が生成されない", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 27 });
+    const rows = buildForecast({
+      anchorDate: "2026-08-20",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [],
+      historyTransactions: [
+        makeTx({
+          date: "2026-08-05",
+          name: "AMEX(確定・実績化済み)",
+          kind: "expense",
+          amount: 140_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-08",
+        }),
+      ],
+      horizonEnd: "2026-09-30",
+    });
+
+    // 8月分(dayOfMonth=27) は anchorDate=8/20 より後だが、既に実績化済みなので仮想行は復活しない
+    const augustRows = rows.filter((r) => r.date.startsWith("2026-08"));
+    expect(augustRows).toHaveLength(0);
+
+    const septemberRows = rows.filter((r) => r.date.startsWith("2026-09"));
+    expect(septemberRows).toHaveLength(1);
+    expect(septemberRows[0].isVirtual).toBe(true);
+  });
+
+  it("historyTransactionsに含まれるのがaddon:trueの行だけなら、仮想行は生成される（アドオンは確定を意味しない）", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 27 });
+    const rows = buildForecast({
+      anchorDate: "2026-08-20",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [],
+      historyTransactions: [
+        makeTx({
+          date: "2026-08-05",
+          name: "ピーリング",
+          kind: "expense",
+          amount: 10_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-08",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-08-31",
+    });
+
+    const augustRows = rows.filter((r) => r.date.startsWith("2026-08"));
+    expect(augustRows).toHaveLength(1);
+    expect(augustRows[0].isVirtual).toBe(true);
+    // historyTransactions側のaddon(10,000)がaddonsByKeyに混入していないこと＝
+    // 仮想行の金額はルールのベース額のままであることを確認する。
+    expect(augustRows[0].amount).toBe(130_000);
+    expect(augustRows[0].balance).toBe(-130_000);
+    expect(augustRows[0].addons).toBeUndefined();
+  });
+
+  it("historyTransactionsのaddon:true行はaddonsByKeyに混入せず、実際に生成される仮想行の金額に影響しない", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 27 });
+    const rows = buildForecast({
+      anchorDate: "2026-08-20",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [],
+      historyTransactions: [
+        // ruleMonth を、実際に仮想行が生成される9月分と同じキーにする。
+        // これがaddonsByKeyに混じると9月の仮想行の金額が999,999分跳ね上がってしまう。
+        makeTx({
+          date: "2026-08-05",
+          name: "過去に付いたアドオン",
+          kind: "expense",
+          amount: 999_999,
+          ruleId: rule._id,
+          ruleMonth: "2026-09",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-09-30",
+    });
+
+    const septemberRow = rows.find((r) => r.date === "2026-09-27");
+    expect(septemberRow).toBeDefined();
+    expect(septemberRow?.isVirtual).toBe(true);
+    expect(septemberRow?.amount).toBe(130_000);
+    expect(septemberRow?.addons).toBeUndefined();
+  });
+
+  it("ルールが存在しても対象月が実績化済みなら仮想行は出ず、基準日より後のアドオンは単独行として金額が残高に反映される", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 27 });
+    const rows = buildForecast({
+      anchorDate: "2026-08-20",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        // 確定行は既に履歴側に実績化されているので、ここにあるのはアドオンだけ（合算先が無い）。
+        makeTx({
+          date: "2026-08-25",
+          name: "ピーリング",
+          kind: "expense",
+          amount: 10_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-08",
+          addon: true,
+        }),
+      ],
+      historyTransactions: [
+        makeTx({
+          date: "2026-08-05",
+          name: "AMEX(確定・実績化済み)",
+          kind: "expense",
+          amount: 140_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-08",
+        }),
+      ],
+      horizonEnd: "2026-09-30",
+    });
+
+    // 8月分の仮想行は復活しない（実績化済み）。代わりに、合算先を失ったアドオンが
+    // 金額を黙って落とさないよう単独行として出て、残高にも反映される。
+    const augustRows = rows.filter((r) => r.date.startsWith("2026-08"));
+    expect(augustRows).toHaveLength(1);
+    expect(augustRows[0].isVirtual).toBe(false);
+    expect(augustRows[0].amount).toBe(10_000);
+    expect(augustRows[0].balance).toBe(-10_000);
+
+    const septemberRow = rows.find((r) => r.date === "2026-09-27");
+    expect(septemberRow?.isVirtual).toBe(true);
+    expect(septemberRow?.amount).toBe(130_000);
+    expect(septemberRow?.balance).toBe(-140_000);
+  });
+
+  it("ルールが削除済みで対象月が実績化済みでも、従来どおり孤児アドオン行として出る（デグレしていないこと）", () => {
+    const deletedRuleId = "rule_deleted" as Doc<"rules">["_id"];
+    const rows = buildForecast({
+      anchorDate: "2026-08-20",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [], // ルールは既に削除されている想定
+      transactions: [
+        makeTx({
+          date: "2026-08-25",
+          name: "ピーリング(孤児)",
+          kind: "expense",
+          amount: 10_000,
+          ruleId: deletedRuleId,
+          ruleMonth: "2026-08",
+          addon: true,
+        }),
+      ],
+      historyTransactions: [
+        makeTx({
+          date: "2026-08-05",
+          name: "AMEX(確定・実績化済み)",
+          kind: "expense",
+          amount: 140_000,
+          ruleId: deletedRuleId,
+          ruleMonth: "2026-08",
+        }),
+      ],
+      horizonEnd: "2026-08-31",
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].isVirtual).toBe(false);
+    expect(rows[0].amount).toBe(10_000);
+    expect(rows[0].balance).toBe(-10_000);
+  });
+
+  it("historyTransactionsを渡さなくても従来どおり動く（後方互換）", () => {
+    const rule = makeRule({ name: "家賃", kind: "expense", amount: 80_000, dayOfMonth: 27 });
+    const rows = buildForecast({
+      anchorDate: "2026-07-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [],
+      horizonEnd: "2026-07-31",
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].isVirtual).toBe(true);
+    expect(rows[0].date).toBe("2026-07-27");
+  });
+
+  it("historyTransactionsの金額は残高計算に混入しない", () => {
+    const rule = makeRule({ name: "給与", kind: "income", amount: 300_000, dayOfMonth: 25 });
+    const baseInput = {
+      anchorDate: "2026-07-01",
+      anchorBalance: 100_000,
+      threshold: 0,
+      rules: [rule],
+      transactions: [makeTx({ date: "2026-07-15", name: "家賃", kind: "expense", amount: 80_000 })],
+      horizonEnd: "2026-08-01",
+    };
+
+    const withoutHistory = buildForecast(baseInput);
+    const withHistory = buildForecast({
+      ...baseInput,
+      // ruleId・ruleMonthともに実際の行生成とは無関係な組み合わせにする。
+      // overriddenKeysに追加されても既存のどの行にもマッチしないので、
+      // amountがどこかに混入していれば行やbalanceに差分として現れるはず。
+      historyTransactions: [
+        makeTx({
+          date: "2026-06-01",
+          name: "無関係な実績行",
+          kind: "expense",
+          amount: 999_999_999,
+          ruleId: "rule_unrelated" as Doc<"rules">["_id"],
+          ruleMonth: "2099-01",
+        }),
+      ],
+    });
+
+    expect(withHistory).toEqual(withoutHistory);
+  });
+});
+
+describe("addonDisplayName", () => {
+  it("空文字のときは既定ラベル「上乗せ」を返す", () => {
+    expect(addonDisplayName("")).toBe("上乗せ");
+  });
+
+  it("空白のみのときも既定ラベル「上乗せ」を返す", () => {
+    expect(addonDisplayName("   ")).toBe("上乗せ");
+  });
+
+  it("通常の文字列はtrimして返す", () => {
+    expect(addonDisplayName("  ピーリング  ")).toBe("ピーリング");
+  });
+});
+
+describe("buildForecast: 名前なしアドオン", () => {
+  it("名前が空文字のアドオンを持つ仮想行は、addons[0].nameが「上乗せ」・rawNameが空文字になる", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 10 });
+    const rows = buildForecast({
+      anchorDate: "2026-11-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        makeTx({
+          date: "2026-11-10",
+          name: "",
+          kind: "expense",
+          amount: 5_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-11-30",
+    });
+
+    const row = rows.find((r) => r.date === "2026-11-10");
+    expect(row?.addons).toHaveLength(1);
+    expect(row?.addons?.[0].name).toBe("上乗せ");
+    expect(row?.addons?.[0].rawName).toBe("");
   });
 });

@@ -1,6 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import { assertAmount, assertDateString, assertMonthString, assertName } from "./validate";
+import { assertAmount, assertDateString, assertMonthString, assertName, assertOptionalName } from "./validate";
 import { requirePro } from "./billing";
 
 export const listAfter = query({
@@ -67,7 +67,7 @@ export const create = mutation({
       throw new ConvexError("上乗せにはruleIdとruleMonthが必要です");
     }
 
-    const trimmedName = assertName(name);
+    const trimmedName = addon === true ? assertOptionalName(name) : assertName(name);
     assertAmount(amount);
     assertDateString(date, "日付");
     if (ruleMonth !== undefined) {
@@ -141,7 +141,7 @@ export const update = mutation({
       throw new ConvexError("権限がありません");
     }
 
-    const trimmedName = assertName(name);
+    const trimmedName = existing.addon === true ? assertOptionalName(name) : assertName(name);
     assertAmount(amount);
     assertDateString(date, "日付");
 

@@ -8,6 +8,7 @@ import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { addMonthsToDateClamped, formatDateShort, todayJST } from '../lib/date'
 import { buildForecast, type ForecastRow } from '../lib/forecast'
+import { currentPosition } from '../lib/forecastList'
 import { buildHistoryRows, type HistoryRow } from '../lib/history'
 import { buildBalanceSeries } from '../lib/chart'
 import { formatYen } from '../lib/money'
@@ -122,16 +123,17 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [menuOpen, setMenuOpen] = useState(false)
 
   const forecast = useMemo(() => {
-    if (transactions === undefined || rules === undefined) return undefined
+    if (transactions === undefined || rules === undefined || historyTxs === undefined) return undefined
     return buildForecast({
       anchorDate: settings.anchorDate,
       anchorBalance: settings.anchorBalance,
       threshold: settings.threshold,
       rules,
       transactions,
+      historyTransactions: historyTxs,
       horizonEnd,
     })
-  }, [transactions, rules, settings.anchorDate, settings.anchorBalance, settings.threshold, horizonEnd])
+  }, [transactions, rules, historyTxs, settings.anchorDate, settings.anchorBalance, settings.threshold, horizonEnd])
 
   const historyRows = useMemo(() => {
     if (historyTxs === undefined) return undefined
@@ -157,15 +159,14 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     )
   }
 
-  // 現在残高: date <= today の最後の行のbalance。無ければ anchorBalance。
-  let currentBalance = settings.anchorBalance
-  for (const row of forecast) {
-    if (row.date <= today) {
-      currentBalance = row.balance
-    } else {
-      break
-    }
-  }
+  // 現在残高: today時点のbalance。無ければ anchorBalance。
+  const position = currentPosition({
+    rows: forecast,
+    today,
+    anchorDate: settings.anchorDate,
+    anchorBalance: settings.anchorBalance,
+  })
+  const currentBalance = position.balance
 
   // 今後12ヶ月の最低残高: date >= today の行から。無ければ全行から。
   const futureRows = forecast.filter((row) => row.date >= today)
@@ -208,6 +209,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
       </div>
 
       <div className="flex flex-col gap-1">
+        <span className="text-sm text-muted">今日 {formatDateShort(today)} 時点の残高</span>
         <span className={`text-4xl font-bold tabular-nums ${currentBalance < 0 ? 'text-red-600' : ''}`}>
           {formatYen(currentBalance)}
         </span>
@@ -223,6 +225,8 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
       <ForecastList
         rows={forecast}
         today={today}
+        anchorDate={settings.anchorDate}
+        anchorBalance={settings.anchorBalance}
         onRowClick={(row) => {
           setTxDrawerTarget(row)
           setTxDrawerOpen(true)
