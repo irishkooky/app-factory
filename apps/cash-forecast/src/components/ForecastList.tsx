@@ -67,6 +67,7 @@ export function ForecastList({
             key={item.key}
             row={item.row}
             isToday={item.isToday}
+            today={today}
             onClick={() => onRowClick(item.row)}
           />
         )
@@ -172,9 +173,6 @@ function HistoryListRow({ row, onClick }: { row: HistoryRow; onClick?: () => voi
           <div className="flex min-w-0 flex-col gap-0">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm">{row.name}</span>
-              <Chip size="sm" variant="soft" className="shrink-0">
-                実績
-              </Chip>
             </div>
           </div>
         </div>
@@ -232,16 +230,17 @@ function TodayMarker({ today, position }: { today: string; position: CurrentPosi
 function ForecastListRow({
   row,
   isToday,
+  today,
   onClick,
 }: {
   row: ForecastRow
   isToday: boolean
+  today: string
   onClick: () => void
 }) {
   const amountColor = row.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
   const amountSign = row.kind === 'expense' ? '-' : '+'
   const balanceColor = row.balance < 0 ? 'text-red-600' : undefined
-  const isConfirmed = !row.isVirtual && row.ruleId !== undefined
   const addonCount = row.addons?.length ?? 0
   // 背景は排他にする。Tailwind は同じプロパティのユーティリティを併記しても
   // クラス文字列の順序では解決されないため、三項で1つだけ選ぶこと。
@@ -261,16 +260,18 @@ function ForecastListRow({
           <div className="flex min-w-0 flex-col gap-0">
             <div className="flex items-center gap-1.5">
               <span className="truncate text-sm">{row.name}</span>
-              {row.isVirtual && (
-                <Chip size="sm" variant="soft" className="shrink-0">
-                  予定
-                </Chip>
-              )}
-              {isConfirmed && (
-                <Chip size="sm" variant="soft" color="success" className="shrink-0">
-                  確定
-                </Chip>
-              )}
+              {/* チップは「金額が見込みかどうか」の1軸のみ。無印＝確定（実額）。
+                  期限を過ぎてまだ見込みの行だけ要確認として操作待ちを示す。 */}
+              {row.isVirtual &&
+                (row.date < today ? (
+                  <Chip size="sm" variant="soft" color="warning" className="shrink-0">
+                    要確認
+                  </Chip>
+                ) : (
+                  <Chip size="sm" variant="soft" className="shrink-0">
+                    予定
+                  </Chip>
+                ))}
             </div>
             {addonCount > 0 && <span className="text-xs text-muted">上乗せ {addonCount}件</span>}
           </div>
