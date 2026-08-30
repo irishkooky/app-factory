@@ -39,8 +39,17 @@ function RootComponent() {
 
 function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="ja">
+    <html lang="ja" suppressHydrationWarning>
       <head>
+        {/* OSのカラースキームを描画前に data-theme へ反映する（FOUC防止のため head 内の同期スクリプト）。
+            OS設定の変更にも追従する。 */}
+        <script
+          // eslint的にはdangerouslySetInnerHTMLだが、静的文字列のみでユーザー入力は含まない
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){var m=window.matchMedia('(prefers-color-scheme: dark)');var f=function(){document.documentElement.setAttribute('data-theme',m.matches?'dark':'light')};f();m.addEventListener('change',f)})()",
+          }}
+        />
         <HeadContent />
       </head>
       <body className="bg-background text-foreground">

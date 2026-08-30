@@ -14,10 +14,20 @@ export type CurrentPosition = {
   hasTodayRows: boolean;
 };
 
+/** 今日より前の予測行をまとめた折りたたみグループ。既定で閉じて表示する。 */
+export type PastGroupItem = {
+  type: "past";
+  key: "past";
+  rows: ForecastRow[]; // 元の順序（date昇順）のまま
+  net: number; // 符号付き収支合計（income は +、expense は -）
+  reviewCount: number; // 要確認（isVirtual）の行数
+};
+
 export type ForecastListItem =
   | { type: "month"; key: string; month: string }
   | { type: "today"; key: "today"; today: string; position: CurrentPosition }
-  | { type: "row"; key: string; row: ForecastRow; isToday: boolean };
+  | { type: "row"; key: string; row: ForecastRow; isToday: boolean }
+  | PastGroupItem;
 
 /** today 時点の残高とその確定日を求める。 */
 export function currentPosition(input: {
@@ -60,10 +70,26 @@ export function buildForecastListItems(input: {
   const position = currentPosition(input);
 
   const items: ForecastListItem[] = [];
+
+  // 今日より前（基準日より後・今日より前）の予測行は、今日マーカーが現在残高を示すので
+  // 畳んでも情報が失われない。既定で閉じた1グループにまとめ、先頭に置く。
+  const past = rows.filter((row) => row.date < today);
+  const rest = rows.filter((row) => row.date >= today);
+
+  if (past.length > 0) {
+    let net = 0;
+    let reviewCount = 0;
+    for (const row of past) {
+      net += row.kind === "income" ? row.amount : -row.amount;
+      if (row.isVirtual) reviewCount += 1;
+    }
+    items.push({ type: "past", key: "past", rows: past, net, reviewCount });
+  }
+
   let currentMonth: string | null = null;
   let todayInserted = false;
 
-  for (const row of rows) {
+  for (const row of rest) {
     // 【重要】月見出しより先に today マーカーを入れる。
     // そうしないと「今日が月末で次の行が翌月」のとき、今日マーカーが翌月の見出しの下に潜り込む。
     if (!todayInserted && row.date > today) {
