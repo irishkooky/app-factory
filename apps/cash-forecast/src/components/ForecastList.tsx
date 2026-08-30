@@ -3,7 +3,7 @@ import { Chip, Separator } from '@heroui/react'
 import { IconChevronRight } from '@tabler/icons-react'
 import type { ForecastRow } from '../lib/forecast'
 import type { HistoryRow } from '../lib/history'
-import { buildForecastListItems, type CurrentPosition } from '../lib/forecastList'
+import { buildForecastListItems, type CurrentPosition, type PastGroupItem } from '../lib/forecastList'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { summarizeByMonth, type MonthSummary } from '../lib/summary'
@@ -61,6 +61,9 @@ export function ForecastList({
         }
         if (item.type === 'today') {
           return <TodayMarker key={item.key} today={item.today} position={item.position} />
+        }
+        if (item.type === 'past') {
+          return <PastSection key={item.key} group={item} today={today} onRowClick={onRowClick} />
         }
         return (
           <ForecastListRow
@@ -223,6 +226,51 @@ function TodayMarker({ today, position }: { today: string; position: CurrentPosi
             : `${formatDateShort(position.asOfDate)} から変動なし`}
         </span>
       </div>
+    </div>
+  )
+}
+
+// 「今日より前」の予測行の折りたたみ。既定は閉。現在残高は今日マーカーが示すので、
+// 畳んでも情報は失われない。要確認の件数だけはヘッダーに出して操作待ちを見えるままにする。
+function PastSection({
+  group,
+  today,
+  onRowClick,
+}: {
+  group: PastGroupItem
+  today: string
+  onRowClick: (row: ForecastRow) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="flex flex-col">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 rounded-md px-1 py-1.5 text-left"
+      >
+        <IconChevronRight
+          size={14}
+          className={`shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`}
+        />
+        <span className="text-sm font-medium">今日より前</span>
+        <span className="text-sm text-muted">{group.rows.length}件</span>
+        <span className={`text-sm tabular-nums ${group.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+          収支 {group.net >= 0 ? '+' : ''}{formatYen(group.net)}
+        </span>
+        {group.reviewCount > 0 && (
+          <Chip size="sm" variant="soft" color="warning" className="shrink-0">
+            要確認 {group.reviewCount}件
+          </Chip>
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-col">
+          {group.rows.map((row) => (
+            <ForecastListRow key={row.key} row={row} isToday={false} today={today} onClick={() => onRowClick(row)} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

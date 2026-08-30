@@ -99,6 +99,13 @@ export function BalanceChart({ points, threshold, today }: BalanceChartProps) {
         <Tooltip
           formatter={(value) => formatYen(Number(value))}
           labelFormatter={(label) => (typeof label === 'string' ? formatDateShort(label) : label)}
+          contentStyle={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 8,
+            color: 'var(--foreground)',
+          }}
+          labelStyle={{ color: 'var(--foreground)' }}
         />
         <ReferenceLine y={threshold} stroke="#dc2626" label={{ value: 'しきい値', position: 'insideBottomRight', fontSize: 10 }} />
         <ReferenceLine x={today} stroke="#6b7280" />
