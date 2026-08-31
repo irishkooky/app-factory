@@ -1,21 +1,10 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import {
-  Button,
-  Checkbox,
-  Drawer,
-  FieldError,
-  Label,
-  NumberField,
-  Separator,
-  Spinner,
-  ToggleButton,
-  ToggleButtonGroup,
-} from '@heroui/react'
+import { Button, Checkbox, Drawer, FieldError, Label, NumberField, Separator, Spinner } from '@heroui/react'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import type { ForecastRow } from '../lib/forecast'
-import { addDays, formatDateShort, todayJST } from '../lib/date'
+import { todayJST } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { notifyError, notifySaved } from '../lib/notify'
 
@@ -61,9 +50,6 @@ export function ReconcileDrawer({
   )
 }
 
-// 行ごとの選択。仮想行は materialize/skip の2択、実体行は materialize/delete/postpone の3択。
-type RowAction = 'materialize' | 'skip' | 'delete' | 'postpone'
-
 type ReconcileOp =
   | {
       type: 'materializeRule'
@@ -75,10 +61,7 @@ type ReconcileOp =
       amount: number
     }
   | { type: 'confirmTx'; txId: Id<'transactions'> }
-  | { type: 'deleteTx'; txId: Id<'transactions'> }
-  | { type: 'postponeTx'; txId: Id<'transactions'>; newDate: string }
   | { type: 'insertActual'; date: string; name: string; kind: 'income' | 'expense'; amount: number }
-  | { type: 'dropRuleAddons'; ruleId: Id<'rules'>; ruleMonth: string }
 
 function signed(kind: 'income' | 'expense', amount: number): number {
   return kind === 'income' ? amount : -amount
@@ -99,28 +82,20 @@ function ManualReconcileForm({
   const [submitting, setSubmitting] = useState(false)
   const [balance, setBalance] = useState<number | undefined>(currentBalance)
   const [error, setError] = useState<string | null>(null)
-  const [actions, setActions] = useState<Record<string, RowAction>>(() =>
-    Object.fromEntries(pendingRows.map((row) => [row.key, 'materialize' as RowAction])),
-  )
   const [adjustChecked, setAdjustChecked] = useState(true)
 
   const newAnchorDate = todayJST()
 
+  // pendingRows は全行を暗黙的に「実績にする」扱いで反映する（行ごとの選択UIは撤去済み）。
   const reflectedBalance = useMemo(() => {
     let total = anchorBalance
     for (const row of pendingRows) {
-      if (actions[row.key] === 'materialize') {
-        total += signed(row.kind, row.amount)
-      }
+      total += signed(row.kind, row.amount)
     }
     return total
-  }, [pendingRows, actions, anchorBalance])
+  }, [pendingRows, anchorBalance])
 
   const diff = balance !== undefined ? Math.round(balance) - reflectedBalance : 0
-
-  const setAction = (key: string, action: RowAction) => {
-    setActions((prev) => ({ ...prev, [key]: action }))
-  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -136,34 +111,19 @@ function ManualReconcileForm({
 
       const ops: ReconcileOp[] = []
       for (const row of pendingRows) {
-        const action = actions[row.key] ?? 'materialize'
-        if (action === 'materialize') {
-          if (row.isVirtual) {
-            if (row.ruleId === undefined || row.ruleMonth === undefined) continue
-            ops.push({
-              type: 'materializeRule',
-              ruleId: row.ruleId,
-              ruleMonth: row.ruleMonth,
-              date: row.date,
-              name: row.name,
-              kind: row.kind,
-              amount: row.amount,
-            })
-          } else if (row.txId !== undefined) {
-            ops.push({ type: 'confirmTx', txId: row.txId })
-          }
-        } else if (action === 'delete') {
-          if (row.txId !== undefined) ops.push({ type: 'deleteTx', txId: row.txId })
-        } else if (action === 'postpone') {
-          if (row.txId !== undefined) {
-            ops.push({ type: 'postponeTx', txId: row.txId, newDate: addDays(newAnchorDate, 1) })
-          }
-        } else if (action === 'skip') {
-          // 「記録しない」を選んだ仮想行に上乗せ(addon)が付いていた場合、そのまま放置すると
-          // 基準日前進後に「幻の実績」としてDBに残ってしまうため、addon行ごと削除する。
-          if (row.isVirtual && row.ruleId !== undefined && row.ruleMonth !== undefined && (row.addons?.length ?? 0) > 0) {
-            ops.push({ type: 'dropRuleAddons', ruleId: row.ruleId, ruleMonth: row.ruleMonth })
-          }
+        if (row.isVirtual) {
+          if (row.ruleId === undefined || row.ruleMonth === undefined) continue
+          ops.push({
+            type: 'materializeRule',
+            ruleId: row.ruleId,
+            ruleMonth: row.ruleMonth,
+            date: row.date,
+            name: row.name,
+            kind: row.kind,
+            amount: row.amount,
+          })
+        } else if (row.txId !== undefined) {
+          ops.push({ type: 'confirmTx', txId: row.txId })
         }
       }
 
@@ -197,22 +157,6 @@ function ManualReconcileForm({
       <p className="text-sm text-muted">
         銀行口座の現在残高を入力してください。過去の予定は実績として記録されます。
       </p>
-
-      {pendingRows.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium">基準日から今日までの予定・取引</span>
-          <div className="flex flex-col divide-y divide-border">
-            {pendingRows.map((row) => (
-              <PendingRowItem
-                key={row.key}
-                row={row}
-                action={actions[row.key] ?? 'materialize'}
-                onChange={(action) => setAction(row.key, action)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       <Separator />
 
@@ -266,72 +210,5 @@ function ManualReconcileForm({
         保存
       </Button>
     </form>
-  )
-}
-
-function PendingRowItem({
-  row,
-  action,
-  onChange,
-}: {
-  row: ForecastRow
-  action: RowAction
-  onChange: (action: RowAction) => void
-}) {
-  const amountColor = row.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
-  const amountSign = row.kind === 'expense' ? '-' : '+'
-
-  return (
-    <div className="flex flex-col gap-1.5 py-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex min-w-0 items-baseline gap-2">
-          <span className="w-10 shrink-0 text-sm text-muted">{formatDateShort(row.date)}</span>
-          <span className="truncate text-sm">{row.name}</span>
-        </div>
-        <span className={`shrink-0 text-sm tabular-nums ${amountColor}`}>
-          {amountSign}
-          {formatYen(row.amount)}
-        </span>
-      </div>
-      {row.isVirtual ? (
-        <ToggleButtonGroup
-          selectionMode="single"
-          disallowEmptySelection
-          size="sm"
-          selectedKeys={[action]}
-          onSelectionChange={(keys) => {
-            const value = Array.from(keys)[0]
-            if (value === 'materialize' || value === 'skip') onChange(value)
-          }}
-        >
-          <ToggleButton id="materialize">実績にする</ToggleButton>
-          <ToggleButton id="skip">
-            <ToggleButtonGroup.Separator />
-            記録しない
-          </ToggleButton>
-        </ToggleButtonGroup>
-      ) : (
-        <ToggleButtonGroup
-          selectionMode="single"
-          disallowEmptySelection
-          size="sm"
-          selectedKeys={[action]}
-          onSelectionChange={(keys) => {
-            const value = Array.from(keys)[0]
-            if (value === 'materialize' || value === 'delete' || value === 'postpone') onChange(value)
-          }}
-        >
-          <ToggleButton id="materialize">実績にする</ToggleButton>
-          <ToggleButton id="delete">
-            <ToggleButtonGroup.Separator />
-            削除
-          </ToggleButton>
-          <ToggleButton id="postpone">
-            <ToggleButtonGroup.Separator />
-            先送り
-          </ToggleButton>
-        </ToggleButtonGroup>
-      )}
-    </div>
   )
 }
