@@ -167,7 +167,12 @@ export const commit = mutation({
         }
         case "insertActual": {
           assertDateString(op.date, "日付");
-          assertInRange(op.date, oldAnchorDate, newAnchorDate);
+          // 残高調整は「基準日を進めない同日再照合」（oldAnchorDate === newAnchorDate、
+          // 残高調整1件だけを記録するケース）でも使うため、materializeRule/confirmTx と違い
+          // oldAnchorDate 当日の日付を許容する。
+          if (!(op.date >= oldAnchorDate && op.date <= newAnchorDate)) {
+            throw new ConvexError("日付が今回の照合対象期間外です");
+          }
           const trimmedName = assertName(op.name);
           assertAmount(op.amount);
 
