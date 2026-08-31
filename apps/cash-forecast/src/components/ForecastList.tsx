@@ -16,6 +16,7 @@ type ForecastListProps = {
   onRowClick: (row: ForecastRow) => void
   historyRows?: HistoryRow[]
   onHistoryRowClick?: (row: HistoryRow) => void
+  onTodayClick?: () => void
 }
 
 export function ForecastList({
@@ -26,6 +27,7 @@ export function ForecastList({
   onRowClick,
   historyRows,
   onHistoryRowClick,
+  onTodayClick,
 }: ForecastListProps) {
   const items = buildForecastListItems({ rows, today, anchorDate, anchorBalance })
   const monthSummaries = useMemo(() => {
@@ -60,7 +62,7 @@ export function ForecastList({
           )
         }
         if (item.type === 'today') {
-          return <TodayMarker key={item.key} today={item.today} position={item.position} />
+          return <TodayMarker key={item.key} today={item.today} position={item.position} onClick={onTodayClick} />
         }
         if (item.type === 'past') {
           return <PastSection key={item.key} group={item} today={today} onRowClick={onRowClick} />
@@ -207,9 +209,22 @@ function MonthDividerLabel({ month, summary }: { month: string; summary: MonthSu
 
 // 「今日」の位置を示すマーカー。しきい値割れ（黄色系）と衝突しないよう、
 // 今日の強調にはグラフの線と同じ --accent（青紫）を使う。
-function TodayMarker({ today, position }: { today: string; position: CurrentPosition }) {
+function TodayMarker({
+  today,
+  position,
+  onClick,
+}: {
+  today: string
+  position: CurrentPosition
+  onClick?: () => void
+}) {
   return (
-    <div className="my-2 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2">
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className="my-2 flex w-full items-center gap-2 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-left"
+    >
       <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
         今日
       </span>
@@ -219,14 +234,16 @@ function TodayMarker({ today, position }: { today: string; position: CurrentPosi
           {formatYen(position.balance)}
         </span>
         <span className="text-xs text-muted">
-          {/* OCR照合等で anchorDate > today になり得る異常データでは asOfDate が未来日になり得るため、
+          {/* anchorDate > today になり得る異常データでは asOfDate が未来日になり得るため、
               hasTodayRows または asOfDate >= today のときは「◯◯から変動なし」ではなく「現在の残高」とする。 */}
           {position.hasTodayRows || position.asOfDate >= today
             ? '現在の残高'
             : `${formatDateShort(position.asOfDate)} から変動なし`}
         </span>
       </div>
-    </div>
+      {/* aria-label だと日付・残高の読み上げごと上書きされるため、視覚非表示テキストで用途を補足する */}
+      <span className="sr-only">残高を合わせる</span>
+    </button>
   )
 }
 

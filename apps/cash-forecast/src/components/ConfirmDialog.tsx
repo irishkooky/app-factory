@@ -15,6 +15,7 @@ const ConfirmContext = createContext<((options: ConfirmOptions) => Promise<boole
 
 export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
 
   const confirm = useCallback((options: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -23,18 +24,26 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
         prev?.resolve(false)
         return { ...options, resolve }
       })
+      setIsOpen(true)
     })
   }, [])
 
   const close = (result: boolean) => {
+    // resolve は Promise の仕様上、複数回呼んでも2回目以降は無視されるだけなので冪等。
+    // ここで二重に呼ばれても問題ない。
     pending?.resolve(result)
-    setPending(null)
+    // pending はここで null にしない: Modal.Backdrop の isOpen が false になった直後に
+    // 中身の Modal.Container ごと unmount すると、react-aria の useExitAnimation が
+    // ref.current === null のまま完了コールバックを呼べず、isExiting が true に固定されて
+    // バックドロップ（暗転）がDOMに残り続けてしまう。isOpen だけ落として exit アニメーションを
+    // 完走させ、pending 自体は次の confirm() 呼び出しまで保持する。
+    setIsOpen(false)
   }
 
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      <Modal.Backdrop isOpen={pending !== null} onOpenChange={(open) => { if (!open) close(false) }}>
+      <Modal.Backdrop isOpen={isOpen} onOpenChange={(open) => { if (!open) close(false) }}>
         {pending && (
           <Modal.Container>
             <Modal.Dialog className="sm:max-w-[360px]">

@@ -28,7 +28,7 @@ export default defineSchema({
     ruleMonth: v.optional(v.string()), // "YYYY-MM"。どの月の仮想行を置き換えるか
     addon: v.optional(v.boolean()), // true = ルール月への上乗せ。ruleId/ruleMonth とセットで使う
     actual: v.optional(v.boolean()), // true = 実績（基準日以前に実際に起きた入出金）
-    batchId: v.optional(v.string()), // 実績化した照合（reconcile）操作のバッチID。Undo/OCR用
+    batchId: v.optional(v.string()), // 実績化した照合（reconcile）操作のバッチID。Undo用
   })
     .index("by_user_date", ["userId", "date"])
     .index("by_user_rule", ["userId", "ruleId", "ruleMonth"]),
