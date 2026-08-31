@@ -236,6 +236,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
           setHistoryDrawerTarget(row)
           setHistoryDrawerOpen(true)
         }}
+        onTodayClick={() => setReconcileOpen(true)}
       />
 
       <Button
@@ -273,7 +274,6 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         anchorDate={settings.anchorDate}
         anchorBalance={settings.anchorBalance}
         pendingRows={pendingRows}
-        historyRows={historyRows}
       />
 
       <RulesDrawer opened={rulesOpen} onClose={() => setRulesOpen(false)} rules={rules} />

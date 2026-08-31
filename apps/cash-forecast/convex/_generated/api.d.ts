@@ -9,9 +9,7 @@
  */
 
 import type * as billing from "../billing.js";
-import type * as files from "../files.js";
 import type * as http from "../http.js";
-import type * as ocr from "../ocr.js";
 import type * as reconcile from "../reconcile.js";
 import type * as rules from "../rules.js";
 import type * as settings from "../settings.js";
@@ -26,9 +24,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   billing: typeof billing;
-  files: typeof files;
   http: typeof http;
-  ocr: typeof ocr;
   reconcile: typeof reconcile;
   rules: typeof rules;
   settings: typeof settings;

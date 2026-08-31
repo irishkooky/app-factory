@@ -137,7 +137,7 @@ describe("currentPosition / buildForecastListItems", () => {
     expect(position.asOfDate).toBe("2026-08-10");
   });
 
-  it("異常データ（OCR照合でanchorDateがtodayより後になった等）でも破綻せず、anchorの値がそのまま返る", () => {
+  it("異常データ（anchorDateがtodayより後になった等）でも破綻せず、anchorの値がそのまま返る", () => {
     // rows は forecast 由来なので date > anchorDate のものしか無いはずで、
     // anchorDate > today ならどの行も date > today になり、today以前の行は存在しない。
     const rows: ForecastRow[] = [
