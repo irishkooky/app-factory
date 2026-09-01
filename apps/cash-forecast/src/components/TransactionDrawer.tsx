@@ -32,7 +32,7 @@ function titleFor(target: ForecastRow | null): string {
   if (!target) return '取引を追加'
   if (target.isVirtual) {
     const month = target.ruleMonth ? formatMonthLabel(target.ruleMonth) : ''
-    return `${target.name}（${month}・${formatDateShort(target.date)}）`
+    return `${target.name}${target.periodLabel ?? ''}（${month}・${formatDateShort(target.date)}）`
   }
   return '取引を編集'
 }

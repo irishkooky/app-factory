@@ -1,5 +1,5 @@
 import type { Doc, Id } from "../../convex/_generated/dataModel";
-import { addMonths, clampDay, monthOf } from "./date";
+import { addMonths, clampDay, monthOf, usagePeriodLabel } from "./date";
 
 export type AddonInfo = {
   txId: Id<"transactions">;
@@ -20,6 +20,7 @@ export type ForecastRow = {
   date: string;
   name: string;
   rawName?: string; // 表示用 name がフォールバックされている場合の生の名前。編集フォームの初期値用
+  periodLabel?: string; // クレカ等の締め日が設定されたルール由来の行に付く利用期間表示「（8/19-9/18）」。name には混ぜない
   kind: "income" | "expense";
   amount: number;
   balance: number; // この行適用後の残高
@@ -120,10 +121,12 @@ export function buildForecast(input: {
       const isOverride = tx.ruleId !== undefined && tx.ruleMonth !== undefined;
       const key = isOverride ? `${tx.ruleId}:${tx.ruleMonth}` : undefined;
       const absorbed = key ? addonsByKey.get(key)?.txs : undefined;
+      const closingDay = tx.ruleId !== undefined ? ruleById.get(tx.ruleId)?.closingDay : undefined;
       return {
         key: `tx-${tx._id}`,
         date: tx.date,
         name: tx.name,
+        periodLabel: closingDay !== undefined ? usagePeriodLabel(tx.date, closingDay) : undefined,
         kind: tx.kind,
         amount: tx.amount,
         isVirtual: false,
@@ -195,6 +198,7 @@ export function buildForecast(input: {
         key: `rule-${rule._id}-${month}`,
         date,
         name: rule.name,
+        periodLabel: rule.closingDay !== undefined ? usagePeriodLabel(date, rule.closingDay) : undefined,
         kind,
         amount,
         isVirtual: true,

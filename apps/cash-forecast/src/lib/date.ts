@@ -93,3 +93,24 @@ export function formatMonthLabel(yyyyMm: string): string {
   const { year, month } = parseYearMonth(yyyyMm);
   return `${year}年${MONTH_LABELS_JA[month - 1]}`;
 }
+
+/** yyyyMm 月の締め日（月の日数を超える場合は末日にクランプ）を "YYYY-MM-DD" で返す。 */
+function closingDateFor(yyyyMm: string, closingDay: number): string {
+  const { year, month } = parseYearMonth(yyyyMm);
+  const day = clampDay(year, month, closingDay);
+  return `${year}-${pad2(month)}-${pad2(day)}`;
+}
+
+/**
+ * 支払日と締め日（クレカ等）から利用期間ラベル「（8/19-9/18）」を作る（全角括弧）。
+ * 終端(end)は支払日以前で最も直近の締め日。起点(start)はその1ヶ月前の締め日の翌日。
+ */
+export function usagePeriodLabel(paymentDate: string, closingDay: number): string {
+  const paymentMonth = monthOf(paymentDate);
+  const closeThisMonth = closingDateFor(paymentMonth, closingDay);
+  const end =
+    closeThisMonth <= paymentDate ? closeThisMonth : closingDateFor(addMonths(paymentMonth, -1), closingDay);
+  const prevClose = closingDateFor(addMonths(monthOf(end), -1), closingDay);
+  const start = addDays(prevClose, 1);
+  return `（${formatDateShort(start)}-${formatDateShort(end)}）`;
+}

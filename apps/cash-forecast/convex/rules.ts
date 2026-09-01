@@ -32,8 +32,9 @@ export const create = mutation({
     amount: v.number(),
     dayOfMonth: v.number(),
     endDate: v.optional(v.string()),
+    closingDay: v.optional(v.number()),
   },
-  handler: async (ctx, { name, kind, amount, dayOfMonth, endDate }) => {
+  handler: async (ctx, { name, kind, amount, dayOfMonth, endDate, closingDay }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new ConvexError("ログインが必要です");
@@ -59,6 +60,9 @@ export const create = mutation({
     if (endDate !== undefined) {
       assertDateString(endDate, "終了日");
     }
+    if (closingDay !== undefined) {
+      assertDayOfMonth(closingDay);
+    }
 
     return ctx.db.insert("rules", {
       userId: identity.subject,
@@ -67,6 +71,7 @@ export const create = mutation({
       amount,
       dayOfMonth,
       endDate,
+      closingDay,
     });
   },
 });
@@ -79,8 +84,9 @@ export const update = mutation({
     amount: v.number(),
     dayOfMonth: v.number(),
     endDate: v.optional(v.string()),
+    closingDay: v.optional(v.number()),
   },
-  handler: async (ctx, { id, name, kind, amount, dayOfMonth, endDate }) => {
+  handler: async (ctx, { id, name, kind, amount, dayOfMonth, endDate, closingDay }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new ConvexError("ログインが必要です");
@@ -95,14 +101,18 @@ export const update = mutation({
     if (endDate !== undefined) {
       assertDateString(endDate, "終了日");
     }
+    if (closingDay !== undefined) {
+      assertDayOfMonth(closingDay);
+    }
 
-    // endDate を省略した場合は undefined を明示的に patch し、既存の終了日をクリアする
+    // endDate/closingDay を省略した場合は undefined を明示的に patch し、既存の値をクリアする
     await ctx.db.patch(id, {
       name: trimmedName,
       kind,
       amount,
       dayOfMonth,
       endDate,
+      closingDay,
     });
   },
 });

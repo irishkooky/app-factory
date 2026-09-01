@@ -16,6 +16,7 @@ export default defineSchema({
     amount: v.number(), // 整数円 >= 0
     dayOfMonth: v.number(), // 1..31。月の日数を超える場合は末日にクランプ
     endDate: v.optional(v.string()), // "YYYY-MM-DD"。この日より後の発生は生成しない
+    closingDay: v.optional(v.number()), // 1..31。クレカの締め日。設定時は利用期間を表示に付与。月の日数を超える場合は末日にクランプ
   }).index("by_user", ["userId"]),
 
   transactions: defineTable({
