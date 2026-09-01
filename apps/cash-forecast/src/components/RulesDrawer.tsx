@@ -122,6 +122,7 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
                     <span className="text-xs text-muted">
                       毎月{rule.dayOfMonth}日
                       {rule.endDate ? `（${rule.endDate}まで）` : ''}
+                      {rule.closingDay !== undefined ? `・締め${rule.closingDay}日` : ''}
                     </span>
                   </div>
                   <div className="flex shrink-0 gap-2">
@@ -171,8 +172,9 @@ function RuleForm({
   const [amount, setAmount] = useState<number | undefined>(rule?.amount)
   const [dayOfMonth, setDayOfMonth] = useState<number | undefined>(rule?.dayOfMonth ?? 1)
   const [endDate, setEndDate] = useState(rule?.endDate ?? '')
+  const [closingDay, setClosingDay] = useState<number | undefined>(rule?.closingDay)
 
-  const [errors, setErrors] = useState<{ name?: string; amount?: string; dayOfMonth?: string }>({})
+  const [errors, setErrors] = useState<{ name?: string; amount?: string; dayOfMonth?: string; closingDay?: string }>({})
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -181,6 +183,9 @@ function RuleForm({
     if (amount === undefined) nextErrors.amount = '金額を入力してください'
     if (dayOfMonth === undefined || dayOfMonth < 1 || dayOfMonth > 31) {
       nextErrors.dayOfMonth = '日は1から31の間で入力してください'
+    }
+    if (closingDay !== undefined && (closingDay < 1 || closingDay > 31)) {
+      nextErrors.closingDay = '締め日は1から31の間で入力してください'
     }
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0 || amount === undefined || dayOfMonth === undefined) return
@@ -193,6 +198,7 @@ function RuleForm({
         amount: Math.round(amount),
         dayOfMonth: Math.round(dayOfMonth),
         endDate: endDate.length > 0 ? endDate : undefined,
+        closingDay: closingDay !== undefined ? Math.round(closingDay) : undefined,
       }
       if (rule) {
         await updateRule({ id: rule._id, ...args })
@@ -284,6 +290,39 @@ function RuleForm({
             クリア
           </Button>
         )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-end gap-2">
+          <NumberField
+            className="flex-1"
+            isInvalid={!!errors.closingDay}
+            isDisabled={submitting}
+            minValue={1}
+            maxValue={31}
+            // react-aria の NumberField は「空」を NaN で表現する。undefined を渡すと
+            // 非制御モードに落ちてクリアが効かず、空入力の確定は onChange(NaN) で飛んでくる。
+            // NaN <-> undefined を境界で変換し、常に制御下のまま「未設定」を扱えるようにする。
+            value={closingDay ?? Number.NaN}
+            onChange={(v) => setClosingDay(Number.isNaN(v) ? undefined : v)}
+          >
+            <Label>締め日（任意）</Label>
+            <NumberField.Group>
+              <NumberField.DecrementButton />
+              <NumberField.Input className="flex-1" />
+              <NumberField.IncrementButton />
+            </NumberField.Group>
+            {errors.closingDay && <FieldError>{errors.closingDay}</FieldError>}
+          </NumberField>
+          {closingDay !== undefined && (
+            <Button variant="tertiary" onPress={() => setClosingDay(undefined)} isDisabled={submitting}>
+              クリア
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-muted">
+          クレカ等で設定すると、一覧の項目名に利用期間（例: 8/19-9/18）が表示されます
+        </p>
       </div>
 
       <div className="mt-2 flex justify-between">

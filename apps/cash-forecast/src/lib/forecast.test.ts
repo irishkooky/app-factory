@@ -677,3 +677,41 @@ describe("buildForecast: 名前なしアドオン", () => {
     expect(row?.addons?.[0].rawName).toBe("");
   });
 });
+
+describe("buildForecast: closingDay（締め日）と periodLabel", () => {
+  it("closingDay付きルールの仮想行にはperiodLabelが付く", () => {
+    const rule = makeRule({
+      name: "AMEX",
+      kind: "expense",
+      amount: 130_000,
+      dayOfMonth: 27,
+      closingDay: 18,
+    });
+    const rows = buildForecast({
+      anchorDate: "2026-09-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [],
+      horizonEnd: "2026-09-30",
+    });
+
+    const row = rows.find((r) => r.date === "2026-09-27");
+    expect(row?.periodLabel).toBe("（8/19-9/18）");
+  });
+
+  it("closingDayが無いルールの仮想行はperiodLabelがundefined", () => {
+    const rule = makeRule({ name: "家賃", kind: "expense", amount: 80_000, dayOfMonth: 27 });
+    const rows = buildForecast({
+      anchorDate: "2026-09-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [],
+      horizonEnd: "2026-09-30",
+    });
+
+    const row = rows.find((r) => r.date === "2026-09-27");
+    expect(row?.periodLabel).toBeUndefined();
+  });
+});

@@ -324,7 +324,10 @@ function ForecastListRow({
           </span>
           <div className="flex min-w-0 flex-col gap-0">
             <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm">{row.name}</span>
+              <span className="truncate text-sm">
+                {row.name}
+                {row.periodLabel ?? ''}
+              </span>
               {/* チップは「金額が見込みかどうか」の1軸のみ。無印＝確定（実額）。
                   期限を過ぎてまだ見込みの行だけ要確認として操作待ちを示す。 */}
               {row.isVirtual &&
