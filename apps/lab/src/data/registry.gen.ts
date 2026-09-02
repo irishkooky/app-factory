@@ -20,7 +20,7 @@ export type RegistryEntry = {
 }
 
 export const SUBDOMAIN = "ichigoooo"
-export const GENERATED_AT = "2026-08-16T12:58:22.545Z"
+export const GENERATED_AT = "2026-09-02T15:54:04.629Z"
 
 export const REGISTRY: RegistryEntry[] = [
   {
@@ -59,7 +59,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://cash-forecast.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-07-12T05:07:30.309258Z",
-    modifiedAt: "2026-07-14T08:05:36.44292Z",
+    modifiedAt: "2026-09-01T06:12:45.504681Z",
     hasShot: true,
     binding: "APP_CASH_FORECAST",
   },
@@ -142,6 +142,16 @@ export const REGISTRY: RegistryEntry[] = [
     modifiedAt: "2026-07-24T13:14:12.581633Z",
     hasShot: true,
     binding: "APP_PITCH_ROULETTE",
+  },
+  {
+    slug: "qwen-arena",
+    workerName: "qwen-arena",
+    url: "https://qwen-arena.ichigoooo.workers.dev",
+    deployed: true,
+    createdAt: "2026-09-02T15:53:26.809703Z",
+    modifiedAt: "2026-09-02T15:53:32.332849Z",
+    hasShot: false,
+    binding: "APP_QWEN_ARENA",
   },
   {
     slug: "salon-booking",

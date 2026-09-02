@@ -53,6 +53,10 @@
       "service": "pitch-roulette"
     },
     {
+      "binding": "APP_QWEN_ARENA",
+      "service": "qwen-arena"
+    },
+    {
       "binding": "APP_SALON_BOOKING",
       "service": "salon-booking"
     },
