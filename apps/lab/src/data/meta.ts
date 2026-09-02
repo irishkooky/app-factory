@@ -93,6 +93,12 @@ export const META: Record<string, AppMeta> = {
     category: 'game',
     tags: ['パーティー', 'リアルタイム', 'Convex'],
   },
+  'qwen-arena': {
+    title: 'Qwen Arena',
+    description: '同じ仕事を Qwen / Claude / GPT / Gemini / DeepSeek に同時に投げ、出力・速度・コスト・月額を横並びで比較。Opus 5 がブラインド採点。',
+    category: 'tool',
+    tags: ['Qwen', 'LLM', '比較', 'コスト'],
+  },
   'salon-booking': {
     title: 'SALON LUMIÈRE',
     description: '架空の美容室の予約サイト。メニュー・スタイリスト紹介から予約まで通せる。',
