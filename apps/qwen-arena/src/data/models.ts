@@ -8,6 +8,8 @@ export type ProviderDef = {
   kind: ProviderKind
   envKey: string // secrets名。例 'DASHSCOPE_API_KEY'
   baseUrl?: string // openai-compat のみ。末尾スラッシュなし
+  /** この secrets 名に値があれば baseUrl を上書きする(例: Qwen の東京リージョンのワークスペース専用ドメイン) */
+  baseUrlEnvKey?: string
   color: string // Mantine color 名('orange' 'violet' 'green' 'blue' 'gray')
   /** openai-compat のリクエストボディで max_tokens を渡すキー名。GPT-5系は max_completion_tokens 必須(既定 'max_tokens') */
   maxTokensParam?: 'max_tokens' | 'max_completion_tokens'
@@ -34,7 +36,10 @@ export const PROVIDERS: ProviderDef[] = [
     short: 'Qwen',
     kind: 'openai-compat',
     envKey: 'DASHSCOPE_API_KEY',
+    // 既定はシンガポール(国際版)。キーはリージョンに紐づくので、東京等で発行した場合は QWEN_BASE_URL で
+    // https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1 を指定する
     baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+    baseUrlEnvKey: 'QWEN_BASE_URL',
     color: 'orange',
   },
   {

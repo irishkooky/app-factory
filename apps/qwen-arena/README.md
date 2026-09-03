@@ -20,6 +20,20 @@ wrangler secret put GEMINI_API_KEY
 wrangler secret put DEEPSEEK_API_KEY
 ```
 
+#### Qwen のリージョンについて(重要)
+
+Model Studio の API キーは**発行したリージョンに紐づき、他リージョンのエンドポイントでは認証エラーになります**。
+このアプリの既定エンドポイントはシンガポール(`dashscope-intl.aliyuncs.com`)です。
+
+- コンソールのリージョンを **Singapore** にしてキーを発行した場合: `DASHSCOPE_API_KEY` だけで動きます
+- **Japan (Tokyo)** など別リージョンで発行した場合: そのリージョンのワークスペース専用ドメインを `QWEN_BASE_URL` に入れてください
+  (ワークスペースIDは Model Studio の Workspace Management で確認)
+
+```sh
+wrangler secret put QWEN_BASE_URL
+# 例: https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1
+```
+
 ### ローカル
 
 ```sh

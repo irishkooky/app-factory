@@ -270,10 +270,19 @@ export const runModel = createServerFn({ method: 'POST' })
     if (!provider.baseUrl) {
       return emptyResult(data.modelId, { error: 'baseUrl が未設定です' })
     }
+    let baseUrl = provider.baseUrl
+    if (provider.baseUrlEnvKey) {
+      try {
+        const override = await readKey(provider.baseUrlEnvKey)
+        if (override) baseUrl = override.replace(/\/+$/, '')
+      } catch {
+        // 上書きが読めなければ既定の baseUrl を使う
+      }
+    }
 
     return runOpenAiCompat(
       data.modelId,
-      provider.baseUrl,
+      baseUrl,
       key,
       model.apiModel,
       data.system,
