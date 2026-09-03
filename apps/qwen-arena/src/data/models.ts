@@ -1,4 +1,4 @@
-export type ProviderId = 'qwen' | 'anthropic' | 'openai' | 'gemini' | 'deepseek'
+export type ProviderId = 'qwen' | 'openrouter' | 'anthropic' | 'openai' | 'gemini' | 'deepseek'
 export type ProviderKind = 'openai-compat' | 'anthropic'
 
 export type ProviderDef = {
@@ -41,6 +41,15 @@ export const PROVIDERS: ProviderDef[] = [
     baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
     baseUrlEnvKey: 'QWEN_BASE_URL',
     color: 'orange',
+  },
+  {
+    id: 'openrouter',
+    label: 'Qwen via OpenRouter(本人確認待ちの代替ルート)',
+    short: 'OpenRouter',
+    kind: 'openai-compat',
+    envKey: 'OPENROUTER_API_KEY',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    color: 'yellow',
   },
   {
     id: 'anthropic',
@@ -116,6 +125,35 @@ export const MODELS: ModelDef[] = [
     defaultOn: true,
     extraBody: { enable_thinking: false },
     note: '重み公開版は Flash-Next(別物)',
+  },
+  // OpenRouter 経由の Qwen(単価は OpenRouter の掲載値。Alibaba 公式と同額)
+  {
+    id: 'or-qwen3.8-max',
+    provider: 'openrouter',
+    label: 'Qwen3.8 Max',
+    apiModel: 'qwen/qwen3.8-max-20260803',
+    inputPerM: 2.0,
+    outputPerM: 6.0,
+    defaultOn: false,
+  },
+  {
+    id: 'or-qwen3.8-flash',
+    provider: 'openrouter',
+    label: 'Qwen3.8 Flash',
+    apiModel: 'qwen/qwen3.8-flash-20260826',
+    inputPerM: 0.15,
+    outputPerM: 0.47,
+    defaultOn: false,
+  },
+  {
+    id: 'or-qwen3.8-27b',
+    provider: 'openrouter',
+    label: 'Qwen3.8 27B',
+    apiModel: 'qwen/qwen3.8-27b-20260814',
+    inputPerM: 0.425,
+    outputPerM: 2.55,
+    defaultOn: false,
+    note: 'Apache 2.0 の重み公開版をホスト',
   },
   // Claude: https://claude.com/pricing
   {
