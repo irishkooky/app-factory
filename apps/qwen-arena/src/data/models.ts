@@ -105,17 +105,6 @@ export const MODELS: ModelDef[] = [
     note: 'フラッグシップ',
   },
   {
-    id: 'qwen3.7-plus',
-    provider: 'qwen',
-    label: 'Qwen3.7 Plus',
-    apiModel: 'qwen3.7-plus',
-    inputPerM: 0.4,
-    outputPerM: 1.6,
-    defaultOn: false,
-    extraBody: { enable_thinking: false },
-    note: '256Kまでの単価',
-  },
-  {
     id: 'qwen3.8-flash',
     provider: 'qwen',
     label: 'Qwen3.8 Flash',
@@ -163,7 +152,7 @@ export const MODELS: ModelDef[] = [
     apiModel: 'claude-opus-5',
     inputPerM: 5,
     outputPerM: 25,
-    defaultOn: false,
+    defaultOn: true,
     note: '採点者にも使う',
   },
   {
@@ -185,6 +174,25 @@ export const MODELS: ModelDef[] = [
     defaultOn: true,
   },
   // OpenAI: https://developers.openai.com/api/docs/pricing
+  {
+    id: 'gpt-5.6-sol',
+    provider: 'openai',
+    label: 'GPT-5.6 Sol',
+    apiModel: 'gpt-5.6-sol',
+    inputPerM: 4.0,
+    outputPerM: 20.0,
+    defaultOn: true,
+    note: 'フラッグシップ(プロモ価格・2026-11-21まで)',
+  },
+  {
+    id: 'gpt-5.6-terra',
+    provider: 'openai',
+    label: 'GPT-5.6 Terra',
+    apiModel: 'gpt-5.6-terra',
+    inputPerM: 2.0,
+    outputPerM: 12.0,
+    defaultOn: true,
+  },
   {
     id: 'gpt-5.6-luna',
     provider: 'openai',
@@ -210,7 +218,7 @@ export const MODELS: ModelDef[] = [
     apiModel: 'gpt-5.4-nano',
     inputPerM: 0.2,
     outputPerM: 1.25,
-    defaultOn: true,
+    defaultOn: false,
   },
   // Gemini: https://ai.google.dev/gemini-api/docs/pricing (2026-12-31 までの価格)
   {
@@ -220,7 +228,7 @@ export const MODELS: ModelDef[] = [
     apiModel: 'gemini-3.8-flash',
     inputPerM: 0.75,
     outputPerM: 3.75,
-    defaultOn: false,
+    defaultOn: true,
   },
   {
     id: 'gemini-3.5-flash-lite',
