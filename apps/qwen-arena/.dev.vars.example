@@ -2,6 +2,8 @@ DASHSCOPE_API_KEY=
 # 任意: Qwen のリージョンがシンガポール以外(東京など)なら、そのワークスペース専用ドメインを指定
 # 例: https://{WorkspaceId}.ap-northeast-1.maas.aliyuncs.com/compatible-mode/v1
 QWEN_BASE_URL=
+# 任意: Alibaba Cloud の本人確認が通らないときの代替。OpenRouter で Qwen を叩く
+OPENROUTER_API_KEY=
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 GEMINI_API_KEY=

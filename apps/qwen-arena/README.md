@@ -20,6 +20,16 @@ wrangler secret put GEMINI_API_KEY
 wrangler secret put DEEPSEEK_API_KEY
 ```
 
+#### 本人確認が間に合わないときの代替: OpenRouter
+
+Alibaba Cloud の本人確認(最大3営業日)が通るまでは Model Studio のキーが使えません。その間は
+OpenRouter(カード登録のみ・即時)経由で同じ Qwen3.8 Max / Flash を叩けます(単価は公式と同額)。
+「Qwen via OpenRouter」プロバイダとして別枠で表示されます。
+
+```sh
+wrangler secret put OPENROUTER_API_KEY   # https://openrouter.ai/settings/keys
+```
+
 #### Qwen のリージョンについて(重要)
 
 Model Studio の API キーは**発行したリージョンに紐づき、他リージョンのエンドポイントでは認証エラーになります**。
