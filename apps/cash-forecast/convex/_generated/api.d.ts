@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
 import type * as billing from "../billing.js";
 import type * as http from "../http.js";
 import type * as reconcile from "../reconcile.js";
@@ -23,6 +24,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
   billing: typeof billing;
   http: typeof http;
   reconcile: typeof reconcile;
