@@ -167,7 +167,12 @@ async function runAnthropic(
 
   const started = performance.now()
   try {
-    const client = new Anthropic({ apiKey: key })
+    // Anthropic Console の identity-linked API key は anthropic-workspace-id ヘッダーが必須(無ければ付けない)
+    const workspaceId = await readKey('ANTHROPIC_WORKSPACE_ID').catch(() => undefined)
+    const client = new Anthropic({
+      apiKey: key,
+      defaultHeaders: workspaceId ? { 'anthropic-workspace-id': workspaceId } : {},
+    })
     const response = await client.messages.create({
       model: apiModel,
       max_tokens: maxTokens,
