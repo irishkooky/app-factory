@@ -30,6 +30,15 @@ OpenRouter(カード登録のみ・即時)経由で同じ Qwen3.8 Max / Flash �
 wrangler secret put OPENROUTER_API_KEY   # https://openrouter.ai/settings/keys
 ```
 
+#### Anthropic のキーが `anthropic-workspace-id is required` で失敗する場合
+
+Anthropic Console の新しい「identity-linked API key」は、リクエストにワークスペースIDのヘッダーが必要です。
+Console の Settings → Workspaces でそのキーが属するワークスペースの ID(`wrkspc_…`)を確認し、secrets に入れてください。
+
+```sh
+wrangler secret put ANTHROPIC_WORKSPACE_ID
+```
+
 #### Qwen のリージョンについて(重要)
 
 Model Studio の API キーは**発行したリージョンに紐づき、他リージョンのエンドポイントでは認証エラーになります**。

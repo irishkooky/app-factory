@@ -151,9 +151,11 @@ export const judgeOutputs = createServerFn({ method: 'POST' })
     const provider = getProvider(judgeModel.provider)
 
     let key: unknown
+    let workspaceId: unknown
     try {
       const { env } = await import('cloudflare:workers')
       key = Reflect.get(env, provider.envKey)
+      workspaceId = Reflect.get(env, 'ANTHROPIC_WORKSPACE_ID')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       return emptyJudgeResult({ error: `キー取得でエラーが発生しました: ${message.slice(0, 200)}` })
@@ -183,7 +185,13 @@ export const judgeOutputs = createServerFn({ method: 'POST' })
 
     const started = performance.now()
     try {
-      const client = new Anthropic({ apiKey: key })
+      const client = new Anthropic({
+        apiKey: key,
+        defaultHeaders:
+          typeof workspaceId === 'string' && workspaceId.trim().length > 0
+            ? { 'anthropic-workspace-id': workspaceId.trim() }
+            : {},
+      })
       const response = await client.messages.create({
         model: judgeModel.apiModel,
         max_tokens: MAX_TOKENS,

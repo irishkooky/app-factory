@@ -5,6 +5,8 @@ QWEN_BASE_URL=
 # 任意: Alibaba Cloud の本人確認が通らないときの代替。OpenRouter で Qwen を叩く
 OPENROUTER_API_KEY=
 ANTHROPIC_API_KEY=
+# 任意: Anthropic Console の identity-linked key を使う場合は必須(Settings → Workspaces の wrkspc_…)
+ANTHROPIC_WORKSPACE_ID=
 OPENAI_API_KEY=
 GEMINI_API_KEY=
 DEEPSEEK_API_KEY=
