@@ -26,7 +26,7 @@ export type JudgeResult = {
   costUsd: number
 }
 
-const MAX_TOKENS = 2048
+const MAX_TOKENS = 8192
 const MIN_OUTPUTS = 2
 
 function labelFor(index: number): string {
@@ -173,7 +173,7 @@ export const judgeOutputs = createServerFn({ method: 'POST' })
       .join('\n\n')
 
     const judgeSystem =
-      'あなたは公平な審査員です。タスク・入力・評価基準・候補回答を読み、各候補を1〜5点で採点し、理由を日本語1文で述べてください。' +
+      'あなたは公平な審査員です。タスク・入力・評価基準・候補回答を読み、各候補を1〜5点で採点し、理由を日本語1文(60字以内)で述べてください。' +
       '出力はJSONのみとし、説明文やコードフェンスは含めないでください。形式: {"scores":[{"label":"A","score":4,"reason":"..."}]}'
 
     const judgeUserContent =
