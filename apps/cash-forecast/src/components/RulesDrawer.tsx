@@ -188,8 +188,14 @@ function RuleForm({
   }
 
   const handleDayOfMonthChange = (v: number) => {
-    setDayOfMonth(v)
-    if (v >= 1 && v <= 31) setErrors((prev) => (prev.dayOfMonth ? { ...prev, dayOfMonth: undefined } : prev))
+    // react-aria の NumberField は空入力を onChange(NaN) で通知してくる。NaN のまま state に
+    // 入れると NaN < 1 / NaN > 31 がどちらも false になり検証をすり抜けてしまうため、
+    // closingDay と同様に undefined に変換して「未設定」を表す。
+    const next = Number.isNaN(v) ? undefined : v
+    setDayOfMonth(next)
+    if (next !== undefined && next >= 1 && next <= 31) {
+      setErrors((prev) => (prev.dayOfMonth ? { ...prev, dayOfMonth: undefined } : prev))
+    }
   }
 
   const handleClosingDayChange = (v: number) => {
@@ -276,7 +282,9 @@ function RuleForm({
         isDisabled={submitting}
         minValue={1}
         maxValue={31}
-        value={dayOfMonth}
+        // closingDay と同じく、空（未設定）は NaN で渡す。undefined を渡すと非制御モードに
+        // 落ちて、一度クリアしたあと値を入れ直せなくなる。
+        value={dayOfMonth ?? Number.NaN}
         onChange={handleDayOfMonthChange}
       >
         <Label>毎月◯日</Label>

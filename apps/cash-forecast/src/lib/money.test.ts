@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countMoneyDigits, formatMoneyInput, toMoneyInputDisplay } from "./money";
+import { caretAfterDigits, countMoneyDigits, formatMoneyInput, toMoneyInputDisplay } from "./money";
 
 describe("formatMoneyInput", () => {
   it("そのまま整数: '1000000' → 1,000,000 / 1000000", () => {
@@ -62,6 +62,53 @@ describe("formatMoneyInput", () => {
   it("maxValue を指定できる", () => {
     expect(formatMoneyInput("500", { maxValue: 100 })).toEqual({ display: "100", value: 100 });
   });
+
+  it("小数部は切り捨てる（四捨五入しない）: '1234.56' → 1,234 / 1234", () => {
+    expect(formatMoneyInput("1234.56")).toEqual({ display: "1,234", value: 1234 });
+  });
+
+  it("小数部は切り捨てる: '1.5' → 1 / 1", () => {
+    expect(formatMoneyInput("1.5")).toEqual({ display: "1", value: 1 });
+  });
+
+  it("カンマ入り小数も切り捨てる: '1,234.00' → 1,234 / 1234", () => {
+    expect(formatMoneyInput("1,234.00")).toEqual({ display: "1,234", value: 1234 });
+  });
+
+  it("小数部切り捨ての結果 0 になる: '0.9' → 0 / 0", () => {
+    expect(formatMoneyInput("0.9")).toEqual({ display: "0", value: 0 });
+  });
+
+  it("全角ピリオドも小数点として扱う: '1２．5' → 12 / 12", () => {
+    expect(formatMoneyInput("1２．5")).toEqual({ display: "12", value: 12 });
+  });
+
+  it("数字以外の文字（'e'等）は無視する: '1e5' → 15 / 15", () => {
+    expect(formatMoneyInput("1e5")).toEqual({ display: "15", value: 15 });
+  });
+
+  it("全角カンマも区切り文字として無視する: '１，２３４' → 1,234 / 1234", () => {
+    expect(formatMoneyInput("１，２３４")).toEqual({ display: "1,234", value: 1234 });
+  });
+
+  it("前後の空白を無視して負数を判定する: '  -5  ' → -5 / -5", () => {
+    expect(formatMoneyInput("  -5  ", { allowNegative: true })).toEqual({ display: "-5", value: -5 });
+  });
+
+  it("'-' が連続していても先頭にあれば負数として扱う: '--5' → -5 / -5", () => {
+    expect(formatMoneyInput("--5", { allowNegative: true })).toEqual({ display: "-5", value: -5 });
+  });
+
+  it("'0' 単体はそのまま 0", () => {
+    expect(formatMoneyInput("0")).toEqual({ display: "0", value: 0 });
+  });
+
+  it("負数側の上限クリップ: '-9999999999' → -1,000,000,000 / -1000000000", () => {
+    expect(formatMoneyInput("-9999999999", { allowNegative: true })).toEqual({
+      display: "-1,000,000,000",
+      value: -1000000000,
+    });
+  });
 });
 
 describe("toMoneyInputDisplay", () => {
@@ -97,5 +144,36 @@ describe("countMoneyDigits", () => {
 
   it("空文字は0", () => {
     expect(countMoneyDigits("")).toBe(0);
+  });
+});
+
+describe("caretAfterDigits", () => {
+  it("digitCount が 0 のときは最初の数字の直前", () => {
+    expect(caretAfterDigits("1,234", 0)).toBe(0);
+  });
+
+  it("数字が無い文字列で digitCount が 0 のときは末尾", () => {
+    expect(caretAfterDigits("-", 0)).toBe(1);
+  });
+
+  it("空文字は常に末尾（0）", () => {
+    expect(caretAfterDigits("", 0)).toBe(0);
+    expect(caretAfterDigits("", 3)).toBe(0);
+  });
+
+  it("digitCount が全桁数を超えるときは末尾", () => {
+    expect(caretAfterDigits("1,234", 99)).toBe(5);
+  });
+
+  it("'1,234' で digitCount=1 → カンマの手前（1の直後）", () => {
+    expect(caretAfterDigits("1,234", 1)).toBe(1);
+  });
+
+  it("'1,234' で digitCount=2 → カンマの次の数字の直後", () => {
+    expect(caretAfterDigits("1,234", 2)).toBe(3);
+  });
+
+  it("'1,234' で digitCount=4 → 末尾", () => {
+    expect(caretAfterDigits("1,234", 4)).toBe(5);
   });
 });

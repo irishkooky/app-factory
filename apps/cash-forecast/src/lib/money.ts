@@ -39,6 +39,9 @@ const DEFAULT_MAX_VALUE = 1_000_000_000;
 // 全角マイナス(U+2212)・長音記号(U+30FC)・全角ハイフン(U+FF0D)も "-" として扱う。
 const MINUS_LIKE_CHARS = /[−ー－]/g;
 
+// 半角ピリオド(.)・全角ピリオド(U+FF0E)を小数点として扱う。
+const DECIMAL_POINT_CHARS = /[.．]/;
+
 export type MoneyInputOptions = {
   /** 負数の入力を許すか（残高フィールド用）。既定 false */
   allowNegative?: boolean;
@@ -53,7 +56,10 @@ export type MoneyInputResult = {
   value: number | undefined;
 };
 
-/** 入力中の生文字列を、カンマ区切りの表示文字列と整数値に正規化する。 */
+/**
+ * 入力中の生文字列を、カンマ区切りの表示文字列と整数値に正規化する。
+ * 小数部は切り捨てる（四捨五入すると入力途中の値が跳ねて混乱するため）。
+ */
 export function formatMoneyInput(raw: string, options?: MoneyInputOptions): MoneyInputResult {
   const allowNegative = options?.allowNegative ?? false;
   const maxValue = options?.maxValue ?? DEFAULT_MAX_VALUE;
@@ -61,8 +67,13 @@ export function formatMoneyInput(raw: string, options?: MoneyInputOptions): Mone
   const normalized = toHankaku(raw).replace(MINUS_LIKE_CHARS, "-");
   const negative = allowNegative && normalized.trim().startsWith("-");
 
-  const digitsRaw = normalized.replace(/[^\d]/g, "");
-  let digits = digitsRaw.replace(/^0+(?=\d)/, "");
+  // 小数点以降は切り捨てる。数字以外を除去する前に、最初の小数点の位置で切ること
+  // （でないと "1234.56" の "." が消えて "123456" と桁数が変わってしまう）。
+  const decimalIdx = normalized.search(DECIMAL_POINT_CHARS);
+  const truncated = decimalIdx === -1 ? normalized : normalized.slice(0, decimalIdx);
+
+  const digitsRaw = truncated.replace(/[^\d]/g, "");
+  const digits = digitsRaw.replace(/^0+(?=\d)/, "");
 
   if (digits === "") {
     return { display: negative ? "-" : "", value: undefined };
@@ -70,7 +81,6 @@ export function formatMoneyInput(raw: string, options?: MoneyInputOptions): Mone
 
   let n = Number(digits);
   if (n > maxValue) {
-    digits = String(maxValue);
     n = maxValue;
   }
 
@@ -95,4 +105,23 @@ export function toMoneyInputDisplay(value: number | undefined): string {
 export function countMoneyDigits(raw: string): number {
   const matches = toHankaku(raw).match(/\d/g);
   return matches ? matches.length : 0;
+}
+
+/**
+ * display の先頭から数えて digitCount 個目の数字の直後の位置を返す（キャレット復元用）。
+ * digitCount が 0 以下のときは最初の数字の直前の位置（数字が無ければ末尾）。
+ */
+export function caretAfterDigits(display: string, digitCount: number): number {
+  if (digitCount <= 0) {
+    const idx = display.search(/\d/);
+    return idx === -1 ? display.length : idx;
+  }
+  let seen = 0;
+  for (let i = 0; i < display.length; i++) {
+    if (/\d/.test(display[i])) {
+      seen++;
+      if (seen === digitCount) return i + 1;
+    }
+  }
+  return display.length;
 }
