@@ -23,6 +23,8 @@ import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
 import { BalanceChart } from '../components/BalanceChart'
 import { MenuDrawer } from '../components/MenuDrawer'
 import { MoneyField } from '../components/MoneyField'
+import { GettingStartedCard } from '../components/GettingStartedCard'
+import type { RulePreset } from '../lib/rulePresets'
 import { PlanBadge, ProGate } from '../components/BillingControls'
 
 export const Route = createFileRoute('/')({
@@ -119,6 +121,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [historyDrawerTarget, setHistoryDrawerTarget] = useState<HistoryRow | null>(null)
   const [reconcileOpen, setReconcileOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
+  const [rulesPreset, setRulesPreset] = useState<RulePreset | null>(null)
   const [thresholdOpen, setThresholdOpen] = useState(false)
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -219,6 +222,15 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         </span>
       </div>
 
+      {(rules ?? []).length === 0 && (
+        <GettingStartedCard
+          onSelectPreset={(p) => {
+            setRulesPreset(p)
+            setRulesOpen(true)
+          }}
+        />
+      )}
+
       <ProGate title="残高推移グラフ" description="グラフ表示はProプラン限定です">
         <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
       </ProGate>
@@ -277,7 +289,12 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         pendingRows={pendingRows}
       />
 
-      <RulesDrawer opened={rulesOpen} onClose={() => setRulesOpen(false)} rules={rules} />
+      <RulesDrawer
+        opened={rulesOpen}
+        onClose={() => { setRulesOpen(false); setRulesPreset(null) }}
+        rules={rules}
+        preset={rulesPreset}
+      />
 
       <MonthlySummaryDrawer
         opened={monthlySummaryOpen}
@@ -298,7 +315,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         opened={menuOpen}
         onClose={() => setMenuOpen(false)}
         onReconcile={() => { setMenuOpen(false); setReconcileOpen(true) }}
-        onRules={() => { setMenuOpen(false); setRulesOpen(true) }}
+        onRules={() => { setMenuOpen(false); setRulesPreset(null); setRulesOpen(true) }}
         onThreshold={() => { setMenuOpen(false); setThresholdOpen(true) }}
         onMonthlySummary={() => { setMenuOpen(false); setMonthlySummaryOpen(true) }}
       />

@@ -41,7 +41,7 @@ export function ForecastList({
   if (rows.length === 0 && (historyRows?.length ?? 0) === 0) {
     return (
       <p className="py-8 text-center text-muted">
-        表示できる予定がありません。ルールや取引を追加してください。
+        毎月の予定や取引を登録すると、ここに12ヶ月分の予測が並びます。
       </p>
     )
   }
