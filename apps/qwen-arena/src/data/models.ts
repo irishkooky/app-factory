@@ -1,4 +1,4 @@
-export type ProviderId = 'qwen' | 'openrouter' | 'anthropic' | 'openai' | 'gemini' | 'deepseek'
+export type ProviderId = 'qwen' | 'anthropic' | 'openai' | 'gemini'
 export type ProviderKind = 'openai-compat' | 'anthropic'
 
 export type ProviderDef = {
@@ -43,15 +43,6 @@ export const PROVIDERS: ProviderDef[] = [
     color: 'orange',
   },
   {
-    id: 'openrouter',
-    label: 'Qwen via OpenRouter(本人確認待ちの代替ルート)',
-    short: 'OpenRouter',
-    kind: 'openai-compat',
-    envKey: 'OPENROUTER_API_KEY',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    color: 'yellow',
-  },
-  {
     id: 'anthropic',
     label: 'Claude (Anthropic)',
     short: 'Claude',
@@ -79,15 +70,6 @@ export const PROVIDERS: ProviderDef[] = [
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     color: 'blue',
   },
-  {
-    id: 'deepseek',
-    label: 'DeepSeek',
-    short: 'DeepSeek',
-    kind: 'openai-compat',
-    envKey: 'DEEPSEEK_API_KEY',
-    baseUrl: 'https://api.deepseek.com/v1',
-    color: 'gray',
-  },
 ]
 
 export const MODELS: ModelDef[] = [
@@ -114,35 +96,6 @@ export const MODELS: ModelDef[] = [
     defaultOn: true,
     extraBody: { enable_thinking: false },
     note: '重み公開版は Flash-Next(別物)',
-  },
-  // OpenRouter 経由の Qwen(単価は OpenRouter の掲載値。Alibaba 公式と同額)
-  {
-    id: 'or-qwen3.8-max',
-    provider: 'openrouter',
-    label: 'Qwen3.8 Max',
-    apiModel: 'qwen/qwen3.8-max-20260803',
-    inputPerM: 2.0,
-    outputPerM: 6.0,
-    defaultOn: false,
-  },
-  {
-    id: 'or-qwen3.8-flash',
-    provider: 'openrouter',
-    label: 'Qwen3.8 Flash',
-    apiModel: 'qwen/qwen3.8-flash-20260826',
-    inputPerM: 0.15,
-    outputPerM: 0.47,
-    defaultOn: false,
-  },
-  {
-    id: 'or-qwen3.8-27b',
-    provider: 'openrouter',
-    label: 'Qwen3.8 27B',
-    apiModel: 'qwen/qwen3.8-27b-20260814',
-    inputPerM: 0.425,
-    outputPerM: 2.55,
-    defaultOn: false,
-    note: 'Apache 2.0 の重み公開版をホスト',
   },
   // Claude: https://claude.com/pricing
   {
@@ -202,24 +155,6 @@ export const MODELS: ModelDef[] = [
     outputPerM: 1.2,
     defaultOn: true,
   },
-  {
-    id: 'gpt-5.4-mini',
-    provider: 'openai',
-    label: 'GPT-5.4 mini',
-    apiModel: 'gpt-5.4-mini',
-    inputPerM: 0.75,
-    outputPerM: 4.5,
-    defaultOn: false,
-  },
-  {
-    id: 'gpt-5.4-nano',
-    provider: 'openai',
-    label: 'GPT-5.4 nano',
-    apiModel: 'gpt-5.4-nano',
-    inputPerM: 0.2,
-    outputPerM: 1.25,
-    defaultOn: false,
-  },
   // Gemini: https://ai.google.dev/gemini-api/docs/pricing (2026-12-31 までの価格)
   {
     id: 'gemini-3.8-flash',
@@ -238,17 +173,6 @@ export const MODELS: ModelDef[] = [
     inputPerM: 0.3,
     outputPerM: 2.5,
     defaultOn: true,
-  },
-  // DeepSeek: https://api-docs.deepseek.com/quick_start/pricing (オフピーク価格。ピーク時は2倍)
-  {
-    id: 'deepseek-v4-flash',
-    provider: 'deepseek',
-    label: 'DeepSeek V4 Flash',
-    apiModel: 'deepseek-v4-flash',
-    inputPerM: 0.22,
-    outputPerM: 0.66,
-    defaultOn: false,
-    note: 'オフピーク価格',
   },
 ]
 
