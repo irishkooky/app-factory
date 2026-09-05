@@ -4,6 +4,8 @@ export type Preset = {
   id: string
   title: string
   description: string
+  /** 実際にどういう会社の、誰の、どの業務で使う仕事か(1〜2文) */
+  scene: string
   system: string
   input: string
   format: PresetFormat
@@ -16,6 +18,8 @@ export const PRESETS: Preset[] = [
     id: 'classify',
     title: '問い合わせの分類+優先度',
     description: 'カスタマーサポートの問い合わせを categories(該当するものすべて)/ priority に分類する',
+    scene:
+      'EC や SaaS のカスタマーサポート。届いたチケットにタグと優先度を付けて担当に振り分ける。Zendesk の自動タグ付けや、問い合わせフォームの裏で分類して Slack の該当チャンネルに流す処理がこれ。',
     system:
       'あなたはECサイトのカスタマーサポート担当です。届いた問い合わせ本文を読み、' +
       'categories(billing/bug/feature/account/other のうち該当するものをすべて。実害の大きい順に並べる)と ' +
@@ -37,6 +41,8 @@ export const PRESETS: Preset[] = [
     id: 'summarize',
     title: 'レビューの要約',
     description: '飲食店の口コミ6件(Googleマップ風)を良い点・悪い点・改善提案に要約する',
+    scene:
+      '多店舗の飲食・美容・小売の本部。エリアマネージャーが Googleマップや食べログの口コミを店ごとに週次で読む代わりに使う。EC なら商品レビューの要約、アプリなら App Store のレビューを開発チームに流す用途。',
     system:
       'あなたは飲食店のオーナー向けにレビューを要約するアシスタントです。' +
       '複数の口コミをまとめて、良い点・悪い点・改善提案をそれぞれ2行以内の日本語で簡潔に出力してください。',
@@ -56,6 +62,8 @@ export const PRESETS: Preset[] = [
     id: 'extract',
     title: '名刺/メール署名からの構造化抽出',
     description: 'メール本文と署名から会社名・氏名・連絡先をJSONで抽出する(引っ掛けなし。下の「引っ掛けあり」と署名は同じ)',
+    scene:
+      '営業と営業事務。メールの署名から連絡先を CRM に自動登録する(HubSpot や Sansan にある機能)。受注センターや BPO が見積依頼メールから顧客マスタに登録する事務も同じ。',
     system:
       '以下のメールから、差出人(このメールを書いた人)の company, name, title, email, phone, address の6項目をJSONで抽出してください。' +
       '本文中に情報が見当たらない項目は必ず null にしてください。JSONのみを返し、説明文は不要です。',
@@ -80,6 +88,8 @@ export const PRESETS: Preset[] = [
     id: 'extract-trap',
     title: '署名の抽出(引っ掛けあり)',
     description: '上と同じ差出人・同じ署名で、本文に返送先・会場住所・サポート窓口が混ざるメールから、差出人の情報だけをJSONで抽出する',
+    scene:
+      '上と同じ CRM 登録の場面で、実務のメールには返送先・会場・窓口など差出人以外の連絡先がいくらでも混ざる。それに釣られず差出人だけを取れるかを見る。',
     system:
       '以下のメールから、差出人(このメールを書いた人)の company, name, title, email, phone, address の6項目をJSONで抽出してください。' +
       '本文中に情報が見当たらない項目は必ず null にしてください。JSONのみを返し、説明文は不要です。',
@@ -107,6 +117,8 @@ export const PRESETS: Preset[] = [
     id: 'translate',
     title: '日→英 翻訳(UI文言)',
     description: 'SaaSのエラーメッセージ・通知文を自然なUI英語に翻訳する',
+    scene:
+      '海外展開する SaaS やアプリの開発チーム・PM。日本語の文言ファイルを英語にする一次訳。翻訳会社に出す前の下訳、小さい会社ならこれで本番。',
     system:
       '以下はSaaSプロダクトのUIに表示するエラーメッセージ・通知文の下書き(社内メモの粒度で、書き方が揃っていません)です。ネイティブのプロダクトマネージャーが書くような、' +
       '自然で簡潔な英語のUI文言に翻訳してください。行番号は保持し、1行ずつ対応する形で出力してください。',
@@ -130,6 +142,8 @@ export const PRESETS: Preset[] = [
     id: 'draft',
     title: '返信の下書き',
     description: '解約希望の顧客メールへの返信ドラフトを作成する',
+    scene:
+      'カスタマーサクセスとサポート。解約・返金・クレームへの一次返信を AI が書き、人が直して送る。営業事務の見積送付や日程調整、美容室やクリニックの予約変更の返信も同じ型。',
     system:
       'あなたはSaaSのカスタマーサクセス担当です。解約を希望する顧客からのメールに対する返信メールの下書きを作成してください。' +
       '丁寧な日本語で150〜250字程度、引き止めの提案は1回だけに留め、しつこくならないようにしてください。',
