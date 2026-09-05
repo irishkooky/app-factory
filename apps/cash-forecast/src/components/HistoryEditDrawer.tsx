@@ -5,7 +5,6 @@ import {
   FieldError,
   Input,
   Label,
-  NumberField,
   Spinner,
   TextField,
   ToggleButton,
@@ -16,6 +15,7 @@ import { api } from '../../convex/_generated/api'
 import type { HistoryRow } from '../lib/history'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { useConfirm } from './ConfirmDialog'
+import { MoneyField } from './MoneyField'
 
 type HistoryEditDrawerProps = {
   opened: boolean
@@ -65,6 +65,16 @@ function HistoryEditForm({
   const [amount, setAmount] = useState<number | undefined>(target.amount)
   const [kind, setKind] = useState<'income' | 'expense'>(target.kind)
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
+
+  const handleNameChange = (v: string) => {
+    setName(v)
+    if (v.trim().length > 0) setErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
+  }
+
+  const handleAmountChange = (v: number | undefined) => {
+    setAmount(v)
+    if (v !== undefined) setErrors((prev) => (prev.amount ? { ...prev, amount: undefined } : prev))
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -123,27 +133,11 @@ function HistoryEditForm({
 
       <TextField isInvalid={!!errors.name} isDisabled={submitting}>
         <Label>名前</Label>
-        <Input placeholder="例: 家賃" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input placeholder="例: 家賃" value={name} onChange={(e) => handleNameChange(e.target.value)} />
         {errors.name && <FieldError>{errors.name}</FieldError>}
       </TextField>
 
-      <NumberField
-        isInvalid={!!errors.amount}
-        isDisabled={submitting}
-        minValue={0}
-        maxValue={1_000_000_000}
-        value={amount}
-        onChange={setAmount}
-        formatOptions={{ style: 'currency', currency: 'JPY' }}
-      >
-        <Label>金額</Label>
-        <NumberField.Group>
-          <NumberField.DecrementButton />
-          <NumberField.Input className="flex-1" />
-          <NumberField.IncrementButton />
-        </NumberField.Group>
-        {errors.amount && <FieldError>{errors.amount}</FieldError>}
-      </NumberField>
+      <MoneyField label="金額" value={amount} onChange={handleAmountChange} error={errors.amount} isDisabled={submitting} />
 
       <ToggleButtonGroup
         selectionMode="single"
