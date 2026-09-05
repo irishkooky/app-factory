@@ -17,7 +17,6 @@ wrangler secret put DASHSCOPE_API_KEY
 wrangler secret put ANTHROPIC_API_KEY
 wrangler secret put OPENAI_API_KEY
 wrangler secret put GEMINI_API_KEY
-wrangler secret put DEEPSEEK_API_KEY
 ```
 
 #### 本人確認が間に合わないときの代替: OpenRouter
@@ -27,7 +26,6 @@ OpenRouter(カード登録のみ・即時)経由で同じ Qwen3.8 Max / Flash �
 「Qwen via OpenRouter」プロバイダとして別枠で表示されます。
 
 ```sh
-wrangler secret put OPENROUTER_API_KEY   # https://openrouter.ai/settings/keys
 ```
 
 #### Anthropic のキーが `anthropic-workspace-id is required` で失敗する場合
@@ -72,7 +70,6 @@ vp dev
 - Anthropic: https://console.anthropic.com/
 - OpenAI: https://platform.openai.com/
 - Gemini (Google AI Studio): https://aistudio.google.com/
-- DeepSeek Platform: https://platform.deepseek.com/
 
 ## 公開後の後片付け(重要)
 
@@ -85,7 +82,6 @@ wrangler secret delete DASHSCOPE_API_KEY
 wrangler secret delete ANTHROPIC_API_KEY
 wrangler secret delete OPENAI_API_KEY
 wrangler secret delete GEMINI_API_KEY
-wrangler secret delete DEEPSEEK_API_KEY
 ```
 
 キーを消してもアプリ自体は壊れません(各プロバイダが「キー未設定」表示に戻るだけです)。
