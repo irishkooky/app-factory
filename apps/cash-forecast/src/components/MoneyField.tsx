@@ -1,26 +1,23 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
-import { CloseButton, FieldError, InputGroup, Label, TextField } from '@heroui/react'
-import { caretAfterDigits, countMoneyDigits, formatMoneyInput, toMoneyInputDisplay } from '../lib/money'
+import { useRef, useState, type ChangeEvent } from 'react'
+import { CloseButton, Description, FieldError, InputGroup, Label, TextField } from '@heroui/react'
+import { formatYen, moneyInputErrorMessage, parseMoneyInput, toMoneyInputText } from '../lib/money'
 
 type MoneyFieldProps = {
   label: string
   value: number | undefined
+  /**
+   * 受け取った値をそのまま親の state に保存すること。`?? 0` などで別の値に矯正すると、
+   * 次のレンダーで「親からの value 同期」が働き、入力途中の文字列（空欄や "-" など）を
+   * 矯正後の値で上書きしてしまう。
+   */
   onChange: (value: number | undefined) => void
   /** エラーメッセージ。undefined ならエラー表示なし */
   error?: string
   isDisabled?: boolean
   /** 負数を許可（残高フィールド用）。既定 false */
   allowNegative?: boolean
-  /** 上限。既定 1_000_000_000 */
-  maxValue?: number
   className?: string
 }
-
-// TanStack Start は SSR されるため、サーバーで useLayoutEffect を呼ぶと
-// 「did you mean useEffect?」警告が出る。クライアントでのみ useLayoutEffect を使う
-// isomorphic layout effect（この判定はモジュール読み込み時に一度だけ行われ、
-// サーバー/クライアントそれぞれの環境で安定する）。
-const useIsomorphicLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect
 
 export function MoneyField({
   label,
@@ -29,17 +26,13 @@ export function MoneyField({
   error,
   isDisabled,
   allowNegative = false,
-  maxValue = 1_000_000_000,
   className,
 }: MoneyFieldProps) {
-  const [text, setText] = useState(() => toMoneyInputDisplay(value))
+  const [text, setText] = useState(() => toMoneyInputText(value))
   // 「最後に自分が親へ通知した値」。親からの value が外部要因（フォームリセット等）で
-  // 変わったときだけ text を作り直すために使う。ref ではなく state で持つ（React公式の
-  // 「props から派生した state を調整する」パターンに合わせる）。ref だと、並行レンダーで
-  // そのレンダーが破棄されたときにロールバックされず、「ref だけ新値・text は旧値」のまま
-  // 永久に同期しなくなる可能性がある。
+  // 変わったときだけ text を作り直すために使う。
   const [prevValue, setPrevValue] = useState(value)
-  const caretRef = useRef<number | null>(null)
+  const [touched, setTouched] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   // レンダー中に props から派生した state を調整するパターン（React公式）。
@@ -48,75 +41,40 @@ export function MoneyField({
   // （=== / !== だと NaN 同士は「変わった」と誤判定されてしまう）。
   if (!Object.is(value, prevValue)) {
     setPrevValue(value)
-    setText(toMoneyInputDisplay(value))
+    setText(toMoneyInputText(value))
   }
 
-  useIsomorphicLayoutEffect(() => {
-    const el = inputRef.current
-    if (caretRef.current === null || !el) return
-    const pos = caretRef.current
-    caretRef.current = null
-    // text/prevValue が変わらず再レンダーが起きなかった場合、この effect 自体は走らない
-    // （呼び出し元の applyRaw が自前で復元する）。ここではフォーカスが外れている間に
-    // 古いキャレット位置が残っていて、無関係な再レンダー（Convexのライブクエリ更新等）で
-    // 誤った位置に飛ぶのを防ぐため、フォーカス中だけ復元する。
-    if (document.activeElement === el) el.setSelectionRange(pos, pos)
-  })
-
-  // raw な入力文字列とその中でのキャレット位置から、正規化・状態更新・キャレット復元までを行う。
-  // handleChange と onKeyDown（カンマまたぎ削除の振り替え）の両方から呼ばれる共通処理。
-  const applyRaw = (raw: string, caretInRaw: number) => {
-    const digitsBefore = countMoneyDigits(raw.slice(0, caretInRaw))
-    const next = formatMoneyInput(raw, { allowNegative, maxValue })
-    const caret = caretAfterDigits(next.display, digitsBefore)
-
-    if (next.display === text && Object.is(next.value, prevValue)) {
-      // display も value も前回と同じ = state が変わらないので再レンダーが起きず、
-      // 上のキャレット復元 effect も走らない。それでも React はコントロールド入力として
-      // DOM の value を text に書き戻すため、キャレットが末尾に飛んでしまう。
-      // ここで自前でキャレットを戻す（DOMの書き戻し後に実行するため queueMicrotask を使う）。
-      const el = inputRef.current
-      queueMicrotask(() => {
-        el?.setSelectionRange(caret, caret)
-      })
-      return
-    }
-
-    caretRef.current = caret
-    setPrevValue(next.value)
-    setText(next.display)
-    onChange(next.value)
-  }
+  const parsed = parseMoneyInput(text, { allowNegative })
+  // 入力途中の "-" のような一時的に不正な状態でも、blur するか親がエラーを立てるまでは
+  // 即座にエラーを出さない。出すときは親の「金額を入力してください」より、より具体的な
+  // 内部エラー（形式・符号・上限）を優先する。'empty'/'partial' は moneyInputErrorMessage が
+  // undefined を返すので、ここで理由を絞り込まなくても自然にエラーは出ない。
+  const internalError = !parsed.ok && (touched || error !== undefined) ? moneyInputErrorMessage(parsed.reason) : undefined
+  const shownError = internalError ?? error
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const el = e.currentTarget
-    applyRaw(el.value, el.selectionStart ?? el.value.length)
+    const raw = e.currentTarget.value
+    setText(raw)
+    const r = parseMoneyInput(raw, { allowNegative })
+    const next = r.ok ? r.value : undefined
+    setPrevValue(next)
+    onChange(next)
   }
 
-  // 桁区切りのカンマをまたぐ削除は、既定動作だと「カンマの手前/次の数字」ではなく
-  // カンマ自体を消そうとして見かけ上なにも変化せず、キャレットが末尾に飛ぶ不具合になる。
-  // カンマをまたぐ Backspace / Delete だけを「隣の数字を消す」に振り替える
-  // （'-' はここでは対象にしない。マイナス記号上の Backspace は符号を消す既定動作でよい）。
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    const el = e.currentTarget
-    const start = el.selectionStart
-    const end = el.selectionEnd
-    if (start === null || end === null || start !== end) return
-
-    if (e.key === 'Backspace' && start >= 2 && el.value[start - 1] === ',') {
-      // カンマの直後で Backspace → カンマの手前の数字を消す
-      e.preventDefault()
-      applyRaw(el.value.slice(0, start - 2) + el.value.slice(start - 1), start - 2)
-    } else if (e.key === 'Delete' && el.value[start] === ',') {
-      // カンマの直前で Delete → カンマの次の数字を消す
-      e.preventDefault()
-      applyRaw(el.value.slice(0, start) + el.value.slice(start + 2), start)
+  const handleBlur = () => {
+    setTouched(true)
+    const r = parseMoneyInput(text, { allowNegative })
+    if (r.ok) {
+      // 表示だけ正規化する（例: "１，２３４" → "1234"、"1234.56" → "1234"）。
+      // パース失敗時はユーザーが直せるよう入力文字列をそのまま残す。
+      setText(toMoneyInputText(r.value))
     }
   }
 
   const handleClear = () => {
-    setPrevValue(undefined)
     setText('')
+    setTouched(false)
+    setPrevValue(undefined)
     onChange(undefined)
     inputRef.current?.focus()
   }
@@ -124,20 +82,21 @@ export function MoneyField({
   const canClear = text !== '' && !isDisabled
 
   return (
-    <TextField className={className} isInvalid={error !== undefined} isDisabled={isDisabled}>
+    <TextField className={className} isInvalid={shownError !== undefined} isDisabled={isDisabled}>
       <Label>{label}</Label>
       <InputGroup>
         <InputGroup.Prefix>¥</InputGroup.Prefix>
         <InputGroup.Input
           ref={inputRef}
           className="flex-1 tabular-nums"
+          type="text"
           // iPhoneのソフトキーボードは numeric/decimal のどちらにもマイナスキーが無いため、
           // 負数を許可するフィールドでは text キーボード（フルキーボード）に切り替える。
           inputMode={allowNegative ? 'text' : 'numeric'}
           autoComplete="off"
           value={text}
           onChange={handleChange}
-          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
         />
         {canClear && (
           <InputGroup.Suffix className="pr-1">
@@ -145,7 +104,8 @@ export function MoneyField({
           </InputGroup.Suffix>
         )}
       </InputGroup>
-      {error !== undefined && <FieldError>{error}</FieldError>}
+      {parsed.ok && text !== '' && <Description>{formatYen(parsed.value)}</Description>}
+      {shownError !== undefined && <FieldError>{shownError}</FieldError>}
     </TextField>
   )
 }

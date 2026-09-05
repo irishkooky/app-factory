@@ -16,9 +16,11 @@ import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { formatYen } from '../lib/money'
+import type { RulePreset } from '../lib/rulePresets'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
+import { RulePresetButtons } from './GettingStartedCard'
 import { MoneyField } from './MoneyField'
 
 // convex/rules.ts の FREE_RULE_LIMIT と同じ値。UI表示用の写しであり、
@@ -29,9 +31,11 @@ type RulesDrawerProps = {
   opened: boolean
   onClose: () => void
   rules: Doc<'rules'>[] | undefined
+  /** ホームの導線から開くとき、そのプリセットでいきなりフォームを開く */
+  preset?: RulePreset | null
 }
 
-export function RulesDrawer({ opened, onClose, rules }: RulesDrawerProps) {
+export function RulesDrawer({ opened, onClose, rules, preset }: RulesDrawerProps) {
   return (
     <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
       <Drawer.Content placement="bottom">
@@ -40,23 +44,33 @@ export function RulesDrawer({ opened, onClose, rules }: RulesDrawerProps) {
           <Drawer.Header>
             <Drawer.Heading>ルール管理</Drawer.Heading>
           </Drawer.Header>
-          <Drawer.Body>{opened && <RulesDrawerContent rules={rules} />}</Drawer.Body>
+          <Drawer.Body>
+            {opened && <RulesDrawerContent key={preset?.id ?? 'list'} rules={rules} preset={preset} />}
+          </Drawer.Body>
         </Drawer.Dialog>
       </Drawer.Content>
     </Drawer.Backdrop>
   )
 }
 
-function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
-  const [mode, setMode] = useState<'list' | 'form'>('list')
+function RulesDrawerContent({
+  rules,
+  preset,
+}: {
+  rules: Doc<'rules'>[] | undefined
+  preset?: RulePreset | null
+}) {
+  const [mode, setMode] = useState<'list' | 'form'>(preset ? 'form' : 'list')
   const [editingRule, setEditingRule] = useState<Doc<'rules'> | null>(null)
+  const [formPreset, setFormPreset] = useState<RulePreset | null>(preset ?? null)
   const removeRule = useMutation(api.rules.remove)
   const { plan } = usePlan()
   const confirm = useConfirm()
   const atFreeLimit = plan === 'free' && (rules?.length ?? 0) >= FREE_RULE_LIMIT
 
-  const handleAdd = () => {
+  const handleAdd = (p?: RulePreset) => {
     setEditingRule(null)
+    setFormPreset(p ?? null)
     setMode('form')
   }
 
@@ -89,6 +103,7 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
     return (
       <RuleForm
         rule={editingRule}
+        preset={editingRule ? null : formPreset}
         onDone={() => setMode('list')}
         onCancel={() => setMode('list')}
       />
@@ -102,11 +117,11 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
           <Spinner />
         </div>
       ) : rules.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-8">
+        <div className="flex flex-col gap-4 py-4">
           <p className="text-center text-muted">
             給与や毎月の引き落としをルールにすると、未来の残高が自動で予測されます。
           </p>
-          <Button onPress={handleAdd}>＋ルールを追加</Button>
+          <RulePresetButtons onSelect={handleAdd} />
         </div>
       ) : (
         <>
@@ -138,7 +153,7 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
               </Card>
             ))}
           </div>
-          <Button onPress={handleAdd} isDisabled={atFreeLimit}>
+          <Button onPress={() => handleAdd()} isDisabled={atFreeLimit}>
             ＋ルールを追加
           </Button>
           {atFreeLimit && (
@@ -157,10 +172,13 @@ function RulesDrawerContent({ rules }: { rules: Doc<'rules'>[] | undefined }) {
 
 function RuleForm({
   rule,
+  preset,
   onDone,
   onCancel,
 }: {
   rule: Doc<'rules'> | null
+  /** rule が null のときだけ初期値として使う（編集時はルールの既存値を優先） */
+  preset?: RulePreset | null
   onDone: () => void
   onCancel: () => void
 }) {
@@ -168,10 +186,10 @@ function RuleForm({
   const updateRule = useMutation(api.rules.update)
   const [submitting, setSubmitting] = useState(false)
 
-  const [name, setName] = useState(rule?.name ?? '')
-  const [kind, setKind] = useState<'income' | 'expense'>(rule?.kind ?? 'expense')
+  const [name, setName] = useState(rule?.name ?? preset?.name ?? '')
+  const [kind, setKind] = useState<'income' | 'expense'>(rule?.kind ?? preset?.kind ?? 'expense')
   const [amount, setAmount] = useState<number | undefined>(rule?.amount)
-  const [dayOfMonth, setDayOfMonth] = useState<number | undefined>(rule?.dayOfMonth ?? 1)
+  const [dayOfMonth, setDayOfMonth] = useState<number | undefined>(rule?.dayOfMonth ?? preset?.dayOfMonth ?? 1)
   const [endDate, setEndDate] = useState(rule?.endDate ?? '')
   const [closingDay, setClosingDay] = useState<number | undefined>(rule?.closingDay)
 

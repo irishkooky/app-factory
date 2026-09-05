@@ -32,7 +32,7 @@ export function parseYen(input: string | number): number | null {
   return Math.round(value);
 }
 
-// 金額入力欄（MoneyField）向け: 入力中の生文字列をリアルタイムでカンマ区切りに整形する。
+// 金額入力欄（MoneyField）向け: 入力中は一切書き換えず、blur時などにパースだけ行う。
 
 const DEFAULT_MAX_VALUE = 1_000_000_000;
 
@@ -42,86 +42,95 @@ const MINUS_LIKE_CHARS = /[−ー－]/g;
 // 半角ピリオド(.)・全角ピリオド(U+FF0E)を小数点として扱う。
 const DECIMAL_POINT_CHARS = /[.．]/;
 
-export type MoneyInputOptions = {
-  /** 負数の入力を許すか（残高フィールド用）。既定 false */
+// 半角・全角(U+3000)空白。
+const WHITESPACE_CHARS = /[\s　]/g;
+
+// 桁区切りカンマ（半角・全角）・通貨記号・「円」。
+const CURRENCY_CHARS = /[,，¥￥円]/g;
+
+export type MoneyParseOptions = {
+  /** 負数を許すか。既定 false */
   allowNegative?: boolean;
   /** 絶対値の上限。既定 1_000_000_000 */
   maxValue?: number;
 };
 
-export type MoneyInputResult = {
-  /** 入力欄に表示する文字列。カンマ区切り・通貨記号は含まない（例 "1,000,000" / "-1,234" / "" / "-"） */
-  display: string;
-  /** 整数円。空入力なら undefined */
-  value: number | undefined;
-};
+export type MoneyParseResult =
+  | { ok: true; value: number }
+  | { ok: false; reason: "empty" | "partial" | "format" | "negative" | "tooLarge" };
 
 /**
- * 入力中の生文字列を、カンマ区切りの表示文字列と整数値に正規化する。
- * 小数部は切り捨てる（四捨五入すると入力途中の値が跳ねて混乱するため）。
+ * 金額入力欄の生文字列を整数円にパースする。表示用の整形は一切しない。
+ * カンマ・全角数字・¥/円・空白は寛容に受け付け、小数部は切り捨てる。
  */
-export function formatMoneyInput(raw: string, options?: MoneyInputOptions): MoneyInputResult {
+export function parseMoneyInput(raw: string, options?: MoneyParseOptions): MoneyParseResult {
   const allowNegative = options?.allowNegative ?? false;
   const maxValue = options?.maxValue ?? DEFAULT_MAX_VALUE;
 
-  const normalized = toHankaku(raw).replace(MINUS_LIKE_CHARS, "-");
-  const negative = allowNegative && normalized.trim().startsWith("-");
+  const normalized = toHankaku(raw)
+    .replace(MINUS_LIKE_CHARS, "-")
+    .replace(WHITESPACE_CHARS, "")
+    .replace(CURRENCY_CHARS, "");
+
+  if (normalized === "") {
+    return { ok: false, reason: "empty" };
+  }
 
   // 小数点以降は切り捨てる。数字以外を除去する前に、最初の小数点の位置で切ること
   // （でないと "1234.56" の "." が消えて "123456" と桁数が変わってしまう）。
   const decimalIdx = normalized.search(DECIMAL_POINT_CHARS);
   const truncated = decimalIdx === -1 ? normalized : normalized.slice(0, decimalIdx);
 
-  const digitsRaw = truncated.replace(/[^\d]/g, "");
-  const digits = digitsRaw.replace(/^0+(?=\d)/, "");
-
-  if (digits === "") {
-    return { display: negative ? "-" : "", value: undefined };
+  if (truncated === "") {
+    return { ok: false, reason: "format" };
+  }
+  if (truncated === "-") {
+    // 負数を打ち始めた途中（"-" だけ）。allowNegative でなければ数字が無いだけの format 扱い。
+    return { ok: false, reason: allowNegative ? "partial" : "format" };
+  }
+  if (!/^-?\d+$/.test(truncated)) {
+    return { ok: false, reason: "format" };
   }
 
-  let n = Number(digits);
-  if (n > maxValue) {
-    n = maxValue;
+  const negative = truncated.startsWith("-");
+  if (negative && !allowNegative) {
+    return { ok: false, reason: "negative" };
   }
 
-  if (n === 0) {
-    // -0 を作らない。
-    return { display: "0", value: 0 };
+  const abs = Number(negative ? truncated.slice(1) : truncated);
+  if (abs > maxValue) {
+    return { ok: false, reason: "tooLarge" };
   }
 
-  const display = (negative ? "-" : "") + n.toLocaleString("ja-JP");
-  return { display, value: negative ? -n : n };
+  const value = negative ? -abs : abs;
+  // -0 を作らない（"-0" 入力時に abs=0 で -abs が -0 になるのを防ぐ）。
+  return { ok: true, value: Object.is(value, -0) ? 0 : value };
 }
 
-/** 数値を入力欄の表示文字列に変換する（undefined -> ""）。 */
-export function toMoneyInputDisplay(value: number | undefined): string {
-  if (value === undefined) return "";
-  const rounded = Math.round(value);
-  const abs = Math.abs(rounded).toLocaleString("ja-JP");
-  return rounded < 0 ? `-${abs}` : abs;
-}
-
-/** 文字列に含まれる数字（半角・全角）の個数を数える。キャレット位置の復元に使う。 */
-export function countMoneyDigits(raw: string): number {
-  const matches = toHankaku(raw).match(/\d/g);
-  return matches ? matches.length : 0;
+/** 数値を入力欄の正規化テキストにする（undefined → ""、1234 → "1234"、-2500 → "-2500"。小数は四捨五入） */
+export function toMoneyInputText(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) return "";
+  // Math.round(-0.x) は -0 になりうるが、String(-0) は "0" になるため "-0" 表記は発生しない。
+  return String(Math.round(value));
 }
 
 /**
- * display の先頭から数えて digitCount 個目の数字の直後の位置を返す（キャレット復元用）。
- * digitCount が 0 以下のときは最初の数字の直前の位置（数字が無ければ末尾）。
+ * パース失敗理由をユーザー向け文言にする。
+ * 'empty'（未入力）と 'partial'（"-" だけ等、入力途中の一時的な不正状態）は undefined
+ * （どちらもフィールド側のエラーとしては出さない）。
  */
-export function caretAfterDigits(display: string, digitCount: number): number {
-  if (digitCount <= 0) {
-    const idx = display.search(/\d/);
-    return idx === -1 ? display.length : idx;
+export function moneyInputErrorMessage(
+  reason: Exclude<MoneyParseResult, { ok: true }>["reason"],
+): string | undefined {
+  switch (reason) {
+    case "format":
+      return "半角数字で入力してください";
+    case "negative":
+      return "0以上の金額を入力してください";
+    case "tooLarge":
+      return "10億円以下で入力してください";
+    case "empty":
+    case "partial":
+      return undefined;
   }
-  let seen = 0;
-  for (let i = 0; i < display.length; i++) {
-    if (/\d/.test(display[i])) {
-      seen++;
-      if (seen === digitCount) return i + 1;
-    }
-  }
-  return display.length;
 }
