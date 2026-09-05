@@ -300,6 +300,12 @@ function HomeComponent() {
             <Text size="sm" c="dimmed">
               {preset.description}
             </Text>
+            <Text size="sm">
+              <Text span fw={600}>
+                使う場面:{' '}
+              </Text>
+              {preset.scene}
+            </Text>
             <Textarea
               label="system(指示)"
               value={system}
