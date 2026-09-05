@@ -1,11 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Button, Checkbox, Drawer, FieldError, Label, NumberField, Separator, Spinner } from '@heroui/react'
+import { Button, Checkbox, Drawer, Separator, Spinner } from '@heroui/react'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import type { ForecastRow } from '../lib/forecast'
 import { todayJST } from '../lib/date'
 import { formatYen } from '../lib/money'
+import { MoneyField } from './MoneyField'
 import { notifyError, notifySaved } from '../lib/notify'
 
 type ReconcileDrawerProps = {
@@ -97,6 +98,11 @@ function ManualReconcileForm({
 
   const diff = balance !== undefined ? Math.round(balance) - reflectedBalance : 0
 
+  const handleBalanceChange = (v: number | undefined) => {
+    setBalance(v)
+    if (v !== undefined) setError(null)
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (balance === undefined) {
@@ -176,23 +182,14 @@ function ManualReconcileForm({
         )}
       </div>
 
-      <NumberField
-        isInvalid={error !== null}
-        isDisabled={submitting}
-        minValue={-1_000_000_000}
-        maxValue={1_000_000_000}
+      <MoneyField
+        label="現在残高"
         value={balance}
-        onChange={setBalance}
-        formatOptions={{ style: 'currency', currency: 'JPY' }}
-      >
-        <Label>現在残高</Label>
-        <NumberField.Group>
-          <NumberField.DecrementButton />
-          <NumberField.Input className="flex-1" />
-          <NumberField.IncrementButton />
-        </NumberField.Group>
-        {error && <FieldError>{error}</FieldError>}
-      </NumberField>
+        onChange={handleBalanceChange}
+        error={error ?? undefined}
+        isDisabled={submitting}
+        allowNegative
+      />
 
       {diff !== 0 && (
         <Checkbox isSelected={adjustChecked} onChange={setAdjustChecked} isDisabled={submitting}>

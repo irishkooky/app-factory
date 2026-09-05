@@ -1,15 +1,21 @@
 import { useState, type FormEvent } from 'react'
-import { Button, Card, FieldError, Label, NumberField, Spinner } from '@heroui/react'
+import { Button, Card, Spinner } from '@heroui/react'
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import { todayJST } from '../lib/date'
+import { MoneyField } from './MoneyField'
 import { notifyError, notifySaved } from '../lib/notify'
 
 export function OnboardingView() {
   const setAnchor = useMutation(api.settings.setAnchor)
   const [submitting, setSubmitting] = useState(false)
-  const [balance, setBalance] = useState<number | undefined>(undefined)
+  const [balance, setBalance] = useState<number | undefined>(1_000_000)
   const [error, setError] = useState<string | null>(null)
+
+  const handleBalanceChange = (v: number | undefined) => {
+    setBalance(v)
+    if (v !== undefined) setError(null)
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -39,23 +45,14 @@ export function OnboardingView() {
             そこから未来の予定を積み上げて予測します。
           </p>
 
-          <NumberField
-            isInvalid={error !== null}
-            isDisabled={submitting}
-            minValue={-1_000_000_000}
-            maxValue={1_000_000_000}
+          <MoneyField
+            label="現在の預金残高"
             value={balance}
-            onChange={setBalance}
-            formatOptions={{ style: 'currency', currency: 'JPY' }}
-          >
-            <Label>現在の預金残高</Label>
-            <NumberField.Group>
-              <NumberField.DecrementButton />
-              <NumberField.Input className="flex-1" placeholder="¥1,000,000" />
-              <NumberField.IncrementButton />
-            </NumberField.Group>
-            {error && <FieldError>{error}</FieldError>}
-          </NumberField>
+            onChange={handleBalanceChange}
+            error={error ?? undefined}
+            isDisabled={submitting}
+            allowNegative
+          />
 
           <Button type="submit" isPending={submitting} isDisabled={submitting}>
             {submitting && <Spinner color="current" size="sm" />}

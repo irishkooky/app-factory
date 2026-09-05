@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Button, Drawer, FieldError, Label, NumberField, Spinner } from '@heroui/react'
+import { Button, Drawer, Spinner } from '@heroui/react'
 import { IconMenu2, IconPlus } from '@tabler/icons-react'
 import { Authenticated, AuthLoading, Unauthenticated, useMutation, useQuery } from 'convex/react'
 import { SignInButton, UserButton } from '@clerk/clerk-react'
@@ -22,6 +22,7 @@ import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
 import { BalanceChart } from '../components/BalanceChart'
 import { MenuDrawer } from '../components/MenuDrawer'
+import { MoneyField } from '../components/MoneyField'
 import { PlanBadge, ProGate } from '../components/BillingControls'
 
 export const Route = createFileRoute('/')({
@@ -343,6 +344,11 @@ function ThresholdForm({
   const [threshold, setThresholdValue] = useState<number | undefined>(currentThreshold)
   const [error, setError] = useState<string | null>(null)
 
+  const handleThresholdChange = (v: number | undefined) => {
+    setThresholdValue(v)
+    if (v !== undefined) setError(null)
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     if (threshold === undefined) {
@@ -366,23 +372,13 @@ function ThresholdForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <p className="text-sm text-muted">残高がこの金額を下回る行を強調表示します。</p>
 
-      <NumberField
-        isInvalid={error !== null}
-        isDisabled={submitting}
-        minValue={0}
-        maxValue={1_000_000_000}
+      <MoneyField
+        label="しきい値"
         value={threshold}
-        onChange={setThresholdValue}
-        formatOptions={{ style: 'currency', currency: 'JPY' }}
-      >
-        <Label>しきい値</Label>
-        <NumberField.Group>
-          <NumberField.DecrementButton />
-          <NumberField.Input className="flex-1" />
-          <NumberField.IncrementButton />
-        </NumberField.Group>
-        {error && <FieldError>{error}</FieldError>}
-      </NumberField>
+        onChange={handleThresholdChange}
+        error={error ?? undefined}
+        isDisabled={submitting}
+      />
 
       <Button type="submit" isPending={submitting} isDisabled={submitting}>
         {submitting && <Spinner color="current" size="sm" />}

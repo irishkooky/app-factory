@@ -19,6 +19,7 @@ import { formatYen } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
+import { MoneyField } from './MoneyField'
 
 // convex/rules.ts の FREE_RULE_LIMIT と同じ値。UI表示用の写しであり、
 // 実際の上限判定は常にサーバー側（rules.create）で行われる。
@@ -176,6 +177,29 @@ function RuleForm({
 
   const [errors, setErrors] = useState<{ name?: string; amount?: string; dayOfMonth?: string; closingDay?: string }>({})
 
+  const handleNameChange = (v: string) => {
+    setName(v)
+    if (v.trim().length > 0) setErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
+  }
+
+  const handleAmountChange = (v: number | undefined) => {
+    setAmount(v)
+    if (v !== undefined) setErrors((prev) => (prev.amount ? { ...prev, amount: undefined } : prev))
+  }
+
+  const handleDayOfMonthChange = (v: number) => {
+    setDayOfMonth(v)
+    if (v >= 1 && v <= 31) setErrors((prev) => (prev.dayOfMonth ? { ...prev, dayOfMonth: undefined } : prev))
+  }
+
+  const handleClosingDayChange = (v: number) => {
+    const next = Number.isNaN(v) ? undefined : v
+    setClosingDay(next)
+    if (next === undefined || (next >= 1 && next <= 31)) {
+      setErrors((prev) => (prev.closingDay ? { ...prev, closingDay: undefined } : prev))
+    }
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const nextErrors: typeof errors = {}
@@ -218,7 +242,7 @@ function RuleForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <TextField isInvalid={!!errors.name} isDisabled={submitting}>
         <Label>名前</Label>
-        <Input placeholder="例: 給与" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input placeholder="例: 給与" value={name} onChange={(e) => handleNameChange(e.target.value)} />
         {errors.name && <FieldError>{errors.name}</FieldError>}
       </TextField>
 
@@ -239,23 +263,13 @@ function RuleForm({
         </ToggleButton>
       </ToggleButtonGroup>
 
-      <NumberField
-        isInvalid={!!errors.amount}
-        isDisabled={submitting}
-        minValue={0}
-        maxValue={1_000_000_000}
+      <MoneyField
+        label="金額"
         value={amount}
-        onChange={setAmount}
-        formatOptions={{ style: 'currency', currency: 'JPY' }}
-      >
-        <Label>金額</Label>
-        <NumberField.Group>
-          <NumberField.DecrementButton />
-          <NumberField.Input className="flex-1" />
-          <NumberField.IncrementButton />
-        </NumberField.Group>
-        {errors.amount && <FieldError>{errors.amount}</FieldError>}
-      </NumberField>
+        onChange={handleAmountChange}
+        error={errors.amount}
+        isDisabled={submitting}
+      />
 
       <NumberField
         isInvalid={!!errors.dayOfMonth}
@@ -263,7 +277,7 @@ function RuleForm({
         minValue={1}
         maxValue={31}
         value={dayOfMonth}
-        onChange={setDayOfMonth}
+        onChange={handleDayOfMonthChange}
       >
         <Label>毎月◯日</Label>
         <NumberField.Group>
@@ -304,7 +318,7 @@ function RuleForm({
             // 非制御モードに落ちてクリアが効かず、空入力の確定は onChange(NaN) で飛んでくる。
             // NaN <-> undefined を境界で変換し、常に制御下のまま「未設定」を扱えるようにする。
             value={closingDay ?? Number.NaN}
-            onChange={(v) => setClosingDay(Number.isNaN(v) ? undefined : v)}
+            onChange={handleClosingDayChange}
           >
             <Label>締め日（任意）</Label>
             <NumberField.Group>
@@ -315,7 +329,14 @@ function RuleForm({
             {errors.closingDay && <FieldError>{errors.closingDay}</FieldError>}
           </NumberField>
           {closingDay !== undefined && (
-            <Button variant="tertiary" onPress={() => setClosingDay(undefined)} isDisabled={submitting}>
+            <Button
+              variant="tertiary"
+              onPress={() => {
+                setClosingDay(undefined)
+                setErrors((prev) => (prev.closingDay ? { ...prev, closingDay: undefined } : prev))
+              }}
+              isDisabled={submitting}
+            >
               クリア
             </Button>
           )}

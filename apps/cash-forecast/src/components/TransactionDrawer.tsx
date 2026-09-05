@@ -5,7 +5,6 @@ import {
   FieldError,
   Input,
   Label,
-  NumberField,
   Spinner,
   TextField,
   ToggleButton,
@@ -19,6 +18,7 @@ import { formatYen } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
+import { MoneyField } from './MoneyField'
 
 type TransactionDrawerProps = {
   opened: boolean
@@ -208,6 +208,11 @@ function AddonForm({
   const [kind, setKind] = useState<'income' | 'expense'>(addon?.kind ?? 'expense')
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
+  const handleAmountChange = (v: number | undefined) => {
+    setAmount(v)
+    if (v !== undefined) setErrors((prev) => (prev.amount ? { ...prev, amount: undefined } : prev))
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const nextErrors: typeof errors = {}
@@ -249,23 +254,7 @@ function AddonForm({
         {errors.name && <FieldError>{errors.name}</FieldError>}
       </TextField>
 
-      <NumberField
-        isInvalid={!!errors.amount}
-        isDisabled={submitting}
-        minValue={0}
-        maxValue={1_000_000_000}
-        value={amount}
-        onChange={setAmount}
-        formatOptions={{ style: 'currency', currency: 'JPY' }}
-      >
-        <Label>金額</Label>
-        <NumberField.Group>
-          <NumberField.DecrementButton />
-          <NumberField.Input className="flex-1" />
-          <NumberField.IncrementButton />
-        </NumberField.Group>
-        {errors.amount && <FieldError>{errors.amount}</FieldError>}
-      </NumberField>
+      <MoneyField label="金額" value={amount} onChange={handleAmountChange} error={errors.amount} isDisabled={submitting} />
 
       <ToggleButtonGroup
         selectionMode="single"
@@ -326,6 +315,16 @@ function ConfirmForm({
     ? `ベース ${formatYen(baseAmount)} + 上乗せ ${formatYen(addonNet)}`
     : `ベース ${formatYen(baseAmount)}`
 
+  const handleNameChange = (v: string) => {
+    setName(v)
+    if (v.trim().length > 0) setErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
+  }
+
+  const handleAmountChange = (v: number | undefined) => {
+    setAmount(v)
+    if (v !== undefined) setErrors((prev) => (prev.amount ? { ...prev, amount: undefined } : prev))
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     const nextErrors: typeof errors = {}
@@ -373,27 +372,11 @@ function ConfirmForm({
 
       <TextField isInvalid={!!errors.name} isDisabled={submitting}>
         <Label>名前</Label>
-        <Input placeholder="例: 家賃" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input placeholder="例: 家賃" value={name} onChange={(e) => handleNameChange(e.target.value)} />
         {errors.name && <FieldError>{errors.name}</FieldError>}
       </TextField>
 
-      <NumberField
-        isInvalid={!!errors.amount}
-        isDisabled={submitting}
-        minValue={0}
-        maxValue={1_000_000_000}
-        value={amount}
-        onChange={setAmount}
-        formatOptions={{ style: 'currency', currency: 'JPY' }}
-      >
-        <Label>金額</Label>
-        <NumberField.Group>
-          <NumberField.DecrementButton />
-          <NumberField.Input className="flex-1" />
-          <NumberField.IncrementButton />
-        </NumberField.Group>
-        {errors.amount && <FieldError>{errors.amount}</FieldError>}
-      </NumberField>
+      <MoneyField label="金額" value={amount} onChange={handleAmountChange} error={errors.amount} isDisabled={submitting} />
 
       <ToggleButtonGroup
         selectionMode="single"
@@ -456,6 +439,16 @@ function TransactionForm({
   const isEdit = target !== null && !target.isVirtual
   const isRuleBacked = isEdit && target?.ruleId !== undefined
   const absorbedAddons = isRuleBacked ? target?.addons ?? [] : []
+
+  const handleNameChange = (v: string) => {
+    setName(v)
+    if (v.trim().length > 0) setErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
+  }
+
+  const handleAmountChange = (v: number | undefined) => {
+    setAmount(v)
+    if (v !== undefined) setErrors((prev) => (prev.amount ? { ...prev, amount: undefined } : prev))
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -557,27 +550,11 @@ function TransactionForm({
 
       <TextField isInvalid={!!errors.name} isDisabled={submitting}>
         <Label>名前</Label>
-        <Input placeholder="例: 家賃" value={name} onChange={(e) => setName(e.target.value)} />
+        <Input placeholder="例: 家賃" value={name} onChange={(e) => handleNameChange(e.target.value)} />
         {errors.name && <FieldError>{errors.name}</FieldError>}
       </TextField>
 
-      <NumberField
-        isInvalid={!!errors.amount}
-        isDisabled={submitting}
-        minValue={0}
-        maxValue={1_000_000_000}
-        value={amount}
-        onChange={setAmount}
-        formatOptions={{ style: 'currency', currency: 'JPY' }}
-      >
-        <Label>金額</Label>
-        <NumberField.Group>
-          <NumberField.DecrementButton />
-          <NumberField.Input className="flex-1" />
-          <NumberField.IncrementButton />
-        </NumberField.Group>
-        {errors.amount && <FieldError>{errors.amount}</FieldError>}
-      </NumberField>
+      <MoneyField label="金額" value={amount} onChange={handleAmountChange} error={errors.amount} isDisabled={submitting} />
 
       <ToggleButtonGroup
         selectionMode="single"
