@@ -16,6 +16,11 @@
   color-scheme: dark;
   --accent: oklch(0.65 0.16 275);
   --accent-foreground: oklch(0.15 0 0);
+  /* HeroUI の既定は入力欄に枠線なし（--field-border: transparent）で、ダークでは影も無効。
+     入力欄の背景（--default）とドロワーの背景（--overlay）の明度差が小さく、実機では
+     入力欄がどこにあるか分からなくなるため、ダークモードでは薄い枠線を付ける。 */
+  --field-border: oklch(38% 0.006 286.033);
+  --field-border-width: 1px;
 }
 
 @theme inline {
