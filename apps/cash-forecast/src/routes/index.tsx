@@ -22,6 +22,7 @@ import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
 import { BalanceChart } from '../components/BalanceChart'
 import { MenuDrawer } from '../components/MenuDrawer'
+import { PdfImportDrawer } from '../components/PdfImportDrawer'
 import { MoneyField } from '../components/MoneyField'
 import { GettingStartedCard } from '../components/GettingStartedCard'
 import type { RulePreset } from '../lib/rulePresets'
@@ -125,6 +126,18 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [thresholdOpen, setThresholdOpen] = useState(false)
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [pdfImportOpen, setPdfImportOpen] = useState(false)
+
+  const existingImportKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const tx of transactions ?? []) {
+      if (tx.importKey !== undefined) keys.add(tx.importKey)
+    }
+    for (const tx of historyTxs ?? []) {
+      if (tx.importKey !== undefined) keys.add(tx.importKey)
+    }
+    return keys
+  }, [transactions, historyTxs])
 
   const forecast = useMemo(() => {
     if (transactions === undefined || rules === undefined || historyTxs === undefined) return undefined
@@ -318,6 +331,14 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onRules={() => { setMenuOpen(false); setRulesPreset(null); setRulesOpen(true) }}
         onThreshold={() => { setMenuOpen(false); setThresholdOpen(true) }}
         onMonthlySummary={() => { setMenuOpen(false); setMonthlySummaryOpen(true) }}
+        onPdfImport={() => { setMenuOpen(false); setPdfImportOpen(true) }}
+      />
+
+      <PdfImportDrawer
+        opened={pdfImportOpen}
+        onClose={() => setPdfImportOpen(false)}
+        anchorDate={settings.anchorDate}
+        existingImportKeys={existingImportKeys}
       />
     </div>
   )
