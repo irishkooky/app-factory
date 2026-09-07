@@ -1,4 +1,5 @@
 import '../styles.css'
+import '@mantine/core/styles.layer.css'
 
 import type { ReactNode } from 'react'
 import {

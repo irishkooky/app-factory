@@ -26,6 +26,7 @@ import { MoneyField } from '../components/MoneyField'
 import { GettingStartedCard } from '../components/GettingStartedCard'
 import type { RulePreset } from '../lib/rulePresets'
 import { PlanBadge, ProGate } from '../components/BillingControls'
+import { PdfImportDrawer } from '../components/PdfImportDrawer'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -125,6 +126,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [thresholdOpen, setThresholdOpen] = useState(false)
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [pdfImportOpen, setPdfImportOpen] = useState(false)
 
   const forecast = useMemo(() => {
     if (transactions === undefined || rules === undefined || historyTxs === undefined) return undefined
@@ -318,7 +320,9 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onRules={() => { setMenuOpen(false); setRulesPreset(null); setRulesOpen(true) }}
         onThreshold={() => { setMenuOpen(false); setThresholdOpen(true) }}
         onMonthlySummary={() => { setMenuOpen(false); setMonthlySummaryOpen(true) }}
+        onPdfImport={() => { setMenuOpen(false); setPdfImportOpen(true) }}
       />
+      <PdfImportDrawer opened={pdfImportOpen} onClose={() => setPdfImportOpen(false)} anchorDate={settings.anchorDate} />
     </div>
   )
 }

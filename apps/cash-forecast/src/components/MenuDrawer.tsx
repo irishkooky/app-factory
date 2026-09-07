@@ -8,9 +8,10 @@ type MenuDrawerProps = {
   onRules: () => void
   onThreshold: () => void
   onMonthlySummary: () => void
+  onPdfImport: () => void
 }
 
-export function MenuDrawer({ opened, onClose, onReconcile, onRules, onThreshold, onMonthlySummary }: MenuDrawerProps) {
+export function MenuDrawer({ opened, onClose, onReconcile, onRules, onThreshold, onMonthlySummary, onPdfImport }: MenuDrawerProps) {
   return (
     <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
       <Drawer.Content placement="right">
@@ -25,6 +26,7 @@ export function MenuDrawer({ opened, onClose, onReconcile, onRules, onThreshold,
               <Button variant="secondary" onPress={onRules}>ルール管理</Button>
               <Button variant="secondary" onPress={onThreshold}>しきい値</Button>
               <Button variant="secondary" onPress={onMonthlySummary}>月次サマリー</Button>
+              <Button variant="secondary" onPress={onPdfImport}>PDFから取り込む</Button>
               <Separator className="my-1" />
               <BillingButton variant="secondary" />
             </div>
