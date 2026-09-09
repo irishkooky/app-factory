@@ -200,6 +200,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
 
   // 「残高を合わせる」対象: 基準日より後・今日以下の予定・確定・手入力行（=まだ実績化されていない過去分）
   const pendingRows = forecast.filter((row) => settings.anchorDate < row.date && row.date <= today)
+  const balanceChart = <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
 
   return (
     <div className="flex flex-col gap-6">
@@ -233,9 +234,11 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         />
       )}
 
-      <ProGate title="残高推移グラフ" description="グラフ表示はProプラン限定です">
-        <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
-      </ProGate>
+      {import.meta.env.VITE_PREVIEW_CHART === 'true' ? balanceChart : (
+        <ProGate title="残高推移グラフ" description="グラフ表示はProプラン限定です">
+          {balanceChart}
+        </ProGate>
+      )}
 
       <ForecastList
         rows={forecast}
