@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { scenarioById } from '../data/scenarios.ts'
 import { normalizeEvaluation } from './jev.ts'
 import { adaptVercelEvaluation, toVercelQuestions } from './vercel-jev.ts'
+import { mapBatchResult, toBatchQuestions, validateBatchRequest } from './batch.ts'
+import { batchScenarioById } from '../data/batch-scenarios.ts'
 
 const scenario = scenarioById('support')
 assert.ok(scenario)
@@ -43,3 +45,17 @@ assert.equal(gatewayResult?.answers.immediate.noul, 0.75)
 assert.equal(gatewayResult?.answers.immediate.confidence, undefined)
 assert.equal(gatewayResult?.usage?.input_tokens, 12)
 assert.equal(adaptVercelEvaluation({ answers: { department: { choice: '__proto__' } } }, scenario), undefined)
+
+const batchScenario = batchScenarioById('support')
+assert.ok(batchScenario)
+assert.equal(validateBatchRequest({ scenarioId: 'support', items: [{ id: 'a-1', text: ' 返金希望 ' }] })?.items[0].text, '返金希望')
+assert.equal(validateBatchRequest({ scenarioId: 'support', items: [{ id: '__proto__', text: 'x' }] }), undefined)
+assert.equal(validateBatchRequest({ scenarioId: 'support', items: [{ id: 'a', text: 'x' }, { id: 'a', text: 'y' }] }), undefined)
+const batchItems = [{ id: 'a-1', text: '請求書をください' }, { id: 'a-2', text: '画面が白い' }]
+const batchQuestions = toBatchQuestions(batchScenario, batchItems)
+assert.equal(Object.keys(batchQuestions).length, 4)
+const mapped = mapBatchResult({ answers: { item_0_route: { choice: 'billing', probabilities: { billing: .9 } }, item_0_priority: { score: 2 }, item_1_route: { choice: 'unknown' }, item_1_priority: { score: 1 } }, providerMetadata: { typesafe: { confidence: { item_0_route: .8 } } } }, batchScenario, batchItems)
+assert.equal(mapped[0].route, 'billing')
+assert.equal(mapped[0].selectedProbability, .9)
+assert.equal(mapped[0].confidence, .8)
+assert.equal(mapped[1].error, '評価結果を確認できませんでした。')

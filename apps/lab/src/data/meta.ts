@@ -35,7 +35,7 @@ export const META: Record<string, AppMeta> = {
   },
   'jev-lab': {
     title: 'Jev 実験室',
-    description: 'Jevが文章を固定基準で評価。仕事の迷いと、どうでもいい議題を切り替えて遊べる。',
+    description: 'Jevが10件ずつの文章を高速仕分け。実務と無駄遣いの受信トレイを一気に判断する。',
     category: 'demo',
     tags: ['AI', 'Jev', '判断', 'Cloudflare'],
   },

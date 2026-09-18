@@ -1,409 +1,60 @@
-import { useMemo, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import {
-  Alert,
-  Badge,
-  Button,
-  Container,
-  Group,
-  Progress,
-  SegmentedControl,
-  Stack,
-  Switch,
-  Text,
-  Textarea,
-  Title,
-} from "@mantine/core";
-import {
-  scenarios,
-  type Mode,
-  type Question,
-  type Scenario,
-} from "../data/scenarios";
-import type { Evaluation } from "../lib/jev";
-import "./index.css";
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import { Alert, Badge, Button, Container, Drawer, Group, SegmentedControl, Select, SimpleGrid, Stack, Switch, Text, Title } from '@mantine/core'
+import { batchScenarioById, batchScenarios, type BatchItem } from '../data/batch-scenarios'
+import type { BatchItemResult } from '../lib/batch'
+import './index.css'
+export const Route = createFileRoute('/')({ component: Dashboard })
+type ApiResult = { items?: BatchItemResult[]; elapsedMs?: number; error?: string }
+const record = (value: unknown): Record<string, unknown> | undefined => typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
+const batchResponse = (value: unknown, expected: BatchItem[], lanes: Record<string, string>): ApiResult | undefined => {
+  const root = record(value); const source = root && Array.isArray(root.items) ? root.items : undefined
+  if (!root || !source || source.length !== expected.length) return undefined
+  const expectedIds = new Set(expected.map((item) => item.id)); const seen = new Set<string>(); const items: BatchItemResult[] = []
+  for (const candidate of source) { const item = record(candidate); if (!item || typeof item.id !== 'string' || !expectedIds.has(item.id) || seen.has(item.id)) return undefined; seen.add(item.id); const route = typeof item.route === 'string' && Object.hasOwn(lanes, item.route) ? item.route : undefined; const priority = typeof item.priority === 'number' && Number.isFinite(item.priority) && item.priority >= 0 && item.priority <= 2 ? item.priority : undefined; const confidence = typeof item.confidence === 'number' && Number.isFinite(item.confidence) && item.confidence >= 0 && item.confidence <= 1 ? item.confidence : undefined; const selectedProbability = typeof item.selectedProbability === 'number' && Number.isFinite(item.selectedProbability) && item.selectedProbability >= 0 && item.selectedProbability <= 1 ? item.selectedProbability : undefined; const error = typeof item.error === 'string' ? item.error : undefined; if ((!route || priority === undefined) && !error) return undefined; items.push({ id: item.id, route, priority, selectedProbability, confidence, error }) }
+  return { items, elapsedMs: typeof root.elapsedMs === 'number' && Number.isFinite(root.elapsedMs) ? root.elapsedMs : undefined, error: typeof root.error === 'string' ? root.error : undefined }
+}
+const contexts: Record<string, string[]> = { support: ['顧客規模は未記載です', '締切は今週です'], sales: ['決裁者も確認予定です', '比較検討中です'], review: ['リリース候補です', '設計メモがあります'], incident: ['影響範囲を調査中です', '5分間継続しています'], documents: ['PDFで届いています', '期限が記載されています'], excuse: ['証人は猫です', '時計は見ていません'], cat: ['朝食前の出来事です', 'その後昼寝しました'], meeting: ['資料はありません', '結論は急ぎません'], loot: ['持ち主は不明です', '呪いは未確認です'], fridge: ['今夜の料理候補です', '洗い物は少なめ希望です'] }
+const expand = (items: BatchItem[], count: number, scenarioId: string) => Array.from({ length: count }, (_, index) => { const base = items[index % items.length]; const n = Math.floor(index / items.length); return n ? { id: `${base.id}-${n + 1}`, text: `${base.text}。${contexts[scenarioId][(index + n) % contexts[scenarioId].length]}。` } : base })
+const priority = (value?: number) => value === undefined ? '要確認' : ['低', '中', '高'][Math.round(value)] ?? '要確認'
 
-export const Route = createFileRoute("/")({ component: Home });
-
-type ApiResponse = { result?: Evaluation; elapsedMs?: number; error?: string };
-class EvaluationRequestError extends Error {}
-const percent = (value: number) => Math.round(value * 100);
-const questionLabel = (
-  question: Question,
-  answer: Evaluation["answers"][string],
-) => {
-  if (question.type === "choice")
-    return answer.choice ? question.criteria[answer.choice] : "未取得";
-  if (question.type === "score") {
-    const rounded = Math.round(answer.score ?? 0);
-    return answer.score === undefined
-      ? "未取得"
-      : `${question.criteria[rounded]}（${answer.score.toFixed(2)} / ${question.criteria.length - 1}）`;
-  }
-  if (answer.noul === undefined) return "未取得";
-  const isTrue = answer.noul >= 0.5;
-  return `${isTrue ? question.criteria.true : question.criteria.false}（${percent(isTrue ? answer.noul : 1 - answer.noul)}%）`;
-};
-
-function Home() {
-  const [mode, setMode] = useState<Mode>("work");
-  const modeScenarios = useMemo(
-    () => scenarios.filter((scenario) => scenario.mode === mode),
-    [mode],
-  );
-  const [scenarioId, setScenarioId] = useState("support");
-  const scenario =
-    scenarios.find((item) => item.id === scenarioId) ?? scenarios[0];
-  const [text, setText] = useState(scenario.samples[0]);
-  const [result, setResult] = useState<Evaluation>();
-  const [elapsed, setElapsed] = useState<number>();
-  const [error, setError] = useState<string>();
-  const [loading, setLoading] = useState(false);
-  const [revealed, setRevealed] = useState(false);
-  const [photo, setPhoto] = useState(false);
-  const requestIdRef = useRef(0);
-  const abortRef = useRef<AbortController | undefined>(undefined);
-  const clearEvaluation = () => {
-    requestIdRef.current += 1;
-    abortRef.current?.abort();
-    abortRef.current = undefined;
-    setLoading(false);
-    setResult(undefined);
-    setElapsed(undefined);
-    setError(undefined);
-    setRevealed(false);
-  };
-  const select = (next: Scenario) => {
-    clearEvaluation();
-    setScenarioId(next.id);
-    setText(next.samples[0]);
-  };
-  const changeMode = (next: string) => {
-    const nextMode = next as Mode;
-    setMode(nextMode);
-    const nextScenario = scenarios.find((item) => item.mode === nextMode);
-    if (nextScenario) select(nextScenario);
-  };
-  const run = async () => {
-    abortRef.current?.abort();
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setLoading(true);
-    setError(undefined);
-    setResult(undefined);
-    setRevealed(false);
-    try {
-      const response = await fetch("/api/evaluate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ scenarioId: scenario.id, text }),
-        signal: controller.signal,
-      });
-      const isJson = response.headers
-        .get("content-type")
-        ?.toLowerCase()
-        .includes("application/json");
-      let data: ApiResponse | undefined;
-      if (isJson) {
-        try {
-          data = (await response.json()) as ApiResponse;
-        } catch {
-          data = undefined;
-        }
-      }
-      if (requestId !== requestIdRef.current) return;
-      const evaluation = data?.result;
-      if (!response.ok || !evaluation)
-        throw new EvaluationRequestError(
-          data?.error ??
-            "評価サービスに一時的な問題が発生しました。少ししてから再試行してください。",
-        );
-      setResult(evaluation);
-      setElapsed(data?.elapsedMs);
-    } catch (cause) {
-      if (requestId !== requestIdRef.current || controller.signal.aborted)
-        return;
-      setError(
-        cause instanceof EvaluationRequestError
-          ? cause.message
-          : "通信または評価サービスに問題が発生しました。少ししてから再試行してください。",
-      );
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-        abortRef.current = undefined;
-      }
+function Dashboard() {
+  const [mode, setMode] = useState<'work' | 'fun'>('work'); const visible = useMemo(() => batchScenarios.filter((item) => item.mode === mode), [mode])
+  const [scenarioId, setScenarioId] = useState('support'); const scenario = batchScenarioById(scenarioId) ?? batchScenarios[0]
+  const [count, setCount] = useState('20'); const items = useMemo(() => expand(scenario.samples, Number(count), scenario.id), [scenario, count])
+  const [results, setResults] = useState<Record<string, BatchItemResult>>({}); const [running, setRunning] = useState(false); const [stopped, setStopped] = useState(false); const [error, setError] = useState<string>(); const [elapsed, setElapsed] = useState(0); const [lastBatch, setLastBatch] = useState<number>(); const [photo, setPhoto] = useState(false); const [selected, setSelected] = useState<BatchItem>()
+  const controllerRef = useRef<AbortController | undefined>(undefined); const generation = useRef(0); const batchStarted = useRef<number | undefined>(undefined); const [clock, setClock] = useState(0)
+  const reset = () => { generation.current += 1; controllerRef.current?.abort(); controllerRef.current = undefined; batchStarted.current = undefined; setRunning(false); setStopped(false); setResults({}); setError(undefined); setElapsed(0); setLastBatch(undefined) }
+  useEffect(() => () => { generation.current += 1; controllerRef.current?.abort() }, [])
+  useEffect(() => { if (!running) return; const timer = setInterval(() => setClock(performance.now()), 100); return () => clearInterval(timer) }, [running])
+  const execute = async () => {
+    const run = ++generation.current; const controller = new AbortController(); controllerRef.current = controller; setRunning(true); setStopped(false); setError(undefined)
+    const pending = items.filter((item) => !results[item.id] || results[item.id].error)
+    for (let start = 0; start < pending.length; start += 10) {
+      if (run !== generation.current || controller.signal.aborted) break
+      const group = pending.slice(start, start + 10); const began = performance.now(); batchStarted.current = began
+      try {
+        const response = await fetch('/api/batch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scenarioId: scenario.id, items: group }), signal: controller.signal })
+        const raw = response.headers.get('content-type')?.includes('application/json') ? await response.json() as unknown : undefined
+        const data = batchResponse(raw, group, scenario.lanes); const rawRecord = record(raw); const serverError = typeof rawRecord?.error === 'string' ? rawRecord.error : undefined
+        if (run !== generation.current) break
+        const duration = performance.now() - began; setElapsed((value) => value + duration); setLastBatch(duration); batchStarted.current = undefined
+        if (!response.ok || !data?.items) { setError(serverError ?? data?.error ?? '通信または評価サービスに問題が発生しました。'); setStopped(true); break }
+        setResults((previous) => ({ ...previous, ...Object.fromEntries(data.items!.map((item) => [item.id, item])) }))
+      } catch { if (run !== generation.current || controller.signal.aborted) break; const duration = performance.now() - began; setElapsed((value) => value + duration); setLastBatch(duration); batchStarted.current = undefined; setError('通信または評価サービスに問題が発生しました。'); setStopped(true); break }
     }
-  };
-  const accent = mode === "fun" ? "fun-accent" : "";
-  return (
-    <main className={`jev-shell ${photo ? "shooting" : ""}`}>
-      <Container size="xl">
-        <nav className="jev-nav">
-          <Group justify="space-between">
-            <Text className="jev-mark">Jev 実験室</Text>
-            <Badge
-              variant="outline"
-              color={mode === "fun" ? "orange" : "indigo"}
-              tt="none"
-            >
-              Cloudflare Workers · Vercel AI Gateway
-            </Badge>
-          </Group>
-        </nav>
-        <section className="jev-hero">
-          <Text className={`jev-kicker ${accent}`}>JUDGMENT, MADE VISIBLE</Text>
-          <h1 className="jev-title">
-            判断を、
-            <br />
-            少し軽く。
-          </h1>
-          <Text className="jev-subtitle">
-            仕事の小さな迷いも、どうでもいい議題も。Jev
-            が固定したものさしで、ひとつずつ評価します。
-          </Text>
-        </section>
-        <SegmentedControl
-          className="mode-control"
-          fullWidth
-          value={mode}
-          onChange={changeMode}
-          data={[
-            { label: "実務の実験", value: "work" },
-            { label: "無駄遣いの実験", value: "fun" },
-          ]}
-          color={mode === "fun" ? "orange" : "indigo"}
-        />
-        <section className="scenario-list" aria-label="企画を選ぶ">
-          {modeScenarios.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`scenario-button ${item.mode === "fun" ? "fun" : ""} ${item.id === scenario.id ? "selected" : ""}`}
-              onClick={() => select(item)}
-            >
-              <span className="scenario-number">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className="scenario-name">{item.title}</span>
-            </button>
-          ))}
-        </section>
-        <section className="workspace">
-          <section className="panel">
-            <Stack gap="md">
-              <div>
-                <Text className={`panel-label ${accent}`}>
-                  INPUT / {scenario.id.toUpperCase()}
-                </Text>
-                <Title order={2} mt={7}>
-                  {scenario.title}
-                </Title>
-                <Text c="dimmed" mt={6}>
-                  {scenario.description}
-                </Text>
-              </div>
-              <div>
-                <Text size="sm" fw={700} mb={8}>
-                  サンプルを入れる
-                </Text>
-                <div className="sample-buttons">
-                  {scenario.samples.map((sample, index) => (
-                    <Button
-                      key={sample}
-                      variant="default"
-                      size="xs"
-                      onClick={() => {
-                        clearEvaluation();
-                        setText(sample);
-                      }}
-                    >
-                      例 {index + 1}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <Textarea
-                label={scenario.inputLabel}
-                value={text}
-                onChange={(event) => {
-                  clearEvaluation();
-                  setText(event.currentTarget.value);
-                }}
-                minRows={8}
-                maxLength={4000}
-                autosize
-              />
-              <Group justify="space-between">
-                <Text size="xs" c="dimmed">
-                  {text.length} / 4000
-                </Text>
-                <Button
-                  color={mode === "fun" ? "orange" : "indigo"}
-                  onClick={run}
-                  loading={loading}
-                  disabled={!text.trim()}
-                >
-                  Jev に評価してもらう
-                </Button>
-              </Group>
-              {error && (
-                <Alert color="red" title="評価できませんでした">
-                  {error}
-                  <Button
-                    variant="subtle"
-                    color="red"
-                    size="compact-sm"
-                    onClick={run}
-                  >
-                    再試行
-                  </Button>
-                </Alert>
-              )}
-            </Stack>
-          </section>
-          <section className={`panel ${photo ? "photo" : ""}`}>
-            <Stack gap="md">
-              <Group justify="space-between">
-                <div>
-                  <Text className={`panel-label ${accent}`}>RESULT</Text>
-                  <Title order={2} mt={7}>
-                    評価結果
-                  </Title>
-                </div>
-                <Switch
-                  label="撮影モード"
-                  checked={photo}
-                  onChange={(event) => setPhoto(event.currentTarget.checked)}
-                  color={mode === "fun" ? "orange" : "indigo"}
-                />
-              </Group>
-              {!result && (
-                <div className="result-empty">
-                  入力を整えたら、評価ボタンを押してください。
-                  <br />
-                  結果はクリックしたときだけ取得します。
-                </div>
-              )}
-              {result && !revealed && (
-                <div className="reveal">
-                  <Stack align="center">
-                    <Text fw={700}>結果を準備しました</Text>
-                    <Button
-                      color={mode === "fun" ? "orange" : "indigo"}
-                      onClick={() => setRevealed(true)}
-                    >
-                      発表する
-                    </Button>
-                    <Text size="xs" c="dimmed">
-                      撮影前なら、ここで少し間をつくれます。
-                    </Text>
-                  </Stack>
-                </div>
-              )}
-              {result && revealed && (
-                <>
-                  <Group justify="space-between">
-                    <Button
-                      variant="subtle"
-                      color="gray"
-                      size="compact-sm"
-                      onClick={() => setRevealed(false)}
-                    >
-                      結果を隠す
-                    </Button>
-                    {!photo && (
-                      <Text size="xs" c="dimmed">
-                        {result.model ?? "Jev"} ·{" "}
-                        {elapsed ? `${(elapsed / 1000).toFixed(1)}秒` : ""}
-                      </Text>
-                    )}
-                  </Group>
-                  {scenario.questions.map((question) => {
-                    const answer = result.answers[question.key];
-                    const selectedProbability =
-                      question.type === "choice" && answer?.choice
-                        ? answer.probabilities?.[answer.choice]
-                        : undefined;
-                    return (
-                      <div className="answer-card" key={question.key}>
-                        <Text size="sm" fw={700} c="dimmed">
-                          {question.label}
-                        </Text>
-                        <div className="answer-value">
-                          {answer ? questionLabel(question, answer) : "未取得"}
-                        </div>
-                        {answer?.confidence !== undefined && !photo && (
-                          <Text className="metric">
-                            モデルの確信度: {percent(answer.confidence)}%
-                          </Text>
-                        )}
-                        {question.type === "choice" &&
-                          selectedProbability !== undefined &&
-                          !photo && (
-                            <>
-                              <Progress
-                                value={percent(selectedProbability)}
-                                color={mode === "fun" ? "orange" : "indigo"}
-                                mt="xs"
-                              />
-                              <Text className="metric">
-                                選択肢の該当確率: {" "}
-                                {answer.choice
-                                  ? `${question.criteria[answer.choice]} ${percent(selectedProbability)}%`
-                                  : "未取得"}
-                              </Text>
-                              <Text className="metric">
-                                分布: {Object.entries(answer.probabilities ?? {})
-                                  .filter(([key]) => question.criteria[key])
-                                  .map(
-                                    ([key, value]) =>
-                                      `${question.criteria[key]} ${percent(value)}%`,
-                                  )
-                                  .join(" / ") || "未取得"}
-                              </Text>
-                            </>
-                          )}
-                        {question.type === "score" &&
-                          answer?.score !== undefined &&
-                          !photo && (
-                            <Text className="metric">
-                              換算スコア:{" "}
-                              {Math.round(
-                                (answer.score /
-                                  Math.max(question.criteria.length - 1, 1)) *
-                                  100,
-                              )}{" "}
-                              / 100
-                            </Text>
-                          )}
-                        {question.type === "noul" &&
-                          answer?.noul !== undefined &&
-                          !photo && (
-                        <Text className="metric">
-                          該当確率（「{question.criteria.true}」）: {percent(answer.noul)}%
-                        </Text>
-                          )}
-                      </div>
-                    );
-                  })}
-                  {!photo && result.usage && (
-                    <Text size="xs" c="dimmed">
-                      tokens: {result.usage.input_tokens ?? "—"} in /{" "}
-                      {result.usage.output_tokens ?? "—"} out
-                    </Text>
-                  )}
-                </>
-              )}
-            </Stack>
-          </section>
-        </section>
-        <Text size="xs" c="dimmed" pb="xl">
-          Jev の出力は判断の補助です。重要な決定は状況を確認して行ってください。
-        </Text>
-      </Container>
-    </main>
-  );
+    if (run === generation.current) { setRunning(false); controllerRef.current = undefined }
+  }
+  const completed = items.filter((item) => results[item.id] && !results[item.id].error).length; const displayedElapsed = elapsed + (running && batchStarted.current ? Math.max(0, clock - batchStarted.current) : 0); const rate = displayedElapsed ? (completed / (displayedElapsed / 1000)).toFixed(1) : '—'; const review = items.filter((item) => { const result = results[item.id]; const certainty = result?.selectedProbability ?? result?.confidence; return result && (!result.route || result.priority === undefined || result.error || certainty === undefined || certainty < .8) })
+  return <main className={`jev-shell ${photo ? 'shooting' : ''}`}><Container size="xl"><nav className="jev-nav"><Group justify="space-between"><Text className="jev-mark">Jev 実験室</Text><Badge variant="outline" color="orange">Workers · Vercel AI Gateway</Badge></Group></nav><section className="batch-hero"><Text className="jev-kicker">HIGH-THROUGHPUT JUDGMENT</Text><h1 className="jev-title">大量の判断を、<br />一気に。</h1><Text className="jev-subtitle">10件ずつ一括判定。通信込みの実測で、仕分けの流れを見える化します。</Text></section>
+    <Group justify="space-between" mb="md"><SegmentedControl value={mode} disabled={running} onChange={(value) => { reset(); setMode(value as 'work' | 'fun'); setScenarioId(batchScenarios.find((item) => item.mode === value)?.id ?? scenarioId) }} data={[{ label: '実務', value: 'work' }, { label: '無駄遣い', value: 'fun' }]} color={mode === 'fun' ? 'orange' : 'indigo'} /><Group><Select value={count} disabled={running} onChange={(value) => { reset(); if (value) setCount(value) }} data={['10', '20', '50', '100']} w={100} /><Switch label="撮影" checked={photo} onChange={(event) => setPhoto(event.currentTarget.checked)} color="orange" /></Group></Group>
+    <section className="scenario-list">{visible.map((item, index) => <button key={item.id} disabled={running} className={`scenario-button ${item.id === scenario.id ? 'selected' : ''} ${item.mode === 'fun' ? 'fun' : ''}`} onClick={() => { reset(); setScenarioId(item.id) }}><span className="scenario-number">{String(index + 1).padStart(2, '0')}</span><span className="scenario-name">{item.title}</span></button>)}</section>
+    <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" my="lg" className="metrics"><div><Text>完了件数</Text><strong>{completed}<small> / {items.length}</small></strong></div><div><Text>実測経過</Text><strong>{(displayedElapsed / 1000).toFixed(1)}<small> 秒</small></strong></div><div><Text>件毎秒</Text><strong>{rate}</strong></div></SimpleGrid>
+    <Group mb="md"><Button onClick={execute} loading={running} disabled={running || completed === items.length}>{completed ? '残りを再開' : '仕分け開始'}</Button><Button variant="default" disabled={!running} onClick={() => { generation.current += 1; if (batchStarted.current !== undefined) { const duration = performance.now() - batchStarted.current; setElapsed((value) => value + duration); setLastBatch(duration); batchStarted.current = undefined } controllerRef.current?.abort(); setRunning(false); setStopped(true) }}>停止</Button><Button variant="subtle" color="gray" disabled={running} onClick={reset}>リセット</Button>{lastBatch && <Text size="sm" c="dimmed">直近バッチ {lastBatch.toFixed(0)}ms · 通信込み実測</Text>}</Group>
+    {error && <Alert color="red" title="仕分けを停止しました">{error}</Alert>}{stopped && !error && <Alert color="yellow">停止中です。残りを再開できます。</Alert>}
+    <SimpleGrid cols={{ base: 2, md: 5 }} spacing="xs" className="lane-summary" mb="md">{Object.entries(scenario.lanes).map(([key, label]) => <div key={key}><Text size="xs">{label}</Text><strong>{items.filter((item) => { const result = results[item.id]; return result?.route === key && !review.some((candidate) => candidate.id === item.id) }).length}</strong></div>)}<div><Text size="xs">要確認</Text><strong>{review.length}</strong></div></SimpleGrid>
+    <section className="queue"><Group justify="space-between"><Title order={2}>受信トレイ</Title><Text c="dimmed">架空デモデータ {items.length}件</Text></Group><div className="item-grid">{items.map((item) => { const result = results[item.id]; const certainty = result?.selectedProbability ?? result?.confidence; return <article className={`item-card ${result ? 'done' : ''}`} key={item.id} role="button" tabIndex={0} onClick={() => setSelected(item)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(item) } }}><Text size="xs" c="dimmed">{item.id}</Text><Text lineClamp={3}>{item.text}</Text>{result && <Badge mt="xs" color={result.error || certainty === undefined || certainty < .8 ? 'yellow' : 'indigo'}>{result.error ? '要確認' : `${result.route ? scenario.lanes[result.route] : '要確認'} · ${priority(result.priority)}`}</Badge>}</article> })}</div></section>
+    <section className="review-lane"><Text fw={700}>要確認 {review.length}件</Text><Text size="sm">分類確率80%未満・欠落・評価エラーをここに残します。無料枠の429では自動停止します。</Text></section>
+    <Drawer opened={Boolean(selected)} onClose={() => setSelected(undefined)} title="項目の詳細" position="right"><Stack>{selected && <><Text size="xs" c="dimmed">{selected.id}</Text><Text>{selected.text}</Text><Text fw={700}>{results[selected.id]?.route ? scenario.lanes[results[selected.id].route!] : '要確認'} · 優先度 {priority(results[selected.id]?.priority)}</Text><Text>分類確率: {results[selected.id]?.selectedProbability === undefined ? '未取得' : `${Math.round(results[selected.id].selectedProbability! * 100)}%`}</Text><Text>モデル信頼度: {results[selected.id]?.confidence === undefined ? '未取得' : `${Math.round(results[selected.id].confidence! * 100)}%`}</Text><Text size="sm" c="dimmed">{results[selected.id]?.error ?? '要確認判定は分類確率を優先し、欠落時はモデル信頼度を使います。'}</Text></>}</Stack></Drawer>
+  </Container></main>
 }

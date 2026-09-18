@@ -31,4 +31,23 @@ body { margin: 0; background: #f7f3ea; }
 .shooting .jev-title { font-size: clamp(36px, 4vw, 52px); margin: 5px 0; }
 .shooting .jev-subtitle, .shooting .jev-kicker { display: none; }
 .shooting .scenario-button { min-height: 66px; padding-block: 9px; }
+.batch-hero { padding: 26px 0 14px; }
+.metrics > div { border-top: 2px solid #17223b; padding: 10px 0; }
+.metrics strong { display: block; font-family: Georgia, serif; font-size: clamp(34px, 5vw, 58px); line-height: 1; }
+.metrics small { font: 14px 'Inter', sans-serif; color: #667085; }
+.queue, .lanes { margin: 22px 0; border-top: 1px solid #d9d2c3; padding-top: 16px; }
+.item-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.item-card { min-height: 112px; background: rgba(255,255,255,.5); border: 1px solid #d9d2c3; padding: 10px; font-size: 13px; }
+.item-card { cursor: pointer; }
+.item-card.done { border-color: #8c86c9; background: #f0effa; }
+.lane { min-height: 104px; background: #17223b; color: #f7f3ea; padding: 14px; }
+.lane-count { font: 42px Georgia, serif; }
+.review-lane { margin-top: 12px; padding: 14px; border: 1px dashed #c45b13; background: #fff0dd; }
+.lane-summary > div { border: 1px solid #d9d2c3; background: #fffdf8; padding: 9px; }
+.lane-summary strong { font: 30px Georgia, serif; }
+.shooting .item-grid { max-height: 48vh; overflow: auto; }
+.shooting .batch-hero { padding: 8px 0; }
+.shooting .batch-hero .jev-subtitle, .shooting .batch-hero .jev-kicker { display: none; }
+@media (max-width: 900px) { .item-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .item-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .jev-hero { padding-top: 35px; } .scenario-list { grid-template-columns: repeat(2, 1fr); } .workspace { grid-template-columns: 1fr; } .scenario-button { min-height: 92px; } }

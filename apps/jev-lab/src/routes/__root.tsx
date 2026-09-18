@@ -21,7 +21,11 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Jev 実験室 — 判断を、少し軽く。',
+        title: 'Jev 実験室 — 大量の判断を、一気に。',
+      },
+      {
+        name: 'description',
+        content: 'Jevで架空の受信トレイを10件ずつ高速に仕分けるデモ。',
       },
     ],
   }),
