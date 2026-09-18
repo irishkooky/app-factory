@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiEvaluateRouteImport } from './routes/api.evaluate'
+import { Route as ApiComedyRouteImport } from './routes/api.comedy'
 import { Route as ApiBatchRouteImport } from './routes/api.batch'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const ApiEvaluateRoute = ApiEvaluateRouteImport.update({
   path: '/api/evaluate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiComedyRoute = ApiComedyRouteImport.update({
+  id: '/api/comedy',
+  path: '/api/comedy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBatchRoute = ApiBatchRouteImport.update({
   id: '/api/batch',
   path: '/api/batch',
@@ -32,30 +38,34 @@ const ApiBatchRoute = ApiBatchRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/batch': typeof ApiBatchRoute
+  '/api/comedy': typeof ApiComedyRoute
   '/api/evaluate': typeof ApiEvaluateRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/batch': typeof ApiBatchRoute
+  '/api/comedy': typeof ApiComedyRoute
   '/api/evaluate': typeof ApiEvaluateRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/batch': typeof ApiBatchRoute
+  '/api/comedy': typeof ApiComedyRoute
   '/api/evaluate': typeof ApiEvaluateRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/batch' | '/api/evaluate'
+  fullPaths: '/' | '/api/batch' | '/api/comedy' | '/api/evaluate'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/batch' | '/api/evaluate'
-  id: '__root__' | '/' | '/api/batch' | '/api/evaluate'
+  to: '/' | '/api/batch' | '/api/comedy' | '/api/evaluate'
+  id: '__root__' | '/' | '/api/batch' | '/api/comedy' | '/api/evaluate'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiBatchRoute: typeof ApiBatchRoute
+  ApiComedyRoute: typeof ApiComedyRoute
   ApiEvaluateRoute: typeof ApiEvaluateRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEvaluateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/comedy': {
+      id: '/api/comedy'
+      path: '/api/comedy'
+      fullPath: '/api/comedy'
+      preLoaderRoute: typeof ApiComedyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/batch': {
       id: '/api/batch'
       path: '/api/batch'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiBatchRoute: ApiBatchRoute,
+  ApiComedyRoute: ApiComedyRoute,
   ApiEvaluateRoute: ApiEvaluateRoute,
 }
 export const routeTree = rootRouteImport

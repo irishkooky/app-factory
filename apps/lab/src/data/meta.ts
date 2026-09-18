@@ -34,10 +34,10 @@ export const META: Record<string, AppMeta> = {
     hidden: true,
   },
   'jev-lab': {
-    title: 'Jev 実験室',
-    description: 'Jevが10件ずつの文章を高速仕分け。実務と無駄遣いの受信トレイを一気に判断する。',
+    title: 'Jev 日常あるある劇場',
+    description: 'お先にどうぞ地獄と帰れない飲み会。気まずい日常をJevに任せて観察する、コミカルなAI劇場。',
     category: 'demo',
-    tags: ['AI', 'Jev', '判断', 'Cloudflare'],
+    tags: ['AI', 'Jev', 'あるある', 'シミュレーション'],
   },
   'ai-era-skill-quiz': {
     title: 'AI時代にはもう要らない？エンジニアスキルクイズ',

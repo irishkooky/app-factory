@@ -59,3 +59,91 @@ assert.equal(mapped[0].route, 'billing')
 assert.equal(mapped[0].selectedProbability, .9)
 assert.equal(mapped[0].confidence, .8)
 assert.equal(mapped[1].error, '評価結果を確認できませんでした。')
+
+import {
+  applyDecisions,
+  createHallway,
+  createParty,
+  getActors,
+  parseDecisions,
+} from './comedy.ts'
+import { mapComedyResult, validateComedyRequest } from '../server/comedy.ts'
+
+const decide = (state: ReturnType<typeof createHallway> | ReturnType<typeof createParty>, action: string) =>
+  getActors(state).map((actor) => ({ actorId: actor.id, action }))
+
+const hallway = createHallway()
+const afterFirstGo = applyDecisions(hallway, decide(hallway, 'go')) as ReturnType<typeof createHallway>
+assert.equal(afterFirstGo.pairs[0].actors[0].x, 40)
+assert.equal(afterFirstGo.pairs[0].actors[1].x, 60)
+assert.equal(hallway.pairs[0].actors[0].x, 20)
+const afterCollision = applyDecisions(afterFirstGo, decide(afterFirstGo, 'go')) as ReturnType<typeof createHallway>
+assert.equal(afterCollision.pairs[0].actors[0].x, 40)
+assert.equal(afterCollision.pairs[0].actors[1].x, 60)
+
+let separated = createHallway()
+separated = applyDecisions(separated, getActors(separated).map((actor) => ({
+  actorId: actor.id,
+  action: actor.id.endsWith('left') ? 'wall' : 'window',
+}))) as ReturnType<typeof createHallway>
+for (let index = 0; index < 4; index += 1) {
+  separated = applyDecisions(separated, decide(separated, 'go')) as ReturnType<typeof createHallway>
+}
+assert.equal(separated.finished, true)
+assert.equal(separated.pairs.flatMap((pair) => pair.actors).every((actor) => actor.passed), true)
+
+const onePassed = createHallway()
+onePassed.pairs[0].actors[0].passed = true
+onePassed.pairs[0].actors[0].x = 100
+const remainingBefore = onePassed.pairs[0].actors[1].x
+const afterOnePassed = applyDecisions(onePassed, decide(onePassed, 'go')) as ReturnType<typeof createHallway>
+assert.equal(afterOnePassed.pairs[0].actors[1].x, remainingBefore - 20)
+assert.equal(afterOnePassed.pairs[0].actors[0].bubble, onePassed.pairs[0].actors[0].bubble)
+
+let stalemate = createHallway()
+for (let index = 0; index < 12; index += 1) {
+  stalemate = applyDecisions(stalemate, decide(stalemate, 'wait')) as ReturnType<typeof createHallway>
+}
+assert.equal(stalemate.finished, true)
+assert.equal(stalemate.ending, '廊下は今日も、譲り合いのまま。')
+assert.equal(parseDecisions([{ actorId: 'p1-left', action: 'leave' }], createHallway()), undefined)
+
+let party = createParty()
+const prematureLeave = applyDecisions(party, decide(party, 'leave')) as ReturnType<typeof createParty>
+assert.equal(prematureLeave.escaped, false)
+party = applyDecisions(party, decide(party, 'announce')) as ReturnType<typeof createParty>
+party = applyDecisions(party, decide(party, 'pay')) as ReturnType<typeof createParty>
+party = applyDecisions(party, decide(party, 'coat')) as ReturnType<typeof createParty>
+assert.equal(getActors(party)[0].actions.announce, undefined)
+party = applyDecisions(party, decide(party, 'leave')) as ReturnType<typeof createParty>
+assert.equal(party.escaped, true)
+
+
+assert.equal(parseDecisions([{ actorId: 'guest', action: 'announce' }], party), undefined)
+assert.equal(validateComedyRequest({ state: createParty() })?.state.kind, 'party')
+assert.equal(validateComedyRequest({ state: { ...createParty(), extra: true } }), undefined)
+const comedyResult = mapComedyResult({
+  answers: { guest: { choice: 'announce', probabilities: { announce: 0.8 } } },
+  providerMetadata: { typesafe: { confidence: { guest: 0.9 } } },
+}, createParty())
+assert.deepEqual(comedyResult, [{ actorId: 'guest', action: 'announce', probability: 0.8, confidence: 0.9 }])
+assert.equal(mapComedyResult({ answers: { guest: { choice: 'unknown' } } }, createParty()), undefined)
+
+assert.deepEqual(getActors(party), [])
+assert.equal(parseDecisions([], party), undefined)
+assert.throws(() => applyDecisions(party, []), /invalid decisions/)
+assert.deepEqual(getActors(stalemate), [])
+assert.throws(() => applyDecisions(stalemate, []), /invalid decisions/)
+
+let stalledParty = createParty()
+for (let index = 0; index < 12; index += 1) {
+  stalledParty = applyDecisions(stalledParty, decide(stalledParty, 'wait')) as ReturnType<typeof createParty>
+}
+assert.equal(stalledParty.ending, '帰るタイミング、最後まで見つからず。')
+assert.equal(stalledParty.bubble, '今じゃないか…')
+
+let announcedParty = applyDecisions(createParty(), [{ actorId: 'guest', action: 'announce' }]) as ReturnType<typeof createParty>
+for (let index = 0; index < 11; index += 1) {
+  announcedParty = applyDecisions(announcedParty, decide(announcedParty, 'wait')) as ReturnType<typeof createParty>
+}
+assert.equal(announcedParty.ending, '「そろそろ帰る」から、もう12ターン。')

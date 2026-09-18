@@ -21,11 +21,11 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Jev 実験室 — 大量の判断を、一気に。',
+        title: 'Jev 日常あるある劇場 — 判断は爆速。空気は読める？',
       },
       {
         name: 'description',
-        content: 'Jevで架空の受信トレイを10件ずつ高速に仕分けるデモ。',
+        content: 'お先にどうぞ地獄と帰れない飲み会。日常の小さな気まずさをJevに任せる、コミカルなAI実験劇場。',
       },
     ],
   }),

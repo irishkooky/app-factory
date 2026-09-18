@@ -1,60 +1,255 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Alert, Badge, Button, Container, Drawer, Group, SegmentedControl, Select, SimpleGrid, Stack, Switch, Text, Title } from '@mantine/core'
-import { batchScenarioById, batchScenarios, type BatchItem } from '../data/batch-scenarios'
-import type { BatchItemResult } from '../lib/batch'
+import { Alert, Badge, Button, Container, Group, SegmentedControl, Switch, Text } from '@mantine/core'
+import { ComedyStage } from '../components/ComedyStage'
+import {
+  applyDecisions, createHallway, createParty, getActors, parseDecisions, setPartyEvent,
+  type Decision, type GameState, type PartyEvent, type Personality,
+} from '../lib/comedy'
 import './index.css'
-export const Route = createFileRoute('/')({ component: Dashboard })
-type ApiResult = { items?: BatchItemResult[]; elapsedMs?: number; error?: string }
-const record = (value: unknown): Record<string, unknown> | undefined => typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : undefined
-const batchResponse = (value: unknown, expected: BatchItem[], lanes: Record<string, string>): ApiResult | undefined => {
-  const root = record(value); const source = root && Array.isArray(root.items) ? root.items : undefined
-  if (!root || !source || source.length !== expected.length) return undefined
-  const expectedIds = new Set(expected.map((item) => item.id)); const seen = new Set<string>(); const items: BatchItemResult[] = []
-  for (const candidate of source) { const item = record(candidate); if (!item || typeof item.id !== 'string' || !expectedIds.has(item.id) || seen.has(item.id)) return undefined; seen.add(item.id); const route = typeof item.route === 'string' && Object.hasOwn(lanes, item.route) ? item.route : undefined; const priority = typeof item.priority === 'number' && Number.isFinite(item.priority) && item.priority >= 0 && item.priority <= 2 ? item.priority : undefined; const confidence = typeof item.confidence === 'number' && Number.isFinite(item.confidence) && item.confidence >= 0 && item.confidence <= 1 ? item.confidence : undefined; const selectedProbability = typeof item.selectedProbability === 'number' && Number.isFinite(item.selectedProbability) && item.selectedProbability >= 0 && item.selectedProbability <= 1 ? item.selectedProbability : undefined; const error = typeof item.error === 'string' ? item.error : undefined; if ((!route || priority === undefined) && !error) return undefined; items.push({ id: item.id, route, priority, selectedProbability, confidence, error }) }
-  return { items, elapsedMs: typeof root.elapsedMs === 'number' && Number.isFinite(root.elapsedMs) ? root.elapsedMs : undefined, error: typeof root.error === 'string' ? root.error : undefined }
-}
-const contexts: Record<string, string[]> = { support: ['顧客規模は未記載です', '締切は今週です'], sales: ['決裁者も確認予定です', '比較検討中です'], review: ['リリース候補です', '設計メモがあります'], incident: ['影響範囲を調査中です', '5分間継続しています'], documents: ['PDFで届いています', '期限が記載されています'], excuse: ['証人は猫です', '時計は見ていません'], cat: ['朝食前の出来事です', 'その後昼寝しました'], meeting: ['資料はありません', '結論は急ぎません'], loot: ['持ち主は不明です', '呪いは未確認です'], fridge: ['今夜の料理候補です', '洗い物は少なめ希望です'] }
-const expand = (items: BatchItem[], count: number, scenarioId: string) => Array.from({ length: count }, (_, index) => { const base = items[index % items.length]; const n = Math.floor(index / items.length); return n ? { id: `${base.id}-${n + 1}`, text: `${base.text}。${contexts[scenarioId][(index + n) % contexts[scenarioId].length]}。` } : base })
-const priority = (value?: number) => value === undefined ? '要確認' : ['低', '中', '高'][Math.round(value)] ?? '要確認'
 
-function Dashboard() {
-  const [mode, setMode] = useState<'work' | 'fun'>('work'); const visible = useMemo(() => batchScenarios.filter((item) => item.mode === mode), [mode])
-  const [scenarioId, setScenarioId] = useState('support'); const scenario = batchScenarioById(scenarioId) ?? batchScenarios[0]
-  const [count, setCount] = useState('20'); const items = useMemo(() => expand(scenario.samples, Number(count), scenario.id), [scenario, count])
-  const [results, setResults] = useState<Record<string, BatchItemResult>>({}); const [running, setRunning] = useState(false); const [stopped, setStopped] = useState(false); const [error, setError] = useState<string>(); const [elapsed, setElapsed] = useState(0); const [lastBatch, setLastBatch] = useState<number>(); const [photo, setPhoto] = useState(false); const [selected, setSelected] = useState<BatchItem>()
-  const controllerRef = useRef<AbortController | undefined>(undefined); const generation = useRef(0); const batchStarted = useRef<number | undefined>(undefined); const [clock, setClock] = useState(0)
-  const reset = () => { generation.current += 1; controllerRef.current?.abort(); controllerRef.current = undefined; batchStarted.current = undefined; setRunning(false); setStopped(false); setResults({}); setError(undefined); setElapsed(0); setLastBatch(undefined) }
-  useEffect(() => () => { generation.current += 1; controllerRef.current?.abort() }, [])
-  useEffect(() => { if (!running) return; const timer = setInterval(() => setClock(performance.now()), 100); return () => clearInterval(timer) }, [running])
-  const execute = async () => {
-    const run = ++generation.current; const controller = new AbortController(); controllerRef.current = controller; setRunning(true); setStopped(false); setError(undefined)
-    const pending = items.filter((item) => !results[item.id] || results[item.id].error)
-    for (let start = 0; start < pending.length; start += 10) {
-      if (run !== generation.current || controller.signal.aborted) break
-      const group = pending.slice(start, start + 10); const began = performance.now(); batchStarted.current = began
-      try {
-        const response = await fetch('/api/batch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ scenarioId: scenario.id, items: group }), signal: controller.signal })
-        const raw = response.headers.get('content-type')?.includes('application/json') ? await response.json() as unknown : undefined
-        const data = batchResponse(raw, group, scenario.lanes); const rawRecord = record(raw); const serverError = typeof rawRecord?.error === 'string' ? rawRecord.error : undefined
-        if (run !== generation.current) break
-        const duration = performance.now() - began; setElapsed((value) => value + duration); setLastBatch(duration); batchStarted.current = undefined
-        if (!response.ok || !data?.items) { setError(serverError ?? data?.error ?? '通信または評価サービスに問題が発生しました。'); setStopped(true); break }
-        setResults((previous) => ({ ...previous, ...Object.fromEntries(data.items!.map((item) => [item.id, item])) }))
-      } catch { if (run !== generation.current || controller.signal.aborted) break; const duration = performance.now() - began; setElapsed((value) => value + duration); setLastBatch(duration); batchStarted.current = undefined; setError('通信または評価サービスに問題が発生しました。'); setStopped(true); break }
-    }
-    if (run === generation.current) { setRunning(false); controllerRef.current = undefined }
+export const Route = createFileRoute('/')({ component: ComedyTheater })
+const actionLabels: Record<string, string> = {
+  go: '進む', wait: '待つ', wall: '壁側へ', window: '窓側へ',
+  announce: '帰ると宣言', pay: 'お会計', coat: '上着を取る', leave: '帰る',
+}
+type Round = { decisions: Decision[]; names: Record<string, string>; source: 'Jev' | '手動' }
+type ActiveCall = { started: number; settled: boolean }
+const object = (value: unknown): Record<string, unknown> | undefined => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown> : undefined
+)
+const sceneCopy = {
+  hallway: { number: '01', title: 'お先にどうぞ地獄', subtitle: 'その一歩が、なぜか揃う。', eyebrow: '気遣い、衝突中。' },
+  party: { number: '02', title: '帰れない飲み会', subtitle: '「そろそろ」が、終わらない。', eyebrow: '帰宅までが、飲み会です。' },
+}
+
+function ComedyTheater() {
+  const [state, setState] = useState<GameState>(() => createHallway())
+  const stateRef = useRef(state)
+  const [busy, setBusy] = useState(false)
+  const [continuous, setContinuous] = useState(false)
+  const [paused, setPaused] = useState(false)
+  const [error, setError] = useState<string>()
+  const [capture, setCapture] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+  const [aiCount, setAiCount] = useState(0)
+  const [manualCount, setManualCount] = useState(0)
+  const [round, setRound] = useState<Round>()
+  const generation = useRef(0)
+  const controller = useRef<AbortController | undefined>(undefined)
+  const activeCall = useRef<ActiveCall | undefined>(undefined)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const wake = useRef<(() => void) | undefined>(undefined)
+  const mounted = useRef(true)
+  const busyRef = useRef(false)
+
+  const update = (next: GameState) => { stateRef.current = next; setState(next) }
+  const settle = (call?: ActiveCall) => {
+    if (!call || call.settled) return
+    call.settled = true
+    const duration = performance.now() - call.started
+    if (mounted.current) setElapsed((total) => total + duration)
+    if (activeCall.current === call) activeCall.current = undefined
   }
-  const completed = items.filter((item) => results[item.id] && !results[item.id].error).length; const displayedElapsed = elapsed + (running && batchStarted.current ? Math.max(0, clock - batchStarted.current) : 0); const rate = displayedElapsed ? (completed / (displayedElapsed / 1000)).toFixed(1) : '—'; const review = items.filter((item) => { const result = results[item.id]; const certainty = result?.selectedProbability ?? result?.confidence; return result && (!result.route || result.priority === undefined || result.error || certainty === undefined || certainty < .8) })
-  return <main className={`jev-shell ${photo ? 'shooting' : ''}`}><Container size="xl"><nav className="jev-nav"><Group justify="space-between"><Text className="jev-mark">Jev 実験室</Text><Badge variant="outline" color="orange">Workers · Vercel AI Gateway</Badge></Group></nav><section className="batch-hero"><Text className="jev-kicker">HIGH-THROUGHPUT JUDGMENT</Text><h1 className="jev-title">大量の判断を、<br />一気に。</h1><Text className="jev-subtitle">10件ずつ一括判定。通信込みの実測で、仕分けの流れを見える化します。</Text></section>
-    <Group justify="space-between" mb="md"><SegmentedControl value={mode} disabled={running} onChange={(value) => { reset(); setMode(value as 'work' | 'fun'); setScenarioId(batchScenarios.find((item) => item.mode === value)?.id ?? scenarioId) }} data={[{ label: '実務', value: 'work' }, { label: '無駄遣い', value: 'fun' }]} color={mode === 'fun' ? 'orange' : 'indigo'} /><Group><Select value={count} disabled={running} onChange={(value) => { reset(); if (value) setCount(value) }} data={['10', '20', '50', '100']} w={100} /><Switch label="撮影" checked={photo} onChange={(event) => setPhoto(event.currentTarget.checked)} color="orange" /></Group></Group>
-    <section className="scenario-list">{visible.map((item, index) => <button key={item.id} disabled={running} className={`scenario-button ${item.id === scenario.id ? 'selected' : ''} ${item.mode === 'fun' ? 'fun' : ''}`} onClick={() => { reset(); setScenarioId(item.id) }}><span className="scenario-number">{String(index + 1).padStart(2, '0')}</span><span className="scenario-name">{item.title}</span></button>)}</section>
-    <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md" my="lg" className="metrics"><div><Text>完了件数</Text><strong>{completed}<small> / {items.length}</small></strong></div><div><Text>実測経過</Text><strong>{(displayedElapsed / 1000).toFixed(1)}<small> 秒</small></strong></div><div><Text>件毎秒</Text><strong>{rate}</strong></div></SimpleGrid>
-    <Group mb="md"><Button onClick={execute} loading={running} disabled={running || completed === items.length}>{completed ? '残りを再開' : '仕分け開始'}</Button><Button variant="default" disabled={!running} onClick={() => { generation.current += 1; if (batchStarted.current !== undefined) { const duration = performance.now() - batchStarted.current; setElapsed((value) => value + duration); setLastBatch(duration); batchStarted.current = undefined } controllerRef.current?.abort(); setRunning(false); setStopped(true) }}>停止</Button><Button variant="subtle" color="gray" disabled={running} onClick={reset}>リセット</Button>{lastBatch && <Text size="sm" c="dimmed">直近バッチ {lastBatch.toFixed(0)}ms · 通信込み実測</Text>}</Group>
-    {error && <Alert color="red" title="仕分けを停止しました">{error}</Alert>}{stopped && !error && <Alert color="yellow">停止中です。残りを再開できます。</Alert>}
-    <SimpleGrid cols={{ base: 2, md: 5 }} spacing="xs" className="lane-summary" mb="md">{Object.entries(scenario.lanes).map(([key, label]) => <div key={key}><Text size="xs">{label}</Text><strong>{items.filter((item) => { const result = results[item.id]; return result?.route === key && !review.some((candidate) => candidate.id === item.id) }).length}</strong></div>)}<div><Text size="xs">要確認</Text><strong>{review.length}</strong></div></SimpleGrid>
-    <section className="queue"><Group justify="space-between"><Title order={2}>受信トレイ</Title><Text c="dimmed">架空デモデータ {items.length}件</Text></Group><div className="item-grid">{items.map((item) => { const result = results[item.id]; const certainty = result?.selectedProbability ?? result?.confidence; return <article className={`item-card ${result ? 'done' : ''}`} key={item.id} role="button" tabIndex={0} onClick={() => setSelected(item)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(item) } }}><Text size="xs" c="dimmed">{item.id}</Text><Text lineClamp={3}>{item.text}</Text>{result && <Badge mt="xs" color={result.error || certainty === undefined || certainty < .8 ? 'yellow' : 'indigo'}>{result.error ? '要確認' : `${result.route ? scenario.lanes[result.route] : '要確認'} · ${priority(result.priority)}`}</Badge>}</article> })}</div></section>
-    <section className="review-lane"><Text fw={700}>要確認 {review.length}件</Text><Text size="sm">分類確率80%未満・欠落・評価エラーをここに残します。無料枠の429では自動停止します。</Text></section>
-    <Drawer opened={Boolean(selected)} onClose={() => setSelected(undefined)} title="項目の詳細" position="right"><Stack>{selected && <><Text size="xs" c="dimmed">{selected.id}</Text><Text>{selected.text}</Text><Text fw={700}>{results[selected.id]?.route ? scenario.lanes[results[selected.id].route!] : '要確認'} · 優先度 {priority(results[selected.id]?.priority)}</Text><Text>分類確率: {results[selected.id]?.selectedProbability === undefined ? '未取得' : `${Math.round(results[selected.id].selectedProbability! * 100)}%`}</Text><Text>モデル信頼度: {results[selected.id]?.confidence === undefined ? '未取得' : `${Math.round(results[selected.id].confidence! * 100)}%`}</Text><Text size="sm" c="dimmed">{results[selected.id]?.error ?? '要確認判定は分類確率を優先し、欠落時はモデル信頼度を使います。'}</Text></>}</Stack></Drawer>
-  </Container></main>
+  const cancel = (countTime: boolean) => {
+    generation.current += 1
+    if (countTime) settle(activeCall.current)
+    else if (activeCall.current) activeCall.current.settled = true
+    activeCall.current = undefined
+    controller.current?.abort()
+    controller.current = undefined
+    if (timer.current) clearTimeout(timer.current)
+    wake.current?.()
+    wake.current = undefined
+    busyRef.current = false
+    setBusy(false)
+    setContinuous(false)
+  }
+  const reset = (kind = stateRef.current.kind, preset?: Personality) => {
+    cancel(false)
+    update(kind === 'party' ? createParty() : createHallway(preset ?? (stateRef.current.kind === 'hallway' ? stateRef.current.preset : 'normal')))
+    setPaused(false)
+    setError(undefined)
+    setElapsed(0)
+    setAiCount(0)
+    setManualCount(0)
+    setRound(undefined)
+  }
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      generation.current += 1
+      controller.current?.abort()
+      if (timer.current) clearTimeout(timer.current)
+      wake.current?.()
+    }
+  }, [])
+
+  const execute = async (auto: boolean) => {
+    if (busyRef.current || stateRef.current.finished) return
+    busyRef.current = true
+    const run = ++generation.current
+    setBusy(true)
+    setContinuous(auto)
+    setPaused(false)
+    setError(undefined)
+    try {
+      do {
+        if (run !== generation.current) break
+        const snapshot = stateRef.current
+        if (snapshot.finished) break
+        const abort = new AbortController()
+        controller.current = abort
+        const call: ActiveCall = { started: performance.now(), settled: false }
+        activeCall.current = call
+        try {
+          const response = await fetch('/api/comedy', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ state: snapshot }), signal: abort.signal,
+          })
+          let raw: unknown
+          if (response.headers.get('content-type')?.includes('application/json')) {
+            try { raw = await response.json() }
+            catch { throw new Error('判断を正しく受け取れませんでした。この場面からやり直せます。') }
+          }
+          if (run !== generation.current) break
+          settle(call)
+          const data = object(raw)
+          if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'うまく通信できませんでした。もう一度試せます。')
+          const decisions = parseDecisions(data?.decisions, snapshot)
+          if (!decisions) throw new Error('判断を正しく受け取れませんでした。この場面からやり直せます。')
+          const next = applyDecisions(snapshot, decisions)
+          update(next)
+          setRound({ decisions, names: Object.fromEntries(getActors(snapshot).map((actor) => [actor.id, actor.name])), source: 'Jev' })
+          setAiCount((count) => count + decisions.length)
+          controller.current = undefined
+          if (!auto || next.finished) break
+          await new Promise<void>((resolve) => {
+            wake.current = resolve
+            timer.current = setTimeout(() => { wake.current = undefined; resolve() }, 1000)
+          })
+        } catch (failure) {
+          if (run !== generation.current) break
+          settle(call)
+          setError(failure instanceof Error ? failure.message : '通信に失敗しました。もう一度試せます。')
+          setPaused(true)
+          break
+        }
+      } while (auto && run === generation.current)
+    } finally {
+      if (run === generation.current) {
+        busyRef.current = false
+        setBusy(false)
+        setContinuous(false)
+        controller.current = undefined
+      }
+    }
+  }
+
+  const manual = (action: string) => {
+    if (busyRef.current || stateRef.current.finished) return
+    const snapshot = stateRef.current
+    const actors = getActors(snapshot)
+    const decisions: Decision[] = actors.map((actor, index) => ({
+      actorId: actor.id,
+      action: (action === 'split' ? (index % 2 ? 'window' : 'wall') : action) as Decision['action'],
+    }))
+    update(applyDecisions(snapshot, decisions))
+    setRound({ decisions, names: Object.fromEntries(actors.map((actor) => [actor.id, actor.name])), source: '手動' })
+    setManualCount((count) => count + decisions.length)
+    setError(undefined)
+    setPaused(false)
+  }
+  const intervene = (event: PartyEvent) => {
+    if (busyRef.current || stateRef.current.kind !== 'party' || stateRef.current.finished) return
+    update(setPartyEvent(stateRef.current, event))
+  }
+  const copy = sceneCopy[state.kind]
+  const awkward = state.kind === 'hallway'
+    ? state.pairs.reduce((sum, pair) => sum + pair.awkward, 0) : state.awkward
+  const passed = state.kind === 'hallway' ? state.pairs.flatMap((pair) => pair.actors).filter((actor) => actor.passed).length : 0
+
+  return (
+    <main className={`comedy-app ${capture ? 'capture-mode' : ''}`}>
+      <Container size="xl">
+        <header className="theater-nav">
+          <a className="theater-brand" href="/" aria-label="Jev 日常あるある劇場 ホーム"><span className="brand-dot" />Jev <span>日常あるある劇場</span></a>
+          <Switch label="撮影モード" checked={capture} onChange={(event) => setCapture(event.currentTarget.checked)} color="dark" size="sm" />
+        </header>
+        <section className="theater-hero">
+          <div>
+            <p className="eyebrow">小さな気まずさ、大きな実験。</p>
+            <h1>判断は爆速。<span>空気は読める？</span></h1>
+            <p className="hero-description">譲りたいのに通れない。帰りたいのに帰れない。<br className="mobile-break" />そんな日常を、Jevに任せてみる。</p>
+          </div>
+          <div className="hero-stamp" aria-hidden="true">あるあるを<br /><strong>実験中。</strong><span>JEV THEATER</span></div>
+        </section>
+        <nav className="scene-tabs" aria-label="実験する場面">
+          {(['hallway', 'party'] as const).map((kind) => (
+            <button key={kind} className={`scene-tab ${state.kind === kind ? 'active' : ''}`} aria-pressed={state.kind === kind} onClick={() => { if (state.kind !== kind) reset(kind) }}>
+              <span className="scene-number">{sceneCopy[kind].number}</span>
+              <span><strong>{sceneCopy[kind].title}</strong><small>{sceneCopy[kind].subtitle}</small></span>
+              <span className="scene-arrow" aria-hidden="true">↗</span>
+            </button>
+          ))}
+        </nav>
+        <section className={`theater-frame ${state.kind}`} aria-label={copy.title}>
+          <div className="stage-heading">
+            <div><span className="on-air-dot" /><strong>{copy.eyebrow}</strong></div>
+            <span className="turn-counter">SCENE <b>{String(state.turn).padStart(2, '0')}</b><span> / 12</span></span>
+          </div>
+          <ComedyStage state={state} pending={busy} />
+          <div className="stage-caption" aria-live="polite" aria-atomic="true">
+            <span className="caption-label">ただいまの空気</span>
+            <strong>{state.finished ? state.ending : state.kind === 'party' ? state.caption : state.turn === 0 ? (state.preset === 'hurry' ? '急いでいるときに限って、鉢合わせ。' : '向かいから人が。さて、どちらが先に？') : state.pairs[0].caption}</strong>
+            <span className="caption-score">{state.kind === 'hallway' ? `${passed} / 6 人 通過` : state.escaped ? '帰宅成功！' : 'まだ、お店にいます。'}</span>
+          </div>
+        </section>
+        <section className="director-desk" aria-label="実験の操作">
+          <div className="play-controls">
+            <Group gap="sm">
+              <Button className="play-button" size="md" color="dark" disabled={busy || state.finished} onClick={() => void execute(true)}>{continuous ? '観察中…' : paused ? '連続で再開' : '連続で観察'}<span aria-hidden="true"> ▶</span></Button>
+              <Button size="md" variant="default" disabled={busy || state.finished} onClick={() => void execute(false)}>Jevで1ターン</Button>
+              {busy && <Button size="md" variant="outline" color="red" onClick={() => { cancel(true); setPaused(true) }}>停止</Button>}
+              <Button variant="subtle" color="dark" onClick={() => reset()}>最初から ↻</Button>
+            </Group>
+            <Text size="xs" c="dimmed">{busy ? '観察中。行動が届くたびに、場面が進みます。場面の切り替え・停止はいつでもできます。' : state.finished ? '幕が下りました。最初から、別の展開を試してみよう。' : '再生を押すまでAIは動きません。最大12ターンの小さな実験。'}</Text>
+          </div>
+          {error && <Alert color="red" title="この場面で一時停止" mt="md">{error}</Alert>}
+          {paused && !error && <Text size="sm" mt="sm" c="dimmed">一時停止中。同じ場面から続けられます。</Text>}
+          <div className="director-options">
+            {state.kind === 'hallway' ? (
+              <div className="personality-control"><label>今日のみなさん</label><SegmentedControl aria-label="登場人物の性格" value={state.preset} onChange={(value) => reset('hallway', value as Personality)} data={[{ value: 'normal', label: 'ふつう' }, { value: 'polite', label: '気遣いすぎ' }, { value: 'hurry', label: '全員、急ぎ' }]} /></div>
+            ) : (
+              <div className="intervention-control"><label>あなたの無茶振り</label><Group gap="xs">
+                {([['dish', '料理を追加'], ['story', '長話が始まる'], ['toast', 'もう一杯！'], ['quiet', 'ひと息つく']] as const).map(([event, label]) => (
+                  <Button key={event} size="xs" variant={state.event === event ? 'filled' : 'default'} color="dark" disabled={busy || state.finished} onClick={() => intervene(event)}>{label}</Button>
+                ))}
+              </Group></div>
+            )}
+            <div className="small-metrics"><span>Jevの判断 <b>{aiCount}</b> 回</span><span>AI通信時間 <b>{(elapsed / 1000).toFixed(2)}</b> 秒</span><span>気まずさ <b>{awkward}</b><small>ゲーム内指標</small></span></div>
+          </div>
+        </section>
+        <div className="backstage">
+          <details className="backstage-panel"><summary>手動で試す <span>あなたならどうする？</span></summary>
+            <Text size="sm" mb="sm">AIを使わず、あなたが次の行動を選びます。Jevの判断回数には含まれません。</Text>
+            <Group gap="xs">
+              {state.kind === 'hallway' ? <>
+                <Button variant="default" disabled={busy || state.finished} onClick={() => manual('wait')}>全員「どうぞ」</Button>
+                <Button variant="default" disabled={busy || state.finished} onClick={() => manual('go')}>全員、一歩進む</Button>
+                <Button variant="default" disabled={busy || state.finished} onClick={() => manual('split')}>左右に避ける</Button>
+              </> : Object.keys(getActors(state)[0]?.actions ?? {}).map((action) => <Button key={action} variant="default" disabled={busy || state.finished} onClick={() => manual(action)}>{actionLabels[action]}</Button>)}
+            </Group>
+            <Text size="xs" mt="sm" c="dimmed">手動の判断：{manualCount}回</Text>
+          </details>
+          <details className="backstage-panel"><summary>判断を見る <span>直前の行動と確率</span></summary>
+            {round ? <><Badge color={round.source === 'Jev' ? 'teal' : 'gray'} variant="light" mb="sm" tt="none">{round.source}が選択</Badge><div className="decision-list">{round.decisions.map((decision) => <div key={decision.actorId}><strong>{round.names[decision.actorId] ?? decision.actorId}</strong><span>{actionLabels[decision.action]}</span><small>{decision.probability === undefined ? '選択確率 —' : `選択確率 ${Math.round(decision.probability * 100)}%`}{decision.confidence !== undefined ? ` / 信頼度 ${Math.round(decision.confidence * 100)}%` : ''}</small></div>)}</div></> : <Text size="sm" c="dimmed">まだ誰も動いていません。まずは1ターン。</Text>}
+          </details>
+        </div>
+        <footer className="theater-footer"><p>行動はJev、吹き出しと演出はゲーム側で用意しています。</p><p>AI通信時間はブラウザで計測。演出の待ち時間を除き、失敗・停止した通信も含みます。<br />無料枠の利用制限に達すると停止します。手動でも遊べます。</p><span>JEV THEATER · A LITTLE AWKWARD, A LOT OF FUN.</span></footer>
+      </Container>
+    </main>
+  )
 }
