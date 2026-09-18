@@ -20,7 +20,7 @@ export type RegistryEntry = {
 }
 
 export const SUBDOMAIN = "ichigoooo"
-export const GENERATED_AT = "2026-09-02T15:54:04.629Z"
+export const GENERATED_AT = "2026-09-18T10:15:31.433Z"
 
 export const REGISTRY: RegistryEntry[] = [
   {
@@ -59,7 +59,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://cash-forecast.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-07-12T05:07:30.309258Z",
-    modifiedAt: "2026-09-01T06:12:45.504681Z",
+    modifiedAt: "2026-09-09T12:35:38.493075Z",
     hasShot: true,
     binding: "APP_CASH_FORECAST",
   },
@@ -94,12 +94,22 @@ export const REGISTRY: RegistryEntry[] = [
     binding: "APP_HELLO",
   },
   {
+    slug: "jev-lab",
+    workerName: "jev-lab",
+    url: "https://jev-lab.ichigoooo.workers.dev",
+    deployed: true,
+    createdAt: "2026-09-18T10:12:07.853459Z",
+    modifiedAt: "2026-09-18T10:12:15.552368Z",
+    hasShot: true,
+    binding: "APP_JEV_LAB",
+  },
+  {
     slug: "lab",
     workerName: "lab",
     url: "https://lab.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-08-16T11:00:36.351525Z",
-    modifiedAt: "2026-08-16T11:14:43.16138Z",
+    modifiedAt: "2026-09-18T10:14:59.069663Z",
     hasShot: false,
     binding: null,
   },
@@ -149,8 +159,8 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://qwen-arena.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-09-02T15:53:26.809703Z",
-    modifiedAt: "2026-09-02T15:53:32.332849Z",
-    hasShot: false,
+    modifiedAt: "2026-09-05T15:12:46.302868Z",
+    hasShot: true,
     binding: "APP_QWEN_ARENA",
   },
   {

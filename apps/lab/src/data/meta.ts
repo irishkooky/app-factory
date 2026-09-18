@@ -33,6 +33,12 @@ export const META: Record<string, AppMeta> = {
     tags: ['テンプレート'],
     hidden: true,
   },
+  'jev-lab': {
+    title: 'Jev 実験室',
+    description: 'Jevが文章を固定基準で評価。仕事の迷いと、どうでもいい議題を切り替えて遊べる。',
+    category: 'demo',
+    tags: ['AI', 'Jev', '判断', 'Cloudflare'],
+  },
   'ai-era-skill-quiz': {
     title: 'AI時代にはもう要らない？エンジニアスキルクイズ',
     description: 'AIに聞けば済むようになった懐かしのスキルを4択で出題。高得点ほど化石度が高い。',
