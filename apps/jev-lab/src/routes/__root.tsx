@@ -21,11 +21,11 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Jev 日常あるある劇場 — 判断は爆速。空気は読める？',
+        title: 'Jev 気づくフォーム — 形式はOK。でも、そこじゃない。',
       },
       {
         name: 'description',
-        content: 'お先にどうぞ地獄と帰れない飲み会。日常の小さな気まずさをJevに任せる、コミカルなAI実験劇場。',
+        content: '名前と会社名の取り違え、窓口のずれ、曖昧な相談。Jevが意味を確認し、必要な入力欄や提案を表示するフォーム実験。',
       },
     ],
   }),

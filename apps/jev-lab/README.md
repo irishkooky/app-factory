@@ -1,11 +1,8 @@
-# Jev 実験室
+# Jev 気づくフォーム
 
-Cloudflare Workers 上で Vercel AI Gateway の `typesafe-ai/jev` を使う、日本語の意思決定ゲームです。表示される登場人物と状況はすべて架空です。
+Cloudflare Workers 上で Vercel AI Gateway の `typesafe-ai/jev` を使う、意味を確かめるフォームのデモです。形式だけでは見つからない、名前と会社名の入れ替わり・問い合わせ先・具体性を、固定の選択肢として判断します。入力例はすべて架空です。
 
-- **廊下のすれ違い**: 6人が同時に判断し、譲り合いの渋滞を抜けます。
-- **飲み会からの脱出**: 店内イベントを見ながら、帰宅に必要な手順を選びます。
-
-判断はクリック時にだけ実行し、結果は Vercel AI Gateway 経由の Jev 応答だけを表示します。無料枠の利用回数制限では停止メッセージを表示します。
+ホームでは1件ずつ、または8件を1リクエストで評価できます。メールアドレスは意味判断のモデル入力に送られません。以前の「日常あるある劇場」は [/theater](/theater) で引き続き試せます。
 
 ## 検証
 
@@ -19,4 +16,10 @@ Jev の料金は Vercel AI Gateway のモデル料金に従います。Cloudflar
 AI_GATEWAY_API_KEY=...
 ```
 
-機密情報はゲームの入力に含めないでください。
+機密情報はデモ入力に含めないでください。
+
+## 意味判断から UI へ
+
+Jev の選択結果をそのまま画面部品にはせず、選択確率が 0.70 以上のときだけ固定カタログの `UiPlan` に変換し、Mantine で描画します。この値は UI を分けるための選択確率であり、実世界での正解率ではありません。同じ判断 JSON なら同じ UI になりますが、AI の意味判断自体は毎回同一とは限りません。
+
+実装は [Vercel AI Gateway の Evaluation](https://vercel.com/docs/ai-gateway/modalities/evaluation) を使い、[json-render](https://json-render.dev/) のカタログ型の考え方を参考にしています。`json-render` パッケージは導入しておらず、任意の生成 UI を実行しない小さな独自 renderer です。

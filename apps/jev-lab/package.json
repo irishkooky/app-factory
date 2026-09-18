@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "deploy": "vp run build && wrangler deploy",
     "cf-typegen": "wrangler types",
-    "test": "node --experimental-strip-types src/lib/jev.test.ts"
+    "test": "node --experimental-strip-types src/lib/jev.test.ts && node --experimental-strip-types src/lib/semantic.test.ts"
   },
   "dependencies": {
     "@mantine/core": "^9.4.1",

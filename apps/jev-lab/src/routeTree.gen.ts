@@ -9,14 +9,26 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TheaterRouteImport } from './routes/theater'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSemanticRouteImport } from './routes/api.semantic'
 import { Route as ApiEvaluateRouteImport } from './routes/api.evaluate'
 import { Route as ApiComedyRouteImport } from './routes/api.comedy'
 import { Route as ApiBatchRouteImport } from './routes/api.batch'
 
+const TheaterRoute = TheaterRouteImport.update({
+  id: '/theater',
+  path: '/theater',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSemanticRoute = ApiSemanticRouteImport.update({
+  id: '/api/semantic',
+  path: '/api/semantic',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEvaluateRoute = ApiEvaluateRouteImport.update({
@@ -37,45 +49,86 @@ const ApiBatchRoute = ApiBatchRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/theater': typeof TheaterRoute
   '/api/batch': typeof ApiBatchRoute
   '/api/comedy': typeof ApiComedyRoute
   '/api/evaluate': typeof ApiEvaluateRoute
+  '/api/semantic': typeof ApiSemanticRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/theater': typeof TheaterRoute
   '/api/batch': typeof ApiBatchRoute
   '/api/comedy': typeof ApiComedyRoute
   '/api/evaluate': typeof ApiEvaluateRoute
+  '/api/semantic': typeof ApiSemanticRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/theater': typeof TheaterRoute
   '/api/batch': typeof ApiBatchRoute
   '/api/comedy': typeof ApiComedyRoute
   '/api/evaluate': typeof ApiEvaluateRoute
+  '/api/semantic': typeof ApiSemanticRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/batch' | '/api/comedy' | '/api/evaluate'
+  fullPaths:
+    | '/'
+    | '/theater'
+    | '/api/batch'
+    | '/api/comedy'
+    | '/api/evaluate'
+    | '/api/semantic'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/batch' | '/api/comedy' | '/api/evaluate'
-  id: '__root__' | '/' | '/api/batch' | '/api/comedy' | '/api/evaluate'
+  to:
+    | '/'
+    | '/theater'
+    | '/api/batch'
+    | '/api/comedy'
+    | '/api/evaluate'
+    | '/api/semantic'
+  id:
+    | '__root__'
+    | '/'
+    | '/theater'
+    | '/api/batch'
+    | '/api/comedy'
+    | '/api/evaluate'
+    | '/api/semantic'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  TheaterRoute: typeof TheaterRoute
   ApiBatchRoute: typeof ApiBatchRoute
   ApiComedyRoute: typeof ApiComedyRoute
   ApiEvaluateRoute: typeof ApiEvaluateRoute
+  ApiSemanticRoute: typeof ApiSemanticRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/theater': {
+      id: '/theater'
+      path: '/theater'
+      fullPath: '/theater'
+      preLoaderRoute: typeof TheaterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/semantic': {
+      id: '/api/semantic'
+      path: '/api/semantic'
+      fullPath: '/api/semantic'
+      preLoaderRoute: typeof ApiSemanticRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/evaluate': {
@@ -104,9 +157,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  TheaterRoute: TheaterRoute,
   ApiBatchRoute: ApiBatchRoute,
   ApiComedyRoute: ApiComedyRoute,
   ApiEvaluateRoute: ApiEvaluateRoute,
+  ApiSemanticRoute: ApiSemanticRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
