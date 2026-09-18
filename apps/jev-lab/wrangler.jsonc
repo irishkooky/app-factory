@@ -4,7 +4,6 @@
   "compatibility_date": "2026-09-18",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
-  "ai": { "binding": "AI" },
   "ratelimits": [
     {
       "name": "EVAL_LIMITER",

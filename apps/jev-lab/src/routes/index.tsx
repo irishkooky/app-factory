@@ -40,9 +40,9 @@ const questionLabel = (
       ? "未取得"
       : `${question.criteria[rounded]}（${answer.score.toFixed(2)} / ${question.criteria.length - 1}）`;
   }
-  return answer.noul === undefined
-    ? "未取得"
-    : `${answer.noul >= 0.5 ? question.criteria.true : question.criteria.false}（${percent(answer.noul)}%）`;
+  if (answer.noul === undefined) return "未取得";
+  const isTrue = answer.noul >= 0.5;
+  return `${isTrue ? question.criteria.true : question.criteria.false}（${percent(isTrue ? answer.noul : 1 - answer.noul)}%）`;
 };
 
 function Home() {
@@ -149,7 +149,7 @@ function Home() {
               color={mode === "fun" ? "orange" : "indigo"}
               tt="none"
             >
-              Cloudflare Workers AI
+              Cloudflare Workers · Vercel AI Gateway
             </Badge>
           </Group>
         </nav>
@@ -382,9 +382,9 @@ function Home() {
                         {question.type === "noul" &&
                           answer?.noul !== undefined &&
                           !photo && (
-                            <Text className="metric">
-                              該当確率: {percent(answer.noul)}%
-                            </Text>
+                        <Text className="metric">
+                          該当確率（「{question.criteria.true}」）: {percent(answer.noul)}%
+                        </Text>
                           )}
                       </div>
                     );

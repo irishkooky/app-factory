@@ -1,9 +1,16 @@
-import { scenarioById } from "../data/scenarios";
-import { normalizeEvaluation } from "../lib/jev";
+import { createGateway, experimental_evaluate } from 'ai'
+import { scenarioById } from '../data/scenarios'
+import { adaptVercelEvaluation, toVercelQuestions } from '../lib/vercel-jev'
 
 type RequestData = { scenarioId: string; text: string };
 const MAX_BODY_BYTES = 32 * 1024;
+const isGatewayRateLimited = (error: unknown) => {
+  if (error instanceof Error && error.name === 'GatewayRateLimitError') return true
+  if (!error || typeof error !== 'object') return false
+  return Reflect.get(error, 'statusCode') === 429
+}
 const evaluationFailureCode = (error: unknown) => {
+  if (isGatewayRateLimited(error)) return "rate_limited";
   if (!(error instanceof Error)) return "provider_error";
   const message = error.message.toLowerCase();
   if (/auth|permission|forbidden|unauthori[sz]ed/.test(message))
@@ -62,9 +69,14 @@ const requestData = (value: unknown): RequestData | undefined => {
     : undefined;
 };
 
+const runtimeSecret = (env: Pick<Env, 'EVAL_LIMITER'>, name: string) => {
+  const value = Reflect.get(env, name)
+  return typeof value === 'string' && value ? value : undefined
+}
+
 export async function evaluate(
   request: Request,
-  env: Pick<Env, "AI" | "EVAL_LIMITER">,
+  env: Pick<Env, 'EVAL_LIMITER'>,
 ): Promise<Response> {
   if (
     request.headers.get("content-type")?.toLowerCase().split(";")[0] !==
@@ -104,36 +116,31 @@ export async function evaluate(
   if (!data) return json({ error: "企画と入力内容を確認してください。" }, 400);
   const scenario = scenarioById(data.scenarioId);
   if (!scenario) return json({ error: "企画が見つかりません。" }, 400);
+  const apiKey = runtimeSecret(env, 'AI_GATEWAY_API_KEY')
+  if (!apiKey) {
+    return json(
+      { error: 'Vercel AI Gateway の API キーが設定されていません。' },
+      503,
+    )
+  }
   const started = Date.now();
   try {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const timeLimit = new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => reject(new Error("timeout")), 40_000);
-    });
-    let raw: unknown;
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 40_000)
+    let raw: unknown
     try {
-      raw = await Promise.race([
-        env.AI.run(
-          "typesafe/jev",
-          {
-            state: data.text,
-            questions: Object.fromEntries(
-              scenario.questions.map(
-                ({ key, type, instructions, criteria }) => [
-                  key,
-                  { type, instructions, criteria },
-                ],
-              ),
-            ),
-          },
-          { gateway: { id: "default", collectLog: false } },
-        ),
-        timeLimit,
-      ]);
+      const gateway = createGateway({ apiKey })
+      raw = await experimental_evaluate({
+        model: gateway.evaluationModel('typesafe-ai/jev'),
+        state: data.text,
+        questions: toVercelQuestions(scenario),
+        maxRetries: 0,
+        abortSignal: controller.signal,
+      })
     } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
+      clearTimeout(timeout)
     }
-    const result = normalizeEvaluation(raw, scenario);
+    const result = adaptVercelEvaluation(raw, scenario);
     if (!result)
       return json(
         { error: "評価結果を読み取れませんでした。もう一度お試しください。" },
@@ -141,16 +148,23 @@ export async function evaluate(
       );
     return json({ result, elapsedMs: Date.now() - started });
   } catch (error) {
+    const code = evaluationFailureCode(error)
     console.error(
       JSON.stringify({
         event: "jev_evaluation_failed",
-        code: evaluationFailureCode(error),
+        code,
       }),
     );
+    if (code === 'rate_limited') {
+      return json(
+        { error: 'Vercel AI Gateway の利用回数制限に達しました。少し待ってから、もう一度お試しください。' },
+        429,
+      )
+    }
     return json(
       {
         error:
-          "評価を完了できませんでした。Cloudflare AI Gateway のクレジットと設定を確認してから、もう一度お試しください。",
+          "評価を完了できませんでした。Vercel AI Gateway の設定と利用状況を確認してから、もう一度お試しください。",
       },
       502,
     );

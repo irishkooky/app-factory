@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { scenarioById } from '../data/scenarios.ts'
 import { normalizeEvaluation } from './jev.ts'
+import { adaptVercelEvaluation, toVercelQuestions } from './vercel-jev.ts'
 
 const scenario = scenarioById('support')
 assert.ok(scenario)
@@ -20,3 +21,25 @@ for (const key of ['__proto__', 'constructor']) {
 }
 const invalid = normalizeEvaluation({ answers: { urgency: { score: 3.01 }, immediate: { noul: Number.NaN } } }, scenario)
 assert.equal(invalid, undefined)
+
+const gatewayQuestions = toVercelQuestions(scenario)
+assert.equal(gatewayQuestions.immediate.type, 'boolean')
+assert.deepEqual(Object.keys(gatewayQuestions.department).sort(), ['criteria', 'instructions', 'type'])
+const gatewayResult = adaptVercelEvaluation({
+  answers: {
+    department: { type: 'choice', choice: 'billing', probabilities: { billing: 0.8, support: 0.2, sales: Number.NaN } },
+    urgency: { type: 'score', score: 2.5 },
+    immediate: { type: 'boolean', probability: 0.75 },
+  },
+  providerMetadata: { typesafe: { confidence: { department: 0.9, urgency: 1.2, immediate: 0.5 } } },
+  usage: { inputTokens: 12, outputTokens: 7 },
+  response: { modelId: 'typesafe-ai/jev' },
+}, scenario)
+assert.equal(gatewayResult?.answers.department.choice, 'billing')
+assert.deepEqual(gatewayResult?.answers.department.probabilities, { billing: 0.8, support: 0.2 })
+assert.equal(gatewayResult?.answers.urgency.score, 2.5)
+assert.equal(gatewayResult?.answers.urgency.confidence, undefined)
+assert.equal(gatewayResult?.answers.immediate.noul, 0.75)
+assert.equal(gatewayResult?.answers.immediate.confidence, undefined)
+assert.equal(gatewayResult?.usage?.input_tokens, 12)
+assert.equal(adaptVercelEvaluation({ answers: { department: { choice: '__proto__' } } }, scenario), undefined)
