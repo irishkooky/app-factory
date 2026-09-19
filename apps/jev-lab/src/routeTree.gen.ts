@@ -10,15 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TheaterRouteImport } from './routes/theater'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiSemanticRouteImport } from './routes/api.semantic'
 import { Route as ApiEvaluateRouteImport } from './routes/api.evaluate'
+import { Route as ApiCompareRouteImport } from './routes/api.compare'
 import { Route as ApiComedyRouteImport } from './routes/api.comedy'
 import { Route as ApiBatchRouteImport } from './routes/api.batch'
 
 const TheaterRoute = TheaterRouteImport.update({
   id: '/theater',
   path: '/theater',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -36,6 +43,11 @@ const ApiEvaluateRoute = ApiEvaluateRouteImport.update({
   path: '/api/evaluate',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCompareRoute = ApiCompareRouteImport.update({
+  id: '/api/compare',
+  path: '/api/compare',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiComedyRoute = ApiComedyRouteImport.update({
   id: '/api/comedy',
   path: '/api/comedy',
@@ -49,26 +61,32 @@ const ApiBatchRoute = ApiBatchRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/theater': typeof TheaterRoute
   '/api/batch': typeof ApiBatchRoute
   '/api/comedy': typeof ApiComedyRoute
+  '/api/compare': typeof ApiCompareRoute
   '/api/evaluate': typeof ApiEvaluateRoute
   '/api/semantic': typeof ApiSemanticRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/theater': typeof TheaterRoute
   '/api/batch': typeof ApiBatchRoute
   '/api/comedy': typeof ApiComedyRoute
+  '/api/compare': typeof ApiCompareRoute
   '/api/evaluate': typeof ApiEvaluateRoute
   '/api/semantic': typeof ApiSemanticRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/theater': typeof TheaterRoute
   '/api/batch': typeof ApiBatchRoute
   '/api/comedy': typeof ApiComedyRoute
+  '/api/compare': typeof ApiCompareRoute
   '/api/evaluate': typeof ApiEvaluateRoute
   '/api/semantic': typeof ApiSemanticRoute
 }
@@ -76,34 +94,42 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/compare'
     | '/theater'
     | '/api/batch'
     | '/api/comedy'
+    | '/api/compare'
     | '/api/evaluate'
     | '/api/semantic'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/compare'
     | '/theater'
     | '/api/batch'
     | '/api/comedy'
+    | '/api/compare'
     | '/api/evaluate'
     | '/api/semantic'
   id:
     | '__root__'
     | '/'
+    | '/compare'
     | '/theater'
     | '/api/batch'
     | '/api/comedy'
+    | '/api/compare'
     | '/api/evaluate'
     | '/api/semantic'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CompareRoute: typeof CompareRoute
   TheaterRoute: typeof TheaterRoute
   ApiBatchRoute: typeof ApiBatchRoute
   ApiComedyRoute: typeof ApiComedyRoute
+  ApiCompareRoute: typeof ApiCompareRoute
   ApiEvaluateRoute: typeof ApiEvaluateRoute
   ApiSemanticRoute: typeof ApiSemanticRoute
 }
@@ -115,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/theater'
       fullPath: '/theater'
       preLoaderRoute: typeof TheaterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -138,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiEvaluateRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/compare': {
+      id: '/api/compare'
+      path: '/api/compare'
+      fullPath: '/api/compare'
+      preLoaderRoute: typeof ApiCompareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/comedy': {
       id: '/api/comedy'
       path: '/api/comedy'
@@ -157,9 +197,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CompareRoute: CompareRoute,
   TheaterRoute: TheaterRoute,
   ApiBatchRoute: ApiBatchRoute,
   ApiComedyRoute: ApiComedyRoute,
+  ApiCompareRoute: ApiCompareRoute,
   ApiEvaluateRoute: ApiEvaluateRoute,
   ApiSemanticRoute: ApiSemanticRoute,
 }

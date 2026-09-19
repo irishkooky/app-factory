@@ -23,3 +23,7 @@ AI_GATEWAY_API_KEY=...
 Jev の選択結果をそのまま画面部品にはせず、選択確率が 0.70 以上のときだけ固定カタログの `UiPlan` に変換し、Mantine で描画します。この値は UI を分けるための選択確率であり、実世界での正解率ではありません。同じ判断 JSON なら同じ UI になりますが、AI の意味判断自体は毎回同一とは限りません。
 
 実装は [Vercel AI Gateway の Evaluation](https://vercel.com/docs/ai-gateway/modalities/evaluation) を使い、[json-render](https://json-render.dev/) のカタログ型の考え方を参考にしています。`json-render` パッケージは導入しておらず、任意の生成 UI を実行しない小さな独自 renderer です。
+
+## モデル比較
+
+`/compare` では同じ固定入力と選択肢を、Jev・GPT-4.1 mini・Gemini 2.5 Flash-Lite・Claude Haiku 4.5 に個別リクエストで送ります。Jev は評価 API、他モデルは JSON 生成を使い、通信から出力完了までを計測します。比較結果は1回の判断であり、優劣や正確さを示すものではありません。

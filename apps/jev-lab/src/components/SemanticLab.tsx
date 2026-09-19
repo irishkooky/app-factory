@@ -137,7 +137,7 @@ export function SemanticLab() {
   return (
     <main className="semantic-lab">
       <Container size="xl">
-        <header className="semantic-nav"><a href="/" className="semantic-brand"><span className="semantic-brand-mark">J</span><strong>Jev</strong><span>気づくフォーム</span></a><a href="/theater" className="theater-link">あるある劇場 <span aria-hidden="true">↗</span></a></header>
+        <header className="semantic-nav"><a href="/" className="semantic-brand"><span className="semantic-brand-mark">J</span><strong>Jev</strong><span>気づくフォーム</span></a><Group gap="md"><a href="/compare" className="theater-link">他のAIと比べる <span aria-hidden="true">↗</span></a><a href="/theater" className="theater-link">あるある劇場 <span aria-hidden="true">↗</span></a></Group></header>
         <section className="semantic-hero">
           <div><p className="semantic-eyebrow">入力の、その先まで。</p><h1>形式はOK。<span>でも、そこじゃない。</span></h1><p>名前と会社名が逆でも、文字列は文字列。<br className="semantic-mobile-break" />意味まで見たら、フォームはどこまで気が利く？</p></div>
           <div className="semantic-hero-note" aria-hidden="true">その入力、<br /><strong>ちょっと待った。</strong><span>気づく受付さん 在席中</span></div>

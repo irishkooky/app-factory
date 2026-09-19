@@ -35,7 +35,7 @@ export const META: Record<string, AppMeta> = {
   },
   'jev-lab': {
     title: 'Jev 気づくフォーム',
-    description: '名前と会社名の取り違えにも気づく受付さん。Jevの意味判定で、必要な修正提案や入力欄が現れるフォーム。',
+    description: '入力の意味に気づく受付フォーム。Jev・GPT・Gemini・Claudeで、同じ入力の判断と応答時間を比較できます。',
     category: 'demo',
     tags: ['AI', 'Jev', 'フォーム', 'Generative UI'],
   },
