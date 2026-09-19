@@ -186,8 +186,6 @@ export function ComparisonLab() {
           <div className="comparison-run"><Group><Button color="dark" size="md" disabled={!valid || busy} onClick={() => void compare()}>{busy ? 'それぞれの返答を待っています…' : Object.keys(states).length ? 'もう一度比較' : '比較を始める'}<span aria-hidden="true"> ↗</span></Button>{busy && <Button color="gray" variant="subtle" onClick={cancel}>キャンセル</Button>}</Group><Text size="xs" c="dimmed">押したときだけ、{selectedModels.length}モデルを各1回呼び出します。自動再試行はしません。</Text></div>
         </section>
 
-        <ComparisonCharts states={states} selectedModels={selectedModels} batch={mode === 'batch'} />
-
         <section className="comparison-results" aria-label="モデルごとの結果">
           <div className="comparison-results-heading"><h2>02 <span>返ってきた受付から、開けます。</span></h2>{mode === 'batch' && <Select label="見比べる入力" value={inspected.id} onChange={(value) => { if (value) setInspectedId(value) }} data={displayedRecords.map((item, index) => ({ value: item.id, label: `${index + 1}. ${item.name} / ${item.company}` }))} allowDeselect={false} className="comparison-record-select" />}</div>
           {mode === 'batch' && <div className="inspected-record"><strong>{inspected.name} / {inspected.company}</strong><p>{inspected.message}</p><span>選択した窓口：{categoryLabels[inspected.category]}</span></div>}
@@ -210,6 +208,7 @@ export function ComparisonLab() {
           </div>
           {successes.length >= 2 && <div className="comparison-differences"><Badge variant="light" color="teal">完了した{successes.length}モデルを比較</Badge><p>{differences === 0 ? '今のところ、すべての観点で同じ選択でした。' : `${displayedRecords.length * 4}個の観点のうち、${differences}個で選択が分かれました。`}<span>一致は正解の証明ではありません。Jevを正解として扱っていません。</span></p></div>}
         </section>
+        <ComparisonCharts states={states} selectedModels={selectedModels} batch={mode === 'batch'} />
         <footer className="comparison-footer"><p>同じ入力・同じ選択肢。Jevは評価API、ほかはJSON生成。通信と出力完了までを計測。1回の結果で優劣は決まりません。</p><p>標準料金と今回のGateway報告額は分けて表示します。推定は2026-09-19の単価で、キャッシュ・割引・追加料金は含めません。確定請求書ではありません。</p><p>デモ用の入力例です。チェック時は入力内容をAIへ送信します。メールアドレスは意味判定に使いません。</p><span>SAME QUESTION, DIFFERENT COUNTERS.</span></footer>
       </Container>
     </main>
