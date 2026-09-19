@@ -1,0 +1,384 @@
+{
+  "recordedDate": "2026-09-19",
+  "scope": "8 fictional records, 4 judgments per record, one call per model; one observed run, not a benchmark average",
+  "timing": "elapsedMs is server measurement; card text records client round-trip timing",
+  "results": [
+    {
+      "status": 200,
+      "model": "jev",
+      "decisions": [
+        {
+          "id": "sample-swapped",
+          "identity": "swapped",
+          "company": "person_like",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-brand",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-misrouted",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-vague",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "unclear",
+          "detail": "vague"
+        },
+        {
+          "id": "sample-ready",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-6",
+          "identity": "aligned",
+          "company": "person_like",
+          "intent": "sales",
+          "detail": "vague"
+        },
+        {
+          "id": "batch-7",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-8",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        }
+      ],
+      "elapsedMs": 682,
+      "cost": {
+        "usd": 0.000391986,
+        "billedUsd": 0,
+        "source": "gateway-market",
+        "inputTokens": 9333,
+        "outputTokens": 1439
+      }
+    },
+    {
+      "status": 200,
+      "model": "gpt",
+      "decisions": [
+        {
+          "id": "sample-swapped",
+          "identity": "swapped",
+          "company": "person_like",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-brand",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-misrouted",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-vague",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "other",
+          "detail": "vague"
+        },
+        {
+          "id": "sample-ready",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-6",
+          "identity": "aligned",
+          "company": "person_like",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-7",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-8",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        }
+      ],
+      "elapsedMs": 2605,
+      "cost": {
+        "usd": 0.00038496,
+        "billedUsd": 0.00038496,
+        "source": "gateway-market",
+        "inputTokens": 6501,
+        "outputTokens": 212
+      }
+    },
+    {
+      "status": 200,
+      "model": "gemini",
+      "decisions": [
+        {
+          "id": "sample-swapped",
+          "identity": "swapped",
+          "company": "person_like",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-brand",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-misrouted",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-vague",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "sales",
+          "detail": "vague"
+        },
+        {
+          "id": "sample-ready",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-6",
+          "identity": "unclear",
+          "company": "person_like",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-7",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-8",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        }
+      ],
+      "elapsedMs": 2682,
+      "cost": {
+        "usd": 0.00480825,
+        "billedUsd": 0.00480825,
+        "source": "gateway-market",
+        "inputTokens": 5426,
+        "outputTokens": 197
+      }
+    },
+    {
+      "status": 200,
+      "model": "claude",
+      "decisions": [
+        {
+          "id": "sample-swapped",
+          "identity": "swapped",
+          "company": "person_like",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-brand",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-misrouted",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-vague",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "other",
+          "detail": "vague"
+        },
+        {
+          "id": "sample-ready",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-6",
+          "identity": "aligned",
+          "company": "person_like",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-7",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-8",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        }
+      ],
+      "elapsedMs": 2817,
+      "cost": {
+        "usd": 0.009094,
+        "billedUsd": 0.009094,
+        "source": "gateway-market",
+        "inputTokens": 8024,
+        "outputTokens": 214
+      }
+    },
+    {
+      "status": 200,
+      "model": "qwen",
+      "decisions": [
+        {
+          "id": "sample-swapped",
+          "identity": "swapped",
+          "company": "person_like",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-brand",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "sales",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-misrouted",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "sample-vague",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "other",
+          "detail": "vague"
+        },
+        {
+          "id": "sample-ready",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-6",
+          "identity": "unclear",
+          "company": "person_like",
+          "intent": "sales",
+          "detail": "vague"
+        },
+        {
+          "id": "batch-7",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "billing",
+          "detail": "sufficient"
+        },
+        {
+          "id": "batch-8",
+          "identity": "aligned",
+          "company": "plausible",
+          "intent": "support",
+          "detail": "sufficient"
+        }
+      ],
+      "elapsedMs": 5096,
+      "cost": {
+        "usd": 0.00092961,
+        "billedUsd": 0.00092961,
+        "source": "gateway-market",
+        "inputTokens": 5248,
+        "outputTokens": 303
+      }
+    }
+  ],
+  "cards": [
+    {
+      "model": "jev",
+      "status": "success",
+      "text": "窓口 01\nJev\n評価APIで選択\n返答が届きました\n0.72 秒\n8件・32判断 / 通信込み実測\n今回の標準料金\n$0.000392\n標準料金（Gateway）\nGateway報告額: $0.000000\n名前と会社名\n入れ替わっていそう\n会社名・屋号\n個人名に見える\n本文の意図\n請求・返金\n具体性\n十分具体的\nモデルと判定JSON"
+    },
+    {
+      "model": "gpt",
+      "status": "success",
+      "text": "窓口 02\nGPT 5.6 Luna\nJSONを生成\n返答が届きました\n2.64 秒\n8件・32判断 / 通信込み実測\n今回の標準料金\n$0.000385\n標準料金（Gateway）\nGateway報告額: $0.000385\n名前と会社名\n入れ替わっていそう\n会社名・屋号\n個人名に見える\n本文の意図\n請求・返金\n具体性\n十分具体的\nモデルと判定JSON"
+    },
+    {
+      "model": "gemini",
+      "status": "success",
+      "text": "窓口 03\nGemini 3.8 Flash\nJSONを生成\n返答が届きました\n2.72 秒\n8件・32判断 / 通信込み実測\n今回の標準料金\n$0.004808\n標準料金（Gateway）\nGateway報告額: $0.004808\n名前と会社名\n入れ替わっていそう\n会社名・屋号\n個人名に見える\n本文の意図\n請求・返金\n具体性\n十分具体的\nモデルと判定JSON"
+    },
+    {
+      "model": "claude",
+      "status": "success",
+      "text": "窓口 04\nClaude Haiku 4.5\nJSONを生成\n返答が届きました\n2.86 秒\n8件・32判断 / 通信込み実測\n今回の標準料金\n$0.009094\n標準料金（Gateway）\nGateway報告額: $0.009094\n名前と会社名\n入れ替わっていそう\n会社名・屋号\n個人名に見える\n本文の意図\n請求・返金\n具体性\n十分具体的\nモデルと判定JSON"
+    },
+    {
+      "model": "qwen",
+      "status": "success",
+      "text": "窓口 05\nQwen 3.8 Flash\nJSONを生成\n返答が届きました\n5.14 秒\n8件・32判断 / 通信込み実測\n今回の標準料金\n$0.000930\n標準料金（Gateway）\nGateway報告額: $0.000930\n名前と会社名\n入れ替わっていそう\n会社名・屋号\n個人名に見える\n本文の意図\n請求・返金\n具体性\n十分具体的\nモデルと判定JSON"
+    }
+  ]
+}
