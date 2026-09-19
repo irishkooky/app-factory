@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, Badge, Button, Checkbox, Container, Group, SegmentedControl, Select, SimpleGrid, Text, Textarea, TextInput } from '@mantine/core'
 import { batchRecords, samples } from '../data/semantic-samples'
 import { categoryLabels, validateStatic, type Category, type FormRecord } from '../lib/semantic'
+import { ComparisonCharts } from './ComparisonCharts'
 import { comparisonModels, comparisonPricing, parseComparisonResponse, type ComparisonDecision, type ComparisonModelId, type ComparisonResponse } from '../lib/comparison'
 
-type ModelState =
+export type ModelState =
   | { status: 'waiting' }
   | { status: 'success'; response: ComparisonResponse; elapsedMs: number }
   | { status: 'error'; error: string }
   | { status: 'canceled' }
-type ModelStates = Partial<Record<ComparisonModelId, ModelState>>
+export type ModelStates = Partial<Record<ComparisonModelId, ModelState>>
 type RequestHandle = { controller: AbortController; timer: ReturnType<typeof setTimeout> }
 type CheckField = Exclude<keyof ComparisonDecision, 'id'>
 const checkFields: CheckField[] = ['identity', 'company', 'intent', 'detail']
@@ -184,6 +185,8 @@ export function ComparisonLab() {
           <div className="comparison-model-selection"><span>参加する受付さん</span><Group gap="lg">{comparisonModels.map((model) => <Checkbox key={model.id} checked={selectedModels.includes(model.id)} disabled={selectedModels.length === 1 && selectedModels.includes(model.id)} label={model.label} color="teal" onChange={(event) => toggleModel(model.id, event.currentTarget.checked)} />)}</Group></div>
           <div className="comparison-run"><Group><Button color="dark" size="md" disabled={!valid || busy} onClick={() => void compare()}>{busy ? 'それぞれの返答を待っています…' : Object.keys(states).length ? 'もう一度比較' : '比較を始める'}<span aria-hidden="true"> ↗</span></Button>{busy && <Button color="gray" variant="subtle" onClick={cancel}>キャンセル</Button>}</Group><Text size="xs" c="dimmed">押したときだけ、{selectedModels.length}モデルを各1回呼び出します。自動再試行はしません。</Text></div>
         </section>
+
+        <ComparisonCharts states={states} selectedModels={selectedModels} batch={mode === 'batch'} />
 
         <section className="comparison-results" aria-label="モデルごとの結果">
           <div className="comparison-results-heading"><h2>02 <span>返ってきた受付から、開けます。</span></h2>{mode === 'batch' && <Select label="見比べる入力" value={inspected.id} onChange={(value) => { if (value) setInspectedId(value) }} data={displayedRecords.map((item, index) => ({ value: item.id, label: `${index + 1}. ${item.name} / ${item.company}` }))} allowDeselect={false} className="comparison-record-select" />}</div>
