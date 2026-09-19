@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import { batchRecords } from '../data/semantic-samples.ts'
-import { comparisonModels, parseComparisonResponse, toComparisonPrompt, validateComparisonRequest } from './comparison.ts'
+import { comparisonModels, comparisonPricing, extractComparisonCost, parseComparisonResponse, toComparisonPrompt, validateComparisonRequest } from './comparison.ts'
 
-assert.equal(comparisonModels.length, 4)
+assert.equal(comparisonModels.length, 5)
+assert.equal(comparisonModels.find((model) => model.id === 'qwen')?.providerId, 'alibaba/qwen3.8-flash')
+assert.equal(comparisonModels.find((model) => model.id === 'gpt')?.reasoning, 'none')
+assert.equal(comparisonModels.find((model) => model.id === 'gemini')?.reasoning, 'low')
+assert.equal(comparisonModels.find((model) => model.id === 'qwen')?.reasoning, 'none')
 const record = batchRecords[0]
 assert.equal(validateComparisonRequest({ records: [record], model: 'jev' })?.model, 'jev')
 assert.equal(validateComparisonRequest({ records: [record], model: 'unknown' }), undefined)
@@ -23,3 +27,10 @@ assert.equal(shared.instructions.includes(record.message), false)
 assert.match(shared.instructions, /全1件を同じ順で1件ずつ評価/)
 assert.match(shared.instructions, /decisions は正確に1要素/)
 assert.match(shared.instructions, /id は state\.records\[index\]\.id をそのまま転記/)
+
+assert.deepEqual(extractComparisonCost('gpt', { inputTokens: 5, outputTokens: 3 }, { gateway: { cost: '0.0000004' } }), { usd: 0.0000046, billedUsd: 0.0000004, source: 'estimate', inputTokens: 5, outputTokens: 3 })
+assert.equal(extractComparisonCost('jev', { inputTokens: 10 }, {}).usd, 10 * comparisonPricing.usdPerToken.jev.input)
+assert.equal(extractComparisonCost('qwen', { inputTokens: 2, outputTokens: 1 }, { gateway: { cost: false } }).source, 'estimate')
+assert.equal(extractComparisonCost('qwen', { inputTokens: 2 }, {}).source, 'unavailable')
+
+assert.deepEqual(extractComparisonCost('jev', { inputTokens: 10, outputTokens: 1 }, { gateway: { cost: '0', marketCost: '0.00000042' } }), { usd: 0.00000042, billedUsd: 0, source: 'gateway-market', inputTokens: 10, outputTokens: 1 })

@@ -35,9 +35,9 @@ export const META: Record<string, AppMeta> = {
   },
   'jev-lab': {
     title: 'Jev 気づくフォーム',
-    description: '入力の意味に気づく受付フォーム。Jev・GPT・Gemini・Claudeで、同じ入力の判断と応答時間を比較できます。',
+    description: '入力の意味に気づく受付フォーム。Jev・GPT 5.6 Luna・Gemini 3.8 Flash・Claude・Qwenで、同じ入力の判断・応答時間・コストを比較できます。',
     category: 'demo',
-    tags: ['AI', 'Jev', 'フォーム', 'Generative UI'],
+    tags: ['AI', 'Jev', 'Qwen', 'フォーム', 'Generative UI'],
   },
   'ai-era-skill-quiz': {
     title: 'AI時代にはもう要らない？エンジニアスキルクイズ',

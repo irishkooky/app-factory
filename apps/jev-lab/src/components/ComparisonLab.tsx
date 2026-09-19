@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, Badge, Button, Checkbox, Container, Group, SegmentedControl, Select, SimpleGrid, Text, Textarea, TextInput } from '@mantine/core'
 import { batchRecords, samples } from '../data/semantic-samples'
 import { categoryLabels, validateStatic, type Category, type FormRecord } from '../lib/semantic'
-import { comparisonModels, parseComparisonResponse, type ComparisonDecision, type ComparisonModelId, type ComparisonResponse } from '../lib/comparison'
+import { comparisonModels, comparisonPricing, parseComparisonResponse, type ComparisonDecision, type ComparisonModelId, type ComparisonResponse } from '../lib/comparison'
 
 type ModelState =
   | { status: 'waiting' }
@@ -20,13 +20,24 @@ const choiceLabels: Record<CheckField, Record<string, string>> = {
   intent: { ...categoryLabels, unclear: '判断できない' },
   detail: { sufficient: '十分具体的', vague: 'もう少し詳しく', unclear: '判断できない' },
 }
-const providerIds: Record<ComparisonModelId, string> = {
-  jev: 'typesafe-ai/jev', gpt: 'openai/gpt-4.1-mini', gemini: 'google/gemini-2.5-flash-lite', claude: 'anthropic/claude-haiku-4.5',
-}
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+const formatUsd = (value: number | null) => {
+  if (value === null) return '取得できません'
+  if (value > 0 && value < 0.000001) return '<$0.000001'
+  return `$${value.toFixed(6)}`
+}
+const standardCostLabel = (source: ComparisonResponse['cost']['source']) =>
+  source === 'gateway-market' ? '標準料金（Gateway）'
+    : source === 'estimate' ? '標準料金（推定）'
+      : source === 'gateway-billed' ? 'Gateway報告額'
+        : '取得不可'
+const costHeading = (source: ComparisonResponse['cost']['source']) =>
+  source === 'gateway-billed' ? '今回のGateway報告額'
+    : source === 'unavailable' ? '今回の料金'
+      : '今回の標準料金'
 
 function CounterClerk({ model, status }: { model: ComparisonModelId; status?: ModelState['status'] }) {
-  const colors = { jev: '#9bc7b7', gpt: '#eed189', gemini: '#9fbbd7', claude: '#dfa58e' }
+  const colors: Record<ComparisonModelId, string> = { jev: '#9bc7b7', gpt: '#eed189', gemini: '#9fbbd7', claude: '#dfa58e', qwen: '#c9a6dc' }
   return (
     <svg viewBox="0 0 80 80" aria-hidden="true" className="counter-clerk">
       <g stroke="#272b3e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -186,17 +197,17 @@ export function ComparisonLab() {
                   <div className="counter-heading"><span className="counter-number">窓口 {String(index + 1).padStart(2, '0')}</span><CounterClerk model={model.id} status={state?.status} /></div>
                   <h3>{model.label}</h3><span className="counter-method">{model.kind === 'evaluation' ? '評価APIで選択' : 'JSONを生成'}</span>
                   <div className="counter-status" aria-live="polite">
-                    {state?.status === 'success' ? <><span className="counter-complete">返答が届きました</span><strong>{(state.elapsedMs / 1000).toFixed(2)}<small> 秒</small></strong><span>{state.response.decisions.length}件・{state.response.decisions.length * 4}判断 / 通信込み実測</span></> : state?.status === 'waiting' ? <><span className="counter-waiting-dots" aria-hidden="true">•••</span><p>まだ、考えています。</p></> : state?.status === 'error' ? <Alert color="red" title="今回は受け取れませんでした">{state.error}</Alert> : state?.status === 'canceled' ? <p>キャンセルしました。<small>完了した結果は、そのまま残します。</small></p> : <p>受付、待機中。<small>上のボタンで、同時にスタート。</small></p>}
+                    {state?.status === 'success' ? <><span className="counter-complete">返答が届きました</span><strong>{(state.elapsedMs / 1000).toFixed(2)}<small> 秒</small></strong><span>{state.response.decisions.length}件・{state.response.decisions.length * 4}判断 / 通信込み実測</span><div className="counter-cost"><span>{costHeading(state.response.cost.source)}</span><strong>{formatUsd(state.response.cost.usd)}</strong><small>{standardCostLabel(state.response.cost.source)}</small><em>Gateway報告額: {formatUsd(state.response.cost.billedUsd)}</em></div></> : state?.status === 'waiting' ? <><span className="counter-waiting-dots" aria-hidden="true">•••</span><p>まだ、考えています。</p></> : state?.status === 'error' ? <><Alert color="red" title="今回は受け取れませんでした">{state.error}</Alert><small className="counter-cost-unavailable">料金は取得できませんでした。</small></> : state?.status === 'canceled' ? <p>キャンセルしました。<small>完了した結果は、そのまま残します。</small></p> : <p>受付、待機中。<small>上のボタンで、同時にスタート。</small></p>}
                   </div>
                   {decision && <dl className="counter-decisions">{checkFields.map((field) => <div key={field}><dt>{checkLabels[field]}</dt><dd>{choiceLabels[field][decision[field]]}</dd></div>)}</dl>}
-                  <details className="counter-details"><summary>モデルと判定JSON</summary><code>{providerIds[model.id]}</code>{state?.status === 'success' ? <pre>{JSON.stringify(state.response.decisions, null, 2)}</pre> : <p>有効な結果が届くと表示します。</p>}</details>
+                  <details className="counter-details"><summary>モデルと判定JSON</summary><code>{model.providerId} · 推論: {model.reasoning}{state?.status === 'success' ? ` · input ${state.response.cost.inputTokens ?? '取得不可'} / output ${state.response.cost.outputTokens ?? '取得不可'} tokens · 単価スナップショット ${comparisonPricing.date} · Gateway報告額 ${formatUsd(state.response.cost.billedUsd)}` : ''}</code>{state?.status === 'success' ? <pre>{JSON.stringify(state.response.decisions, null, 2)}</pre> : <p>有効な結果が届くと表示します。</p>}</details>
                 </article>
               )
             })}
           </div>
           {successes.length >= 2 && <div className="comparison-differences"><Badge variant="light" color="teal">完了した{successes.length}モデルを比較</Badge><p>{differences === 0 ? '今のところ、すべての観点で同じ選択でした。' : `${displayedRecords.length * 4}個の観点のうち、${differences}個で選択が分かれました。`}<span>一致は正解の証明ではありません。Jevを正解として扱っていません。</span></p></div>}
         </section>
-        <footer className="comparison-footer"><p>同じ入力・同じ選択肢。Jevは評価API、ほかはJSON生成。通信と出力完了までを計測。1回の結果で優劣は決まりません。</p><p>デモ用の入力例です。チェック時は入力内容をAIへ送信します。メールアドレスは意味判定に使いません。</p><span>SAME QUESTION, DIFFERENT COUNTERS.</span></footer>
+        <footer className="comparison-footer"><p>同じ入力・同じ選択肢。Jevは評価API、ほかはJSON生成。通信と出力完了までを計測。1回の結果で優劣は決まりません。</p><p>標準料金と今回のGateway報告額は分けて表示します。推定は2026-09-19の単価で、キャッシュ・割引・追加料金は含めません。確定請求書ではありません。</p><p>デモ用の入力例です。チェック時は入力内容をAIへ送信します。メールアドレスは意味判定に使いません。</p><span>SAME QUESTION, DIFFERENT COUNTERS.</span></footer>
       </Container>
     </main>
   )

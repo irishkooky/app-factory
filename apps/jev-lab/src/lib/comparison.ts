@@ -2,15 +2,60 @@ import type { FormRecord } from './semantic.ts'
 import { toSemanticQuestions, validateSemanticRequest } from './semantic.ts'
 
 export const comparisonModels = [
-  { id: 'jev', label: 'Jev', kind: 'evaluation' },
-  { id: 'gpt', label: 'GPT-4.1 mini', kind: 'language' },
-  { id: 'gemini', label: 'Gemini 2.5 Flash-Lite', kind: 'language' },
-  { id: 'claude', label: 'Claude Haiku 4.5', kind: 'language' },
+  { id: 'jev', label: 'Jev', kind: 'evaluation', providerId: 'typesafe-ai/jev', reasoning: 'provider-default' },
+  { id: 'gpt', label: 'GPT 5.6 Luna', kind: 'language', providerId: 'openai/gpt-5.6-luna', reasoning: 'none' },
+  { id: 'gemini', label: 'Gemini 3.8 Flash', kind: 'language', providerId: 'google/gemini-3.8-flash', reasoning: 'low' },
+  { id: 'claude', label: 'Claude Haiku 4.5', kind: 'language', providerId: 'anthropic/claude-haiku-4.5', reasoning: 'provider-default' },
+  { id: 'qwen', label: 'Qwen 3.8 Flash', kind: 'language', providerId: 'alibaba/qwen3.8-flash', reasoning: 'none' },
 ] as const
 
 export type ComparisonModelId = typeof comparisonModels[number]['id']
 export type ComparisonDecision = { id: string; identity: 'aligned'|'swapped'|'unclear'; company: 'plausible'|'person_like'|'unclear'; intent: 'sales'|'billing'|'support'|'other'|'unclear'; detail: 'sufficient'|'vague'|'unclear' }
-export type ComparisonResponse = { model: ComparisonModelId; decisions: ComparisonDecision[]; elapsedMs: number }
+export type ComparisonCost = { usd: number | null; billedUsd: number | null; source: 'gateway-market' | 'gateway-billed' | 'estimate' | 'unavailable'; inputTokens: number | null; outputTokens: number | null }
+export type ComparisonResponse = { model: ComparisonModelId; decisions: ComparisonDecision[]; elapsedMs: number; cost: ComparisonCost }
+
+export const comparisonPricing = {
+  date: '2026-09-19',
+  usdPerToken: {
+    jev: { input: 0.000000042, output: 0 },
+    gpt: { input: 0.0000002, output: 0.0000012 },
+    gemini: { input: 0.00000075, output: 0.00000375 },
+    claude: { input: 0.000001, output: 0.000005 },
+    qwen: { input: 0.00000015, output: 0.00000047 },
+  },
+} as const
+
+const nonNegativeInteger = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && Number.isInteger(value) ? value : undefined
+const nonNegativeNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+const strictNumber = (value: unknown): number | undefined => {
+  if (typeof value === 'number') return nonNegativeNumber(value)
+  if (typeof value !== 'string' || !/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) return undefined
+  const parsed = Number(value)
+  return nonNegativeNumber(parsed)
+}
+
+export function extractComparisonCost(
+  model: ComparisonModelId,
+  resultUsage: unknown,
+  providerMetadata: unknown,
+): ComparisonCost {
+  const usage = object(resultUsage)
+  const inputTokens = nonNegativeInteger(usage?.inputTokens)
+  const outputTokens = nonNegativeInteger(usage?.outputTokens)
+  const metadata = object(providerMetadata)
+  const gateway = object(metadata?.gateway)
+  const billedUsd = strictNumber(gateway?.cost) ?? null
+  const marketUsd = strictNumber(gateway?.marketCost)
+  if (marketUsd !== undefined) return { usd: marketUsd, billedUsd, source: 'gateway-market', inputTokens: inputTokens ?? null, outputTokens: outputTokens ?? null }
+  const price = comparisonPricing.usdPerToken[model]
+  if (inputTokens !== undefined && (outputTokens !== undefined || price.output === 0)) {
+    return { usd: inputTokens * price.input + (outputTokens ?? 0) * price.output, billedUsd, source: 'estimate', inputTokens, outputTokens: outputTokens ?? null }
+  }
+  if (billedUsd !== null) return { usd: billedUsd, billedUsd, source: 'gateway-billed', inputTokens: inputTokens ?? null, outputTokens: outputTokens ?? null }
+  return { usd: null, billedUsd: null, source: 'unavailable', inputTokens: inputTokens ?? null, outputTokens: outputTokens ?? null }
+}
 
 const models = new Set<ComparisonModelId>(comparisonModels.map((model) => model.id))
 const identities = new Set(['aligned', 'swapped', 'unclear'])
@@ -37,9 +82,18 @@ function decision(value: unknown, id: string): ComparisonDecision | undefined {
 
 export function parseComparisonResponse(raw: unknown, records: FormRecord[], model: ComparisonModelId): ComparisonResponse | undefined {
   const source = object(raw)
-  if (!source || !exactKeys(source, ['model', 'decisions', 'elapsedMs']) || source.model !== model || !Array.isArray(source.decisions) || source.decisions.length !== records.length || typeof source.elapsedMs !== 'number' || !Number.isFinite(source.elapsedMs) || source.elapsedMs < 0) return undefined
+  if (!source || !(['model', 'decisions', 'elapsedMs'].every((key) => Object.hasOwn(source, key))) || Object.keys(source).some((key) => !['model', 'decisions', 'elapsedMs', 'cost'].includes(key)) || source.model !== model || !Array.isArray(source.decisions) || source.decisions.length !== records.length || typeof source.elapsedMs !== 'number' || !Number.isFinite(source.elapsedMs) || source.elapsedMs < 0) return undefined
   const decisions = source.decisions.map((item, index) => decision(item, records[index].id))
-  return decisions.every(Boolean) ? { model, decisions: decisions as ComparisonDecision[], elapsedMs: source.elapsedMs } : undefined
+  const suppliedCost = object(source.cost)
+  const cost = suppliedCost && exactKeys(suppliedCost, ['usd', 'billedUsd', 'source', 'inputTokens', 'outputTokens']) &&
+    (suppliedCost.usd === null || nonNegativeNumber(suppliedCost.usd) !== undefined) &&
+    (suppliedCost.billedUsd === null || nonNegativeNumber(suppliedCost.billedUsd) !== undefined) &&
+    (suppliedCost.source === 'gateway-market' || suppliedCost.source === 'gateway-billed' || suppliedCost.source === 'estimate' || suppliedCost.source === 'unavailable') &&
+    (suppliedCost.inputTokens === null || nonNegativeInteger(suppliedCost.inputTokens) !== undefined) &&
+    (suppliedCost.outputTokens === null || nonNegativeInteger(suppliedCost.outputTokens) !== undefined)
+    ? suppliedCost as ComparisonCost
+    : ({ usd: null, billedUsd: null, source: 'unavailable', inputTokens: null, outputTokens: null } satisfies ComparisonCost)
+  return decisions.every(Boolean) ? { model, decisions: decisions as ComparisonDecision[], elapsedMs: source.elapsedMs, cost } : undefined
 }
 
 export const comparisonSchema = {

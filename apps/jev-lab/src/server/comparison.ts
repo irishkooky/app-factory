@@ -1,5 +1,7 @@
 import { createGateway, experimental_evaluate, generateText, jsonSchema, Output } from 'ai'
 import {
+  comparisonModels,
+  extractComparisonCost,
   comparisonSchema,
   parseComparisonResponse,
   sharedComparisonQuestions,
@@ -10,13 +12,6 @@ import {
 import { mapSemanticResult } from '../lib/semantic.ts'
 
 const MAX_BODY_BYTES = 24 * 1024
-const modelIds: Record<ComparisonModelId, string> = {
-  jev: 'typesafe-ai/jev',
-  gpt: 'openai/gpt-4.1-mini',
-  gemini: 'google/gemini-2.5-flash-lite',
-  claude: 'anthropic/claude-haiku-4.5',
-}
-
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { 'cache-control': 'no-store' } })
 
@@ -106,10 +101,12 @@ export async function evaluateComparison(
     controller.signal.throwIfAborted()
     const gateway = createGateway({ apiKey })
     let output: unknown
+    let usage: unknown
+    let providerMetadata: unknown
 
     if (input.model === 'jev') {
       const result = await experimental_evaluate({
-        model: gateway.evaluationModel(modelIds.jev),
+        model: gateway.evaluationModel(comparisonModels[0].providerId),
         state: {
           records: input.records.map(({ id, name, company, category, message }) =>
             ({ id, name, company, category, message })),
@@ -118,6 +115,8 @@ export async function evaluateComparison(
         maxRetries: 0,
         abortSignal: controller.signal,
       })
+      usage = result.usage
+      providerMetadata = result.providerMetadata
       const mapped = mapSemanticResult(result, input.records)
       if (!mapped) throw new Error('invalid')
       output = {
@@ -132,19 +131,21 @@ export async function evaluateComparison(
     } else {
       const prompt = toComparisonPrompt(input.records)
       const result = await generateText({
-        model: gateway(modelIds[input.model]),
+        model: gateway(comparisonModels.find((model) => model.id === input.model)?.providerId ?? ''),
         instructions: prompt.instructions,
         prompt: prompt.prompt,
         output: Output.object({ schema: jsonSchema(comparisonSchema) }),
-        temperature: 0,
-        maxOutputTokens: 2048,
+        ...(input.model === 'gpt' ? {} : { temperature: 0 }),
+        maxOutputTokens: 4096,
         maxRetries: 0,
         abortSignal: controller.signal,
-        providerOptions: input.model === 'gemini'
-          ? { google: { thinkingConfig: { thinkingBudget: 0 } } }
-          : undefined,
+        ...(input.model === 'gpt' || input.model === 'gemini' || input.model === 'qwen'
+          ? { reasoning: comparisonModels.find((model) => model.id === input.model)?.reasoning as 'none' | 'low' }
+          : {}),
       })
       output = result.output
+      usage = result.usage
+      providerMetadata = result.providerMetadata
     }
 
     const outputRecord = typeof output === 'object' && output !== null && !Array.isArray(output)
@@ -154,6 +155,7 @@ export async function evaluateComparison(
       model: input.model,
       decisions: outputRecord?.decisions,
       elapsedMs: Date.now() - started,
+      cost: extractComparisonCost(input.model, usage, providerMetadata),
     }, input.records, input.model)
     if (!parsed) return json({ error: '判断結果を読み取れませんでした。もう一度お試しください。' }, 502)
     return json(parsed)
