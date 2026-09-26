@@ -302,6 +302,6 @@ echo "  APP_URL:     $APP_URL"
 echo "  Convex env:  STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET / STRIPE_PRICE_ID / STRIPE_PORTAL_CONFIG_ID / APP_URL"
 echo
 echo "次のステップ（apps/$APP_NAME 内で実行）:"
-echo "  1. convex/billing.ts 等の課金用Convex関数を実装する（docs/billing.md 参照）"
+echo "  1. convex/billing.ts 等の課金用Convex関数を実装する（.agents/skills/stripe-billing/SKILL.md 参照）"
 echo "  2. npx convex deploy --cmd 'vp run build' --cmd-url-env-var-name VITE_CONVEX_URL"
 echo "  3. wrangler deploy"

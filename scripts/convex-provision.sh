@@ -110,6 +110,6 @@ echo "  認証情報:   apps/$APP_NAME/.env.local（gitignore済み）"
 echo
 echo "次のステップ（apps/$APP_NAME 内で実行）:"
 echo "  1. vp add convex @convex-dev/react-query @tanstack/react-query @tanstack/react-router-ssr-query"
-echo "  2. convex/ ディレクトリにスキーマ・関数を実装する（docs/convex.md 参照）"
+echo "  2. convex/ ディレクトリにスキーマ・関数を実装する（.agents/skills/convex-app/SKILL.md 参照）"
 echo "  3. npx convex deploy --cmd 'vp run build' --cmd-url-env-var-name VITE_CONVEX_URL"
 echo "  4. wrangler deploy"

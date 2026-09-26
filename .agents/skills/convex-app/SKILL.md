@@ -1,3 +1,8 @@
+---
+name: convex-app
+description: app-factory のアプリに Convex（DB）を組み込む手順。scripts/convex-provision.sh でのプロビジョニング、依存追加、スキーマと関数の実装、npx convex run での関数テスト、convex deploy と wrangler deploy の順序を扱う。データの保存・DB・永続化が必要なアプリを作るときや、既存の Convex アプリを直すときに使う。
+---
+
 # Convex を使うアプリの作り方
 
 データベースが必要なアプリは Convex（https://convex.dev）を使う。
@@ -13,7 +18,7 @@
 
 ### 1. プロビジョニング
 
-通常の新規アプリ手順（AGENTS.md セクション4）で `apps/<name>` を作った後:
+`new-app` スキルの手順で `apps/<name>` を作った後:
 
 ```bash
 scripts/convex-provision.sh <name>
