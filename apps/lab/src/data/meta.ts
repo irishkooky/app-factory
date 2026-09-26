@@ -33,6 +33,12 @@ export const META: Record<string, AppMeta> = {
     tags: ['テンプレート'],
     hidden: true,
   },
+  'jev-lab': {
+    title: 'Jev 気づくフォーム',
+    description: '入力の意味に気づく受付フォーム。Jev・GPT 5.6 Luna・Gemini 3.8 Flash・Claude・Qwenで、同じ入力の判断・応答時間・コストを比較できます。',
+    category: 'demo',
+    tags: ['AI', 'Jev', 'Qwen', 'フォーム', 'Generative UI'],
+  },
   'ai-era-skill-quiz': {
     title: 'AI時代にはもう要らない？エンジニアスキルクイズ',
     description: 'AIに聞けば済むようになった懐かしのスキルを4択で出題。高得点ほど化石度が高い。',

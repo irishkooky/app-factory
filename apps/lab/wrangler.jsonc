@@ -37,6 +37,10 @@
       "service": "hello"
     },
     {
+      "binding": "APP_JEV_LAB",
+      "service": "jev-lab"
+    },
+    {
       "binding": "APP_LOOP_ENGINEERING_DEMO",
       "service": "loop-engineering-demo"
     },

@@ -1,0 +1,125 @@
+.semantic-lab { min-height: 100vh; color: #22263b; background: #f7f5ed; padding-bottom: 20px; }
+.semantic-lab * { box-sizing: border-box; }
+.semantic-lab button:focus-visible, .semantic-lab a:focus-visible, .semantic-lab summary:focus-visible { outline: 3px solid #518e7a; outline-offset: 4px; }
+.semantic-lab .semantic-nav { min-height: 66px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #d9d5c8; }
+.semantic-lab .semantic-brand { display: flex; gap: 9px; align-items: center; color: #22263b; text-decoration: none; }
+.semantic-lab .semantic-brand strong { font-size: 25px; letter-spacing: -1px; }
+.semantic-lab .semantic-brand > span:last-child { font-size: 12px; font-weight: 800; }
+.semantic-lab .semantic-brand-mark { width: 27px; height: 27px; display: grid; place-items: center; border: 2px solid #22263b; background: #9fc7b7; font: italic 900 19px Georgia, serif; transform: rotate(-6deg); box-shadow: 2px 2px 0 #22263b; border-radius: 7px; }
+.semantic-lab .theater-link { color: #666b70; text-decoration: none; font-size: 11px; }
+.semantic-lab .theater-link span { margin-left: 10px; }
+.semantic-lab .semantic-hero { padding: 29px 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.semantic-lab .semantic-eyebrow { color: #9b654c; font-size: 11px; font-weight: 800; letter-spacing: .13em; margin: 0 0 8px; }
+.semantic-lab h1 { margin: 0 0 12px; font-size: clamp(28px, 3.4vw, 43px); font-weight: 900; line-height: 1.4; letter-spacing: -.07em; }
+.semantic-lab h1 > span { background: linear-gradient(transparent 76%, #efd484 76% 94%, transparent 94%); }
+.semantic-lab .semantic-hero p:last-child { margin: 0; color: #777680; font-size: 12px; line-height: 1.8; }
+.semantic-lab .semantic-mobile-break { display: none; }
+.semantic-lab .semantic-hero-note { transform: rotate(5deg); padding: 13px 18px; font-size: 11px; line-height: 1.5; border: 1px solid #b9ac8e; background: #eee2be; flex-shrink: 0; box-shadow: 3px 3px 0 #d4c9af; }
+.semantic-lab .semantic-hero-note strong { font-size: 16px; }
+.semantic-lab .semantic-hero-note span { display: block; font-size: 8px; margin-top: 8px; color: #877251; }
+.semantic-lab .semantic-modebar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 10px; }
+.semantic-lab .semantic-modebar > span { font-size: 10px; color: #82808a; }
+.semantic-lab .semantic-modebar .mantine-SegmentedControl-root { background: #e9e7dd; }
+.semantic-lab .semantic-modebar .mantine-SegmentedControl-label { font-size: 12px; padding: 8px 18px; font-weight: 700; }
+.semantic-lab .sample-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-bottom: 20px; }
+.semantic-lab .sample-strip button { border: 1px solid #d5d0c1; background: #fbfaf4; border-radius: 7px; padding: 10px 11px; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 7px; color: #454755; min-width: 0; line-height: 1.45; }
+.semantic-lab .sample-strip button.selected { border-color: #22263b; background: #f6e8c0; box-shadow: 2px 2px 0 #22263b; }
+.semantic-lab .sample-strip small { font-size: 10px; color: #979085; font-family: Georgia, serif; }
+.semantic-lab .sample-strip span { font-size: 10px; font-weight: 800; }
+.semantic-lab .semantic-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.semantic-lab .inquiry-panel, .semantic-lab .semantic-result-panel { border: 1px solid #d1cebf; background: #fffdf7; padding: 23px; border-radius: 13px; min-width: 0; }
+.semantic-lab .inquiry-panel { box-shadow: 4px 4px 0 #e6e0d2; }
+.semantic-lab .semantic-result-panel { background: #f0f2e8; border-color: #d3d9c9; }
+.semantic-lab .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 22px; }
+.semantic-lab .panel-heading > div { display: flex; align-items: center; gap: 8px; }
+.semantic-lab .section-number { color: #9b9587; font: italic 17px Georgia, serif; }
+.semantic-lab h2 { font-size: 16px; margin: 0; font-weight: 800; letter-spacing: -.035em; }
+.semantic-lab .inquiry-panel .mantine-InputWrapper-label { font-size: 11px; margin-bottom: 5px; color: #555765; font-weight: 700; }
+.semantic-lab .inquiry-panel .mantine-Input-input { background: #fffefa; font-size: 13px; border-color: #d3d2c7; border-radius: 7px; }
+.semantic-lab .inquiry-panel .mantine-Input-input:focus { border-color: #518e7a; }
+.semantic-lab .form-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 8px; line-height: 1.6; color: #929099; margin-top: 7px; }
+.semantic-lab .form-meta > span:last-child { white-space: nowrap; }
+.semantic-lab .static-check { margin: 19px 0; padding: 11px 12px; background: #fcf0db; border: 1px dashed #d7cdb7; display: flex; gap: 9px; border-radius: 7px; }
+.semantic-lab .static-check.static-valid { background: #eff3e9; border-color: #cbd7c5; }
+.semantic-lab .static-check > span { border: 1px solid #83866b; border-radius: 50%; width: 17px; height: 17px; display: grid; place-items: center; font-size: 10px; flex-shrink: 0; }
+.semantic-lab .static-check strong { font-size: 11px; display: block; }
+.semantic-lab .static-check p { margin: 3px 0 0; font-size: 9px; color: #7e8076; line-height: 1.6; }
+.semantic-lab .semantic-check-button { box-shadow: 3px 3px 0 #a5c9b6; font-size: 13px; }
+.semantic-lab .semantic-check-button span[aria-hidden] { padding-left: 11px; }
+.semantic-lab .semantic-time { font-size: 9px; white-space: nowrap; color: #648675; }
+.semantic-lab .reception-desk { display: flex; align-items: center; gap: 16px; padding: 0 0 20px; border-bottom: 1px solid #d9dfcf; margin-bottom: 20px; }
+.semantic-lab .receptionist { width: 112px; flex: 0 0 112px; }
+.semantic-lab .reception-speech { position: relative; background: #fffdf6; border: 1.5px solid #343748; padding: 14px 15px; border-radius: 13px 13px 13px 2px; font-weight: 800; font-size: 14px; line-height: 1.6; transform: rotate(-2deg); }
+.semantic-lab .reception-speech small { display: block; font-size: 9px; font-weight: 400; color: #88838a; margin-top: 7px; line-height: 1.6; }
+.semantic-lab .meaning-placeholder { padding: 4px 6px 8px; color: #7e847b; }
+.semantic-lab .meaning-placeholder > span { font-size: 11px; display: block; margin-bottom: 16px; font-weight: 700; }
+.semantic-lab .meaning-placeholder > div { display: flex; gap: 11px; align-items: center; padding: 11px 0; font-size: 12px; border-bottom: 1px dashed #d8ddce; }
+.semantic-lab .meaning-placeholder i { font-style: normal; font-size: 17px; color: #8b9d88; }
+.semantic-lab .meaning-placeholder small { display: block; font-size: 8px; line-height: 1.8; margin-top: 19px; color: #969b90; }
+.semantic-lab .adaptive-cards { display: grid; gap: 13px; }
+.semantic-lab .adaptive-card { position: relative; background: #fffdf7; border: 1px solid #d9ccb3; border-radius: 10px; padding: 19px 17px 15px; animation: semantic-appear .25s ease-out; }
+.semantic-lab .adaptive-icon { display: grid; place-items: center; width: 21px; height: 21px; border: 1.4px solid #22263b; border-radius: 50%; background: #f2d48b; font-size: 12px; font-weight: 900; margin-bottom: 10px; box-shadow: 2px 2px 0 #22263b; transform: rotate(-10deg); }
+.semantic-lab .adaptive-card h3 { margin: 0 0 9px; font-size: 15px; line-height: 1.65; letter-spacing: -.025em; }
+.semantic-lab .adaptive-card p { font-size: 11px; color: #777580; line-height: 1.8; margin: 0 0 13px; overflow-wrap: anywhere; }
+.semantic-lab .adaptive-card .mantine-Button-root { max-width: 100%; }
+.semantic-lab .adaptive-card .mantine-Button-label { white-space: normal; }
+.semantic-lab .swap-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; margin: 12px 0 17px; border: 1px dashed #ded6c5; border-radius: 7px; background: #faf6ea; }
+.semantic-lab .swap-preview > div { display: flex; align-items: flex-start; flex-direction: column; gap: 4px; min-width: 0; }
+.semantic-lab .swap-preview small { font-size: 9px; color: #908477; }
+.semantic-lab .swap-preview del { font-size: 11px; color: #9a9191; overflow-wrap: anywhere; }
+.semantic-lab .swap-preview strong { font-size: 12px; overflow-wrap: anywhere; }
+.semantic-lab .swap-preview span { font-size: 12px; color: #b59572; }
+.semantic-lab .category-preview { display: flex; gap: 12px; padding: 11px 13px; align-items: center; margin: 12px 0 17px; border-radius: 7px; background: #f8efda; font-size: 12px; }
+.semantic-lab .category-preview > span:first-child { color: #9c9184; }
+.semantic-lab .adaptive-fields { display: grid; gap: 10px; border-left: 3px solid #e7c982; padding-left: 13px; }
+.semantic-lab .adaptive-fields .mantine-InputWrapper-label { font-size: 10px; }
+.semantic-lab .adaptive-fields .mantine-Input-input { font-size: 12px; }
+.semantic-lab .adaptive-fields > button { justify-self: start; }
+.semantic-lab .adaptive-card ul { font-size: 11px; line-height: 1.8; padding-left: 18px; color: #756f78; }
+.semantic-lab .ready-card { background: #f9fcf3; border-color: #c0d3bd; }
+.semantic-lab .ready-card .adaptive-icon { background: #b0d0b8; }
+.semantic-lab .acknowledged-card { background: #f2f6ed; border-style: dashed; border-color: #c1ceb9; }
+.semantic-lab .acknowledged-card p { margin-top: 10px; }
+.semantic-lab .advisory-note .mantine-Alert-message { font-size: 10px; }
+.semantic-lab .demo-submit { margin-top: 19px; padding-top: 17px; border-top: 1px solid #d2dccc; }
+.semantic-lab .confirmation-summary { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 7px; margin-bottom: 0; font-size: 11px; line-height: 1.6; }
+.semantic-lab .confirmation-summary dt { color: #66877a; }.semantic-lab .confirmation-summary dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.semantic-lab .semantic-pending { text-align: center; padding: 40px 10px; font-size: 11px; color: #8b9085; }
+.semantic-lab .semantic-pending > span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #a8bdab; margin: 0 4px; animation: semantic-pulse .8s infinite alternate; }
+.semantic-lab .semantic-pending > span:nth-child(2) { animation-delay: .2s; }.semantic-lab .semantic-pending > span:nth-child(3) { animation-delay: .4s; }
+.semantic-lab .thinking-dot { animation: semantic-pulse .8s infinite alternate; }
+.semantic-lab .semantic-internals { border-top: 1px solid #d1d0c2; margin-top: 28px; padding: 18px 0; }
+.semantic-lab .semantic-internals summary { cursor: pointer; font-size: 12px; font-weight: 800; }
+.semantic-lab .semantic-internals summary > span { color: #94909a; font-size: 10px; margin-left: 10px; font-weight: 400; }
+.semantic-lab .semantic-internals p { font-size: 10px; color: #86828b; line-height: 1.8; }
+.semantic-lab .render-pipeline { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 20px 0 13px; }
+.semantic-lab .render-pipeline > span { border: 1px solid #d1d2c4; padding: 10px 15px; border-radius: 7px; font-size: 11px; background: #fffdf7; }
+.semantic-lab .render-pipeline b { color: #959b8b; font-size: 12px; }
+.semantic-lab .json-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }.semantic-lab .json-pair > div { min-width: 0; }
+.semantic-lab .json-pair h3 { font-size: 11px; }.semantic-lab .json-pair pre { border-radius: 9px; background: #252938; color: #d6dfd0; padding: 16px; font-size: 10px; overflow: auto; max-height: 360px; }
+.semantic-lab .batch-introduction { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 21px 0 25px; }
+.semantic-lab .batch-introduction h2 { font-size: 23px; }.semantic-lab .batch-introduction p:not(.semantic-eyebrow) { font-size: 11px; color: #89838b; margin-bottom: 0; }.semantic-lab .batch-introduction .batch-timing { font-size: 12px; }
+.semantic-lab .batch-records { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; }
+.semantic-lab .batch-record { padding: 21px; border: 1px solid #d3cebd; border-radius: 12px; background: #fffdf7; min-width: 0; }
+.semantic-lab .batch-record-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }.semantic-lab .batch-record-number { font: italic 23px Georgia, serif; color: #b5ac9c; }.semantic-lab .batch-meaning-status { font-size: 9px; margin-left: auto; color: #9b968f; }
+.semantic-lab .batch-record h3 { font-size: 14px; margin: 0 0 9px; overflow-wrap: anywhere; }.semantic-lab .batch-record h3 > span { font-size: 11px; color: #87838d; font-weight: 400; }
+.semantic-lab .batch-message { font-size: 12px; line-height: 1.8; color: #64636c; margin: 0 0 9px; overflow-wrap: anywhere; }.semantic-lab .batch-category { color: #939185; font-size: 9px; }
+.semantic-lab .batch-waiting { background: #f4f3ea; color: #aaa69d; padding: 12px; border-radius: 5px; font-size: 10px; margin: 12px 0; }
+.semantic-lab .batch-plan { list-style: none; padding: 11px 12px; background: #eef3e8; color: #60715d; border-radius: 5px; font-size: 11px; line-height: 1.8; }
+.semantic-lab .batch-plan li + li { border-top: 1px dashed #d4ddca; padding-top: 4px; margin-top: 4px; }
+.semantic-lab .batch-revealed { animation: semantic-appear .35s both; border-color: #b7c9af; }
+.semantic-lab .batch-measure-note { font-size: 10px; color: #8b878e; margin: 18px 0; }
+.semantic-lab .semantic-footer { border-top: 1px solid #d9d5c8; margin-top: 25px; padding: 17px 0 5px; color: #96909a; font-size: 9px; line-height: 1.9; }
+.semantic-lab .semantic-footer p { margin: 0 0 3px; }.semantic-lab .semantic-footer > span { display: block; font-size: 8px; letter-spacing: .16em; margin-top: 17px; color: #aaa49f; }
+@keyframes semantic-appear { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes semantic-pulse { from { opacity: .4; transform: translateY(2px); } to { opacity: 1; transform: translateY(-2px); } }
+@media (max-width: 900px) {
+  .semantic-lab .semantic-hero-note { display: none; }.semantic-lab .sample-strip { grid-template-columns: repeat(3, 1fr); }.semantic-lab .semantic-modebar > span { display: none; }.semantic-lab .semantic-workspace { gap: 16px; }.semantic-lab .inquiry-panel, .semantic-lab .semantic-result-panel { padding: 18px; }.semantic-lab .panel-heading { gap: 7px; flex-wrap: wrap; }.semantic-lab h2 { font-size: 14px; }.semantic-lab .reception-desk { gap: 8px; }.semantic-lab .receptionist { width: 86px; flex-basis: 86px; }.semantic-lab .reception-speech { padding: 11px; font-size: 12px; }.semantic-lab .reception-speech small { font-size: 8px; }
+}
+@media (max-width: 650px) {
+  .semantic-lab .semantic-workspace { grid-template-columns: 1fr; gap: 23px; }.semantic-lab .semantic-hero { padding-top: 23px; }.semantic-lab h1 { font-size: 31px; line-height: 1.5; }.semantic-lab h1 > span { display: inline-block; }.semantic-lab .semantic-hero p:last-child { font-size: 11px; }.semantic-lab .semantic-mobile-break { display: initial; }.semantic-lab .sample-strip { grid-template-columns: repeat(2, 1fr); }.semantic-lab .sample-strip button { padding: 9px 10px; }.semantic-lab .sample-strip button:last-child { grid-column: 1 / -1; }.semantic-lab .sample-strip span { font-size: 10px; }.semantic-lab .receptionist { width: 108px; flex-basis: 108px; }.semantic-lab .reception-speech { font-size: 13px; }.semantic-lab .reception-speech small { font-size: 9px; }.semantic-lab .batch-introduction { flex-direction: column; align-items: flex-start; padding-top: 13px; gap: 18px; }.semantic-lab .batch-records { grid-template-columns: 1fr; }.semantic-lab .batch-introduction h2 { font-size: 22px; }.semantic-lab .json-pair { grid-template-columns: 1fr; gap: 10px; }.semantic-lab .semantic-internals summary > span { display: block; margin: 8px 0 0 14px; }.semantic-lab .render-pipeline { gap: 7px; }.semantic-lab .render-pipeline > span { font-size: 9px; padding: 8px; }
+}
+@media (max-width: 400px) {
+  .semantic-lab > .mantine-Container-root { padding-inline: 14px; }.semantic-lab .semantic-nav { min-height: 59px; }.semantic-lab .semantic-brand { gap: 6px; }.semantic-lab .semantic-brand strong { font-size: 22px; }.semantic-lab .semantic-brand > span:last-child { font-size: 10px; }.semantic-lab .theater-link { font-size: 9px; }.semantic-lab h1 { font-size: 29px; }.semantic-lab .semantic-hero p:last-child { font-size: 10px; }.semantic-lab .semantic-modebar .mantine-SegmentedControl-label { font-size: 11px; }.semantic-lab .panel-heading { margin-bottom: 19px; }.semantic-lab .inquiry-panel, .semantic-lab .semantic-result-panel { padding: 17px 15px; }.semantic-lab .form-meta { font-size: 7px; }.semantic-lab .adaptive-card { padding: 16px 13px; }.semantic-lab .adaptive-card h3 { font-size: 14px; }.semantic-lab .adaptive-card .mantine-Button-root { font-size: 11px; }.semantic-lab .semantic-footer { font-size: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .semantic-lab *, .semantic-lab *::before, .semantic-lab *::after { animation: none !important; transition: none !important; } }
