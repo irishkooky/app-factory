@@ -61,7 +61,9 @@ pstack の指示とこの節が食い違ったら、この節を優先する。
 1. **デプロイで止まらない。** `wrangler deploy`、`npx convex deploy`、`vp run release`（apps/lab）は
    このリポジトリでは日常の可逆な操作として扱い、確認を取らずに実行する。条件は `vp run build` が通っていること。
    Worker の削除、Convex プロジェクトやデータの削除、Stripe の本番モード化、共有ブランチへの force push は従来どおり止まって確認する
-2. **PR とマージ。** PR は ready で作る（`draft: false`）。
+2. **PR とマージ。** PR は ready で作る（`draft: false`）。PR の本文は日本語で書く。
+   セクション構成（Why / Scope / Tradeoffs / Blast Radius / Verification）は pstack の Opening a PR に従い、
+   見出しは「背景 / 変更範囲 / 検討した代替案 / 影響範囲 / 検証」とする
    - 変更が `apps/` 配下だけなら squash merge まで行い、リモートブランチを消す。
      デプロイがマージより先に来るので、マージは main を本番の写しに保つ作業。未マージで終えない
    - `apps/` 以外（`AGENTS.md`、`.agents/`、`.cursor/`、`apps/hello`、`scripts/`、`packages/`、ルートの設定）に
