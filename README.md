@@ -9,8 +9,9 @@
 
 ## 使い方
 
-詳細な運用ルール・新規アプリの作り方は [AGENTS.md](./AGENTS.md) を参照してください
-（`CLAUDE.md` は `AGENTS.md` へのシンボリックリンクです）。
+運用ルールは [AGENTS.md](./AGENTS.md)、新規アプリの作り方や出荷・検証の手順は
+[.agents/skills/](./.agents/skills/) のスキルを参照してください
+（`CLAUDE.md` は `AGENTS.md` へ、`.claude` は `.agents` へのシンボリックリンクです）。
 
 ```bash
 # 依存関係インストール（ワークスペース全体）

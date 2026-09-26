@@ -1,3 +1,8 @@
+---
+name: stripe-billing
+description: app-factory のアプリに Stripe サブスク課金（テストモード、Free/Pro の2プラン）を組み込む手順。scripts/stripe-provision.sh、Convex 側の Checkout / Customer Portal / webhook、サーバー側でのプラン制限を扱う。課金・有料プラン・サブスクが必要なアプリを作るときに使う。Convex と Clerk が前提。参照実装は apps/cash-forecast。
+---
+
 # 課金（Stripe サブスク Free/Pro）が必要なアプリの作り方
 
 サブスク課金が必要なアプリは **Stripe（テストモード）+ Convex + Clerk** を使う。
@@ -10,9 +15,9 @@
 - `STRIPE_SECRET_KEY` が環境変数として供給されている
   （**テストモードの鍵**。ローカルではリポジトリ直下の `.env`。スクリプトが自動で読む）
 - 課金アプリは **Convex + Clerk 前提**（プラン状態の保存とユーザー識別に使う）。
-  `docs/convex.md` / `docs/auth.md` を先に実施すること
+  `convex-app` / `clerk-auth` スキルを先に実施すること
 - すべて**テストモード**で実装・検証する。実課金の開始はそのアプリの本番化
-  （独自ドメイン + Clerk 本番インスタンス。`docs/auth.md` の注意事項参照）が済んでから
+  （独自ドメイン + Clerk 本番インスタンス。`clerk-auth` スキルの注意事項参照）が済んでから
 
 ## 仕組み（全体像）
 
@@ -27,7 +32,7 @@
 
 ### 1. プロビジョニング
 
-`docs/convex.md` と `docs/auth.md` の手順を済ませた後:
+`convex-app` と `clerk-auth` スキルの手順を済ませた後:
 
 ```bash
 scripts/stripe-provision.sh <name> [monthly-price-jpy]   # 省略時 300円
