@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as billing from "../billing.js";
 import type * as http from "../http.js";
+import type * as imports from "../imports.js";
 import type * as reconcile from "../reconcile.js";
 import type * as rules from "../rules.js";
 import type * as settings from "../settings.js";
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   billing: typeof billing;
   http: typeof http;
+  imports: typeof imports;
   reconcile: typeof reconcile;
   rules: typeof rules;
   settings: typeof settings;
