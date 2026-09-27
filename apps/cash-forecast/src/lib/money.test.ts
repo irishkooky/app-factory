@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moneyInputErrorMessage, parseMoneyInput, toMoneyInputText } from "./money";
+import { moneyInputErrorMessage, parseMoneyInput, signedAmount, toMoneyInputText } from "./money";
 
 describe("parseMoneyInput", () => {
   it("そのまま整数: '1000000' → ok 1000000", () => {
@@ -192,5 +192,11 @@ describe("moneyInputErrorMessage", () => {
 
   it("partial は undefined", () => {
     expect(moneyInputErrorMessage("partial")).toBeUndefined();
+  });
+});
+
+describe("signedAmount", () => {
+  it("支出を負にする", () => {
+    expect([signedAmount("income", 300), signedAmount("expense", 300)]).toEqual([300, -300]);
   });
 });

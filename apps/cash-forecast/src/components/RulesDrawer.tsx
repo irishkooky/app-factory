@@ -15,7 +15,8 @@ import {
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
-import { formatYen } from '../lib/money'
+import type { Kind } from '../lib/money'
+import { KindYen, kindTone } from './Amount'
 import type { RulePreset } from '../lib/rulePresets'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
@@ -131,10 +132,7 @@ function RulesDrawerContent({
                 <Card.Content className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <span className="font-medium">{rule.name}</span>
-                    <span className={`text-sm ${rule.kind === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
-                      {rule.kind === 'expense' ? '-' : '+'}
-                      {formatYen(rule.amount)}
-                    </span>
+                    <span className={`text-sm ${kindTone(rule.kind)}`}><KindYen kind={rule.kind} amount={rule.amount} /></span>
                     <span className="text-xs text-muted">
                       毎月{rule.dayOfMonth}日
                       {rule.endDate ? `（${rule.endDate}まで）` : ''}
@@ -187,7 +185,7 @@ function RuleForm({
   const [submitting, setSubmitting] = useState(false)
 
   const [name, setName] = useState(rule?.name ?? preset?.name ?? '')
-  const [kind, setKind] = useState<'income' | 'expense'>(rule?.kind ?? preset?.kind ?? 'expense')
+  const [kind, setKind] = useState<Kind>(rule?.kind ?? preset?.kind ?? 'expense')
   const [amount, setAmount] = useState<number | undefined>(rule?.amount)
   const [dayOfMonth, setDayOfMonth] = useState<number | undefined>(rule?.dayOfMonth ?? preset?.dayOfMonth ?? 1)
   const [endDate, setEndDate] = useState(rule?.endDate ?? '')

@@ -2,35 +2,15 @@
 // このアプリはSSRされる（Workers/ローカルNodeはUTC）ため、todayJST 以外で
 // `new Date()` から暗黙にローカル日付を作らない。日付の分解・演算は文字列パース + 数値計算で行う。
 
-const MONTH_LABELS_JA = [
-  "1月",
-  "2月",
-  "3月",
-  "4月",
-  "5月",
-  "6月",
-  "7月",
-  "8月",
-  "9月",
-  "10月",
-  "11月",
-  "12月",
-] as const;
-
 /** Asia/Tokyo における「今日」を "YYYY-MM-DD" で返す。 */
 export function todayJST(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(new Date());
 }
 
 /** 指定した年月の日数。month は 1-12。うるう年対応。 */
-export function daysInMonth(year: number, month: number): number {
+function daysInMonth(year: number, month: number): number {
   // day=0 は「前月の末日」を意味するため、month の翌月の0日目 = month の末日になる
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-/** day を year/month の日数にクランプする。 */
-export function clampDay(year: number, month: number, day: number): number {
-  return Math.min(day, daysInMonth(year, month));
 }
 
 function parseYearMonth(yyyyMm: string): { year: number; month: number } {
@@ -58,11 +38,7 @@ export function addMonths(yyyyMm: string, n: number): string {
 
 /** "YYYY-MM-DD" に n ヶ月を加算する。日は加算後の月の日数にクランプする（例: 1/31 +1ヶ月 → 2/28）。 */
 export function addMonthsToDateClamped(yyyyMmDd: string, n: number): string {
-  const { year, month, day } = parseDate(yyyyMmDd);
-  const nextYm = addMonths(`${year}-${pad2(month)}`, n);
-  const { year: newYear, month: newMonth } = parseYearMonth(nextYm);
-  const clampedDay = clampDay(newYear, newMonth, day);
-  return `${newYear}-${pad2(newMonth)}-${pad2(clampedDay)}`;
+  return clampedDateInMonth(addMonths(monthOf(yyyyMmDd), n), parseDate(yyyyMmDd).day);
 }
 
 /** "YYYY-MM-DD" から "YYYY-MM" を取り出す。 */
@@ -91,14 +67,12 @@ export function formatDateShort(yyyyMmDd: string): string {
 /** "YYYY-MM" を「2026年8月」表示に整形する。 */
 export function formatMonthLabel(yyyyMm: string): string {
   const { year, month } = parseYearMonth(yyyyMm);
-  return `${year}年${MONTH_LABELS_JA[month - 1]}`;
+  return `${year}年${month}月`;
 }
 
-/** yyyyMm 月の締め日（月の日数を超える場合は末日にクランプ）を "YYYY-MM-DD" で返す。 */
-function closingDateFor(yyyyMm: string, closingDay: number): string {
+export function clampedDateInMonth(yyyyMm: string, day: number): string {
   const { year, month } = parseYearMonth(yyyyMm);
-  const day = clampDay(year, month, closingDay);
-  return `${year}-${pad2(month)}-${pad2(day)}`;
+  return `${year}-${pad2(month)}-${pad2(Math.min(day, daysInMonth(year, month)))}`;
 }
 
 /**
@@ -107,10 +81,10 @@ function closingDateFor(yyyyMm: string, closingDay: number): string {
  */
 export function usagePeriodLabel(paymentDate: string, closingDay: number): string {
   const paymentMonth = monthOf(paymentDate);
-  const closeThisMonth = closingDateFor(paymentMonth, closingDay);
+  const closeThisMonth = clampedDateInMonth(paymentMonth, closingDay);
   const end =
-    closeThisMonth <= paymentDate ? closeThisMonth : closingDateFor(addMonths(paymentMonth, -1), closingDay);
-  const prevClose = closingDateFor(addMonths(monthOf(end), -1), closingDay);
+    closeThisMonth <= paymentDate ? closeThisMonth : clampedDateInMonth(addMonths(paymentMonth, -1), closingDay);
+  const prevClose = clampedDateInMonth(addMonths(monthOf(end), -1), closingDay);
   const start = addDays(prevClose, 1);
   return `（${formatDateShort(start)}-${formatDateShort(end)}）`;
 }

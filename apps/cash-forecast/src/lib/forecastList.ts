@@ -3,6 +3,7 @@
 
 import type { ForecastRow } from "./forecast";
 import { monthOf } from "./date";
+import { signedAmount } from "./money";
 
 /** 「今」の残高と、その残高がどの時点のものかを表す。 */
 export type CurrentPosition = {
@@ -56,6 +57,20 @@ export function currentPosition(input: {
   return { balance, asOfDate, hasTodayRows };
 }
 
+export function lowestBalanceAhead(
+  rows: ForecastRow[],
+  today: string,
+  currentBalance: number,
+): { balance: number; date: string } {
+  const futureRows = rows.filter((row) => row.date >= today);
+  const candidates = futureRows.length > 0 ? futureRows : rows;
+  const lowest = candidates.reduce<ForecastRow | undefined>(
+    (min, row) => (min === undefined || row.balance < min.balance ? row : min),
+    undefined,
+  );
+  return lowest ? { balance: lowest.balance, date: lowest.date } : { balance: currentBalance, date: today };
+}
+
 /**
  * ForecastList 描画用のアイテム列を組み立てる。
  * 月見出し・「今日」マーカー・各行を、日付順を保ったまま並べる。
@@ -77,13 +92,13 @@ export function buildForecastListItems(input: {
   const rest = rows.filter((row) => row.date >= today);
 
   if (past.length > 0) {
-    let net = 0;
-    let reviewCount = 0;
-    for (const row of past) {
-      net += row.kind === "income" ? row.amount : -row.amount;
-      if (row.isVirtual) reviewCount += 1;
-    }
-    items.push({ type: "past", key: "past", rows: past, net, reviewCount });
+    items.push({
+      type: "past",
+      key: "past",
+      rows: past,
+      net: past.reduce((sum, row) => sum + signedAmount(row.kind, row.amount), 0),
+      reviewCount: past.filter((row) => row.isVirtual).length,
+    });
   }
 
   let currentMonth: string | null = null;

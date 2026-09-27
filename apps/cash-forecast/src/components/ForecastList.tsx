@@ -6,6 +6,7 @@ import type { HistoryRow } from '../lib/history'
 import { buildForecastListItems, type CurrentPosition, type PastGroupItem } from '../lib/forecastList'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
 import { formatYen } from '../lib/money'
+import { KindYen, NetYen, kindTone, netTone } from './Amount'
 import { summarizeByMonth, type MonthSummary } from '../lib/summary'
 
 type ForecastListProps = {
@@ -30,13 +31,10 @@ export function ForecastList({
   onTodayClick,
 }: ForecastListProps) {
   const items = buildForecastListItems({ rows, today, anchorDate, anchorBalance })
-  const monthSummaries = useMemo(() => {
-    const map = new Map<string, MonthSummary>()
-    for (const summary of summarizeByMonth(rows)) {
-      map.set(summary.month, summary)
-    }
-    return map
-  }, [rows])
+  const monthSummaries = useMemo(
+    () => new Map(summarizeByMonth(rows).map((summary) => [summary.month, summary])),
+    [rows],
+  )
 
   if (rows.length === 0 && (historyRows?.length ?? 0) === 0) {
     return (
@@ -92,23 +90,14 @@ function HistorySection({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const monthGroups = useMemo(() => {
-    const map = new Map<string, HistoryRow[]>()
+    const rowsByMonth = new Map<string, HistoryRow[]>()
     for (const row of rows) {
       const month = monthOf(row.date)
-      const list = map.get(month)
-      if (list) {
-        list.push(row)
-      } else {
-        map.set(month, [row])
-      }
+      const monthRows = rowsByMonth.get(month)
+      if (monthRows) monthRows.push(row)
+      else rowsByMonth.set(month, [row])
     }
-    const summaries = new Map<string, MonthSummary>()
-    for (const summary of summarizeByMonth(rows)) {
-      summaries.set(summary.month, summary)
-    }
-    return [...map.entries()]
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([month, monthRows]) => ({ month, rows: monthRows, summary: summaries.get(month) }))
+    return summarizeByMonth(rows).map((summary) => ({ summary, rows: rowsByMonth.get(summary.month) ?? [] }))
   }, [rows])
 
   const toggle = (month: string) => {
@@ -125,7 +114,8 @@ function HistorySection({
 
   return (
     <div className="flex flex-col">
-      {monthGroups.map(({ month, rows: monthRows, summary }) => {
+      {monthGroups.map(({ summary, rows: monthRows }) => {
+        const { month } = summary
         const isOpen = expanded.has(month)
         return (
           <div key={month} className="flex flex-col">
@@ -140,12 +130,7 @@ function HistorySection({
               />
               <span className="text-sm font-medium">{formatMonthLabel(month)}</span>
               <span className="text-sm text-muted">実績 {monthRows.length}件</span>
-              {summary && (
-                <span className={`text-sm tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                  収支 {summary.net >= 0 ? '+' : ''}
-                  {formatYen(summary.net)}
-                </span>
-              )}
+              <NetLabel net={summary.net} />
             </button>
             {isOpen && (
               <div className="flex flex-col">
@@ -162,9 +147,6 @@ function HistorySection({
 }
 
 function HistoryListRow({ row, onClick }: { row: HistoryRow; onClick?: () => void }) {
-  const amountColor = row.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
-  const amountSign = row.kind === 'expense' ? '-' : '+'
-
   return (
     <button
       type="button"
@@ -182,10 +164,7 @@ function HistoryListRow({ row, onClick }: { row: HistoryRow; onClick?: () => voi
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0">
-          <span className={`text-sm tabular-nums ${amountColor}`}>
-            {amountSign}
-            {formatYen(row.amount)}
-          </span>
+          <span className={`text-sm tabular-nums ${kindTone(row.kind)}`}><KindYen kind={row.kind} amount={row.amount} /></span>
           <span className="text-xs tabular-nums">{formatYen(row.balance)}</span>
         </div>
       </div>
@@ -197,14 +176,13 @@ function MonthDividerLabel({ month, summary }: { month: string; summary: MonthSu
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       <span className="text-sm font-medium">{formatMonthLabel(month)}</span>
-      {summary && (
-        <span className={`text-sm tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-          収支 {summary.net >= 0 ? '+' : ''}
-          {formatYen(summary.net)}
-        </span>
-      )}
+      {summary && <NetLabel net={summary.net} />}
     </div>
   )
+}
+
+function NetLabel({ net }: { net: number }) {
+  return <span className={`text-sm tabular-nums ${netTone(net)}`}>収支 <NetYen value={net} /></span>
 }
 
 // 「今日」の位置を示すマーカー。しきい値割れ（黄色系）と衝突しないよう、
@@ -272,9 +250,7 @@ function PastSection({
         />
         <span className="text-sm font-medium">今日より前</span>
         <span className="text-sm text-muted">{group.rows.length}件</span>
-        <span className={`text-sm tabular-nums ${group.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-          収支 {group.net >= 0 ? '+' : ''}{formatYen(group.net)}
-        </span>
+        <NetLabel net={group.net} />
         {group.reviewCount > 0 && (
           <Chip size="sm" variant="soft" color="warning" className="shrink-0">
             要確認 {group.reviewCount}件
@@ -303,8 +279,6 @@ function ForecastListRow({
   today: string
   onClick: () => void
 }) {
-  const amountColor = row.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
-  const amountSign = row.kind === 'expense' ? '-' : '+'
   const balanceColor = row.balance < 0 ? 'text-red-600' : undefined
   const addonCount = row.addons?.length ?? 0
   // 背景は排他にする。Tailwind は同じプロパティのユーティリティを併記しても
@@ -345,10 +319,7 @@ function ForecastListRow({
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0">
-          <span className={`text-sm tabular-nums ${amountColor}`}>
-            {amountSign}
-            {formatYen(row.amount)}
-          </span>
+          <span className={`text-sm tabular-nums ${kindTone(row.kind)}`}><KindYen kind={row.kind} amount={row.amount} /></span>
           <span className={`text-xs tabular-nums ${isToday ? 'font-bold' : ''} ${balanceColor ?? ''}`}>
             {formatYen(row.balance)}
           </span>

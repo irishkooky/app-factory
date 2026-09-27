@@ -1,5 +1,6 @@
 // 残高推移グラフ用のデータ整形。純粋関数のみ（Reactに依存しない）。
 import type { ForecastRow } from "./forecast";
+import { monthOf } from "./date";
 
 export type BalancePoint = {
   date: string; // "YYYY-MM-DD"
@@ -32,24 +33,13 @@ export function buildBalanceSeries(input: {
   }));
 
   // 暦月ごとの最低残高日を求める（イベント点のみが対象。同値なら最初の点）
-  const monthMinDates = new Set<string>();
-  const pointsByMonth = new Map<string, BalancePoint[]>();
+  const monthMin = new Map<string, BalancePoint>();
   for (const point of eventPoints) {
-    const month = point.date.slice(0, 7);
-    const bucket = pointsByMonth.get(month);
-    if (bucket) {
-      bucket.push(point);
-    } else {
-      pointsByMonth.set(month, [point]);
-    }
+    const month = monthOf(point.date);
+    const min = monthMin.get(month);
+    if (min === undefined || point.balance < min.balance) monthMin.set(month, point);
   }
-  for (const bucket of pointsByMonth.values()) {
-    let minPoint = bucket[0];
-    for (const point of bucket) {
-      if (point.balance < minPoint.balance) minPoint = point;
-    }
-    monthMinDates.add(minPoint.date);
-  }
+  const monthMinDates = new Set([...monthMin.values()].map((point) => point.date));
 
   // 先頭にanchor点、続けてイベント点を並べる
   const points: BalancePoint[] = [

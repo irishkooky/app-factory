@@ -1,10 +1,11 @@
 import { monthOf } from "./date";
+import type { Kind } from "./money";
 
 // summarizeByMonth が要求する最小限の形。ForecastRow / HistoryRow はどちらもこれを満たす
 // （構造的部分型のため、フィールドが多いぶんには問題ない）。
 export type MoneyRow = {
   date: string;
-  kind: "income" | "expense";
+  kind: Kind;
   amount: number;
   balance: number;
 };
@@ -32,15 +33,10 @@ export function summarizeByMonth(rows: MoneyRow[]): MonthSummary[] {
 
   for (const row of rows) {
     const month = monthOf(row.date);
-    const bucket = byMonth.get(month);
+    let bucket = byMonth.get(month);
     if (bucket === undefined) {
-      byMonth.set(month, {
-        income: row.kind === "income" ? row.amount : 0,
-        expense: row.kind === "expense" ? row.amount : 0,
-        minBalance: row.balance,
-        minBalanceDate: row.date,
-      });
-      continue;
+      bucket = { income: 0, expense: 0, minBalance: row.balance, minBalanceDate: row.date };
+      byMonth.set(month, bucket);
     }
     if (row.kind === "income") {
       bucket.income += row.amount;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ForecastRow } from "./forecast";
-import { buildForecastListItems, currentPosition } from "./forecastList";
+import { buildForecastListItems, currentPosition, lowestBalanceAhead } from "./forecastList";
 
 let rowSeq = 0;
 function makeRow(overrides: Partial<ForecastRow> & Pick<ForecastRow, "date" | "kind" | "amount">): ForecastRow {
@@ -193,5 +193,26 @@ describe("currentPosition / buildForecastListItems", () => {
 
     const items = buildForecastListItems(input);
     expect(items.some((item) => item.type === "past")).toBe(false);
+  });
+});
+
+describe("lowestBalanceAhead", () => {
+  it("today以降の行から最低残高を選び、同値なら最初の行の日付を返す", () => {
+    const rows: ForecastRow[] = [
+      makeRow({ date: "2026-08-20", kind: "expense", amount: 9000, balance: -1000 }),
+      makeRow({ date: "2026-08-30", kind: "expense", amount: 1000, balance: 3000 }),
+      makeRow({ date: "2026-09-10", kind: "income", amount: 5000, balance: 8000 }),
+      makeRow({ date: "2026-09-27", kind: "expense", amount: 5000, balance: 3000 }),
+    ];
+    expect(lowestBalanceAhead(rows, "2026-08-30", 4000)).toEqual({ balance: 3000, date: "2026-08-30" });
+  });
+
+  it("today以降に行が無ければ全行から、行が無ければ現在残高と今日を返す", () => {
+    const rows: ForecastRow[] = [
+      makeRow({ date: "2026-08-20", kind: "expense", amount: 9000, balance: -1000 }),
+      makeRow({ date: "2026-08-25", kind: "income", amount: 2000, balance: 1000 }),
+    ];
+    expect(lowestBalanceAhead(rows, "2026-09-01", 1000)).toEqual({ balance: -1000, date: "2026-08-20" });
+    expect(lowestBalanceAhead([], "2026-09-01", 1000)).toEqual({ balance: 1000, date: "2026-09-01" });
   });
 });

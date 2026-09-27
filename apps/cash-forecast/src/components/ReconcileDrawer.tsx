@@ -5,7 +5,8 @@ import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import type { ForecastRow } from '../lib/forecast'
 import { todayJST } from '../lib/date'
-import { formatYen } from '../lib/money'
+import { formatYen, signedAmount, type Kind } from '../lib/money'
+import { NetYen, netTone } from './Amount'
 import { MoneyField } from './MoneyField'
 import { notifyError, notifySaved } from '../lib/notify'
 
@@ -58,15 +59,11 @@ type ReconcileOp =
       ruleMonth: string
       date: string
       name: string
-      kind: 'income' | 'expense'
+      kind: Kind
       amount: number
     }
   | { type: 'confirmTx'; txId: Id<'transactions'> }
-  | { type: 'insertActual'; date: string; name: string; kind: 'income' | 'expense'; amount: number }
-
-function signed(kind: 'income' | 'expense', amount: number): number {
-  return kind === 'income' ? amount : -amount
-}
+  | { type: 'insertActual'; date: string; name: string; kind: Kind; amount: number }
 
 function ManualReconcileForm({
   currentBalance,
@@ -88,13 +85,10 @@ function ManualReconcileForm({
   const newAnchorDate = todayJST()
 
   // pendingRows は全行を暗黙的に「実績にする」扱いで反映する（行ごとの選択UIは撤去済み）。
-  const reflectedBalance = useMemo(() => {
-    let total = anchorBalance
-    for (const row of pendingRows) {
-      total += signed(row.kind, row.amount)
-    }
-    return total
-  }, [pendingRows, anchorBalance])
+  const reflectedBalance = useMemo(
+    () => pendingRows.reduce((total, row) => total + signedAmount(row.kind, row.amount), anchorBalance),
+    [pendingRows, anchorBalance],
+  )
 
   const diff = balance !== undefined ? Math.round(balance) - reflectedBalance : 0
 
@@ -174,10 +168,7 @@ function ManualReconcileForm({
         {diff !== 0 && (
           <div className="flex items-center justify-between">
             <span className="text-muted">ズレ</span>
-            <span className={`tabular-nums ${diff > 0 ? 'text-blue-600' : 'text-red-600'}`}>
-              {diff > 0 ? '+' : ''}
-              {formatYen(diff)}
-            </span>
+            <span className={`tabular-nums ${netTone(diff)}`}><NetYen value={diff} /></span>
           </div>
         )}
       </div>

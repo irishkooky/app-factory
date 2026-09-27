@@ -1,5 +1,11 @@
 // 通貨は円・整数のみを扱う。
 
+export type Kind = "income" | "expense";
+
+export function signedAmount(kind: Kind, amount: number): number {
+  return kind === "income" ? amount : -amount;
+}
+
 /** 整数円を "¥1,234,567" / 負数は "-¥1,234" の形式に整形する。 */
 export function formatYen(n: number): string {
   const abs = Math.abs(Math.round(n));
