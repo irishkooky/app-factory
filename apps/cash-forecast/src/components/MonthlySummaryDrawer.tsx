@@ -3,7 +3,8 @@ import { Chip, Drawer, Table } from '@heroui/react'
 import type { ForecastRow } from '../lib/forecast'
 import type { HistoryRow } from '../lib/history'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
-import { formatYen, signPrefix, signedTone } from '../lib/money'
+import { formatYen } from '../lib/money'
+import { NetYen, netTone } from './Amount'
 import { averageSavings, summarizeByMonth } from '../lib/summary'
 import { ProGate } from './BillingControls'
 
@@ -80,8 +81,8 @@ function MonthlySummaryContent({
               <span className="flex items-center gap-1.5 text-sm font-medium">
                 <MonthLabel month={summary.month} anchorMonth={anchorMonth} historyMonths={historyMonths} />
               </span>
-              <span className={`text-base font-semibold tabular-nums ${signedTone(summary.net)}`}>
-                収支 {signPrefix(summary.net)}{formatYen(summary.net)}
+              <span className={`text-base font-semibold tabular-nums ${netTone(summary.net)}`}>
+                収支 <NetYen value={summary.net} />
               </span>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
@@ -121,8 +122,8 @@ function MonthlySummaryContent({
                     </Table.Cell>
                     <Table.Cell className="text-right tabular-nums">{formatYen(summary.income)}</Table.Cell>
                     <Table.Cell className="text-right tabular-nums">{formatYen(summary.expense)}</Table.Cell>
-                    <Table.Cell className={`text-right tabular-nums ${signedTone(summary.net)}`}>
-                      {signPrefix(summary.net)}{formatYen(summary.net)}
+                    <Table.Cell className={`text-right tabular-nums ${netTone(summary.net)}`}>
+                      <NetYen value={summary.net} />
                     </Table.Cell>
                     <Table.Cell className="text-right tabular-nums">{formatRate(summary.savingsRate)}</Table.Cell>
                     <Table.Cell className="text-right tabular-nums">
@@ -146,7 +147,7 @@ function MonthlySummaryContent({
           <span className="tabular-nums">
             {formatRate(average.savingsRate)}
             {'（'}
-            <span className={signedTone(average.totalNet)}>{signPrefix(average.totalNet)}{formatYen(average.totalNet)}</span>
+            <span className={netTone(average.totalNet)}><NetYen value={average.totalNet} /></span>
             {'）'}
           </span>
         </div>
@@ -160,7 +161,6 @@ function formatRate(rate: number | null): string {
   return rate === null ? '—' : `${Math.round(rate * 100)}%`
 }
 
-// 基準月は「*」、それ以外で実績を含む月は「実績」チップを付ける。
 function MonthLabel({
   month,
   anchorMonth,

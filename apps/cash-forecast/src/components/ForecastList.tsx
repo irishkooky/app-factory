@@ -5,7 +5,8 @@ import type { ForecastRow } from '../lib/forecast'
 import type { HistoryRow } from '../lib/history'
 import { buildForecastListItems, type CurrentPosition, type PastGroupItem } from '../lib/forecastList'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
-import { formatYen, kindSign, kindTone, signPrefix, signedTone } from '../lib/money'
+import { formatYen } from '../lib/money'
+import { KindYen, NetYen, kindTone, netTone } from './Amount'
 import { summarizeByMonth, type MonthSummary } from '../lib/summary'
 
 type ForecastListProps = {
@@ -88,14 +89,16 @@ function HistorySection({
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const monthGroups = useMemo(
-    () =>
-      summarizeByMonth(rows).map((summary) => ({
-        summary,
-        rows: rows.filter((row) => monthOf(row.date) === summary.month),
-      })),
-    [rows],
-  )
+  const monthGroups = useMemo(() => {
+    const rowsByMonth = new Map<string, HistoryRow[]>()
+    for (const row of rows) {
+      const month = monthOf(row.date)
+      const monthRows = rowsByMonth.get(month)
+      if (monthRows) monthRows.push(row)
+      else rowsByMonth.set(month, [row])
+    }
+    return summarizeByMonth(rows).map((summary) => ({ summary, rows: rowsByMonth.get(summary.month) ?? [] }))
+  }, [rows])
 
   const toggle = (month: string) => {
     setExpanded((prev) => {
@@ -161,7 +164,7 @@ function HistoryListRow({ row, onClick }: { row: HistoryRow; onClick?: () => voi
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0">
-          <span className={`text-sm tabular-nums ${kindTone(row.kind)}`}>{kindSign(row.kind)}{formatYen(row.amount)}</span>
+          <span className={`text-sm tabular-nums ${kindTone(row.kind)}`}><KindYen kind={row.kind} amount={row.amount} /></span>
           <span className="text-xs tabular-nums">{formatYen(row.balance)}</span>
         </div>
       </div>
@@ -179,7 +182,7 @@ function MonthDividerLabel({ month, summary }: { month: string; summary: MonthSu
 }
 
 function NetLabel({ net }: { net: number }) {
-  return <span className={`text-sm tabular-nums ${signedTone(net)}`}>収支 {signPrefix(net)}{formatYen(net)}</span>
+  return <span className={`text-sm tabular-nums ${netTone(net)}`}>収支 <NetYen value={net} /></span>
 }
 
 // 「今日」の位置を示すマーカー。しきい値割れ（黄色系）と衝突しないよう、
@@ -316,7 +319,7 @@ function ForecastListRow({
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0">
-          <span className={`text-sm tabular-nums ${kindTone(row.kind)}`}>{kindSign(row.kind)}{formatYen(row.amount)}</span>
+          <span className={`text-sm tabular-nums ${kindTone(row.kind)}`}><KindYen kind={row.kind} amount={row.amount} /></span>
           <span className={`text-xs tabular-nums ${isToday ? 'font-bold' : ''} ${balanceColor ?? ''}`}>
             {formatYen(row.balance)}
           </span>

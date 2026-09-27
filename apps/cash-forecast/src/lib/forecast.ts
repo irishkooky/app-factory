@@ -1,5 +1,5 @@
 import type { Doc, Id } from "../../convex/_generated/dataModel";
-import { addMonths, dateInMonth, monthOf, usagePeriodLabel } from "./date";
+import { addMonths, clampedDateInMonth, monthOf, usagePeriodLabel } from "./date";
 import { signedAmount, type Kind } from "./money";
 
 export type AddonInfo = {
@@ -38,7 +38,6 @@ type UnpricedRow = Omit<ForecastRow, "balance" | "belowThreshold">;
 
 type EntrySortKey = { date: string; kind: Kind; name: string };
 
-/** 予測行・実績行の並び順: date昇順 → 同日内は income が先 → 同種内は name の localeCompare */
 export function compareEntries(a: EntrySortKey, b: EntrySortKey): number {
   if (a.date !== b.date) return a.date < b.date ? -1 : 1;
   if (a.kind !== b.kind) return a.kind === "income" ? -1 : 1;
@@ -47,7 +46,6 @@ export function compareEntries(a: EntrySortKey, b: EntrySortKey): number {
 
 type Tx = Doc<"transactions">;
 
-/** ルールの特定月の発生（仮想行1つ分）を指すキー。上書き行・アドオン・実績化済みの行はこのキーで仮想行と対応する。 */
 function occurrenceKey(ruleId: Id<"rules">, ruleMonth: string): string {
   return `${ruleId}:${ruleMonth}`;
 }
@@ -103,18 +101,15 @@ export function buildForecast(input: {
   const inHorizon = (date: string) => anchorDate < date && date <= horizonEnd;
   const ruleById = new Map(rules.map((rule) => [rule._id, rule] as const));
 
-  // 手入力行と上書き行（ルールの特定月を確定した行）。addon === true の判定は厳密に行う。
-  const ownTxs = transactions.filter((tx) => tx.addon !== true);
+  const manualOrOverrideTxs = transactions.filter((tx) => tx.addon !== true);
 
-  // 表示行として存在する上書き行のキー。
-  const overriddenKeys = occurrenceKeys(ownTxs);
+  const overriddenKeys = occurrenceKeys(manualOrOverrideTxs);
   // 履歴側（date <= anchorDate）で既に確定・実績化済みのキー。
   // 仮想行の抑止には使うが、「吸収してくれる表示行がある」ことは意味しないので
   // overriddenKeys とは別集合にする（孤児アドオン判定に混ぜると、合算先も吸収先も無い
   // アドオンの金額が黙って消えてしまう）。
   const settledInHistoryKeys = occurrenceKeys((historyTransactions ?? []).filter((tx) => tx.addon !== true));
 
-  // アドオンを発生キーでグルーピングする。グループ内は _creationTime 昇順。
   const addonsByKey = new Map<string, { ruleId: Id<"rules">; txs: Tx[] }>();
   const addonTxs = transactions.filter((tx) => tx.addon === true).sort((a, b) => a._creationTime - b._creationTime);
   for (const tx of addonTxs) {
@@ -128,8 +123,7 @@ export function buildForecast(input: {
     }
   }
 
-  // 上書き行には吸収済みアドオンを付与する。
-  const txRows: UnpricedRow[] = ownTxs
+  const txRows: UnpricedRow[] = manualOrOverrideTxs
     .filter((tx) => inHorizon(tx.date))
     .map((tx) => {
       const key = occurrenceKeyOf(tx);
@@ -142,26 +136,24 @@ export function buildForecast(input: {
       };
     });
 
-  // 孤児アドオン: 吸収先の上書き行も合算先の仮想行も無いアドオンは、金額を黙って落とさないよう単独行として出す。
-  // ルールが存在していても、その月が履歴側で確定済みなら仮想行は生成されない＝合算先が無い。
+  const hasRowToJoin = (key: string, ruleId: Id<"rules">) =>
+    overriddenKeys.has(key) || (ruleById.has(ruleId) && !settledInHistoryKeys.has(key));
   const orphanAddonRows: UnpricedRow[] = [];
   for (const [key, group] of addonsByKey) {
-    if (overriddenKeys.has(key)) continue;
-    if (ruleById.has(group.ruleId) && !settledInHistoryKeys.has(key)) continue;
+    if (hasRowToJoin(key, group.ruleId)) continue;
     for (const tx of group.txs) {
       if (!inHorizon(tx.date)) continue;
       orphanAddonRows.push({ ...txRow(tx), name: addonDisplayName(tx.name), rawName: tx.name });
     }
   }
 
-  // 各ルールについて仮想行を生成（ベース + アドオン合算）
   const virtualRows: UnpricedRow[] = [];
   const endMonth = monthOf(horizonEnd);
   for (const rule of rules) {
     let month = monthOf(anchorDate);
     // 安全のため月数の上限を設ける（無限ループ防止）
     for (let i = 0; i < 1200 && month <= endMonth; i++, month = addMonths(month, 1)) {
-      const date = dateInMonth(month, rule.dayOfMonth);
+      const date = clampedDateInMonth(month, rule.dayOfMonth);
       if (!inHorizon(date)) continue;
       if (rule.endDate !== undefined && date > rule.endDate) continue;
       const key = occurrenceKey(rule._id, month);

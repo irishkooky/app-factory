@@ -38,7 +38,7 @@ export function addMonths(yyyyMm: string, n: number): string {
 
 /** "YYYY-MM-DD" に n ヶ月を加算する。日は加算後の月の日数にクランプする（例: 1/31 +1ヶ月 → 2/28）。 */
 export function addMonthsToDateClamped(yyyyMmDd: string, n: number): string {
-  return dateInMonth(addMonths(monthOf(yyyyMmDd), n), parseDate(yyyyMmDd).day);
+  return clampedDateInMonth(addMonths(monthOf(yyyyMmDd), n), parseDate(yyyyMmDd).day);
 }
 
 /** "YYYY-MM-DD" から "YYYY-MM" を取り出す。 */
@@ -70,8 +70,7 @@ export function formatMonthLabel(yyyyMm: string): string {
   return `${year}年${month}月`;
 }
 
-/** yyyyMm 月の day 日（月の日数を超える場合は末日にクランプ）を "YYYY-MM-DD" で返す。 */
-export function dateInMonth(yyyyMm: string, day: number): string {
+export function clampedDateInMonth(yyyyMm: string, day: number): string {
   const { year, month } = parseYearMonth(yyyyMm);
   return `${year}-${pad2(month)}-${pad2(Math.min(day, daysInMonth(year, month)))}`;
 }
@@ -82,10 +81,10 @@ export function dateInMonth(yyyyMm: string, day: number): string {
  */
 export function usagePeriodLabel(paymentDate: string, closingDay: number): string {
   const paymentMonth = monthOf(paymentDate);
-  const closeThisMonth = dateInMonth(paymentMonth, closingDay);
+  const closeThisMonth = clampedDateInMonth(paymentMonth, closingDay);
   const end =
-    closeThisMonth <= paymentDate ? closeThisMonth : dateInMonth(addMonths(paymentMonth, -1), closingDay);
-  const prevClose = dateInMonth(addMonths(monthOf(end), -1), closingDay);
+    closeThisMonth <= paymentDate ? closeThisMonth : clampedDateInMonth(addMonths(paymentMonth, -1), closingDay);
+  const prevClose = clampedDateInMonth(addMonths(monthOf(end), -1), closingDay);
   const start = addDays(prevClose, 1);
   return `（${formatDateShort(start)}-${formatDateShort(end)}）`;
 }

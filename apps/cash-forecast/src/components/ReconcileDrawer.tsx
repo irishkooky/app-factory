@@ -5,7 +5,8 @@ import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
 import type { ForecastRow } from '../lib/forecast'
 import { todayJST } from '../lib/date'
-import { formatYen, signPrefix, signedAmount, signedTone, type Kind } from '../lib/money'
+import { formatYen, signedAmount, type Kind } from '../lib/money'
+import { NetYen, netTone } from './Amount'
 import { MoneyField } from './MoneyField'
 import { notifyError, notifySaved } from '../lib/notify'
 
@@ -167,7 +168,7 @@ function ManualReconcileForm({
         {diff !== 0 && (
           <div className="flex items-center justify-between">
             <span className="text-muted">ズレ</span>
-            <span className={`tabular-nums ${signedTone(diff)}`}>{signPrefix(diff)}{formatYen(diff)}</span>
+            <span className={`tabular-nums ${netTone(diff)}`}><NetYen value={diff} /></span>
           </div>
         )}
       </div>

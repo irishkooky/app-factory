@@ -57,10 +57,6 @@ export function currentPosition(input: {
   return { balance, asOfDate, hasTodayRows };
 }
 
-/**
- * 今後の最低残高とその日付。today 以降の行から、無ければ全行から、同値なら最初の行を選ぶ。
- * 行が1つも無ければ currentBalance を today 時点の値として返す。
- */
 export function lowestBalanceAhead(
   rows: ForecastRow[],
   today: string,
