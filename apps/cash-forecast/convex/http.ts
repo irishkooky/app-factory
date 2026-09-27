@@ -1,4 +1,4 @@
-// このファイルはアプリ非依存。新規アプリにはこのままコピーする（docs/billing.md 参照）。
+// このファイルはアプリ非依存。新規アプリにはこのままコピーする（.agents/skills/stripe-billing/SKILL.md 参照）。
 //
 // Stripe Webhook（POST /stripe/webhook）。
 //

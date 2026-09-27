@@ -1,0 +1,24 @@
+---
+description: pstack per-role model choices (overrides skill defaults)
+alwaysApply: true
+---
+# pstack model configuration. One line per role. Delete a line to fall back to the skill default.
+# `inherit-parent` or `auto` as a value: the role runs on the parent chat model (omit Task `model`). Alias entries in a panel list still count toward its fan-out.
+# Project copy of the user's /setup-pstack choice, so Cloud Agents (which never see ~/.cursor/rules/) behave the same.
+feature, refactoring: auto
+bug-fix: auto
+perf-issue: auto
+hillclimb: auto
+judgment and prose: auto
+hardest tasks: auto
+how explorer: auto
+how explainer: auto
+why investigators: auto
+why synthesizer: auto
+reflect tooling: auto
+reflect judgment, divergent, synthesizer: auto
+arena runners: auto, auto, auto, auto
+arena cross-judge pool: auto
+swarm workers: auto
+architect runners: auto, auto, auto, auto
+interrogate reviewers: auto, auto, auto, auto

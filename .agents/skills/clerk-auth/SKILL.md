@@ -1,3 +1,8 @@
+---
+name: clerk-auth
+description: app-factory のアプリに Googleログイン（Clerk 共有開発インスタンス + Convex）を組み込む手順。scripts/clerk-provision.sh、ClerkProvider と Convex の接続、ctx.auth.getUserIdentity() によるユーザー識別を扱う。ログイン・ユーザー別データ・認証が必要なアプリを作るときに使う。参照実装は apps/auth-demo。
+---
+
 # 認証（Googleログイン）が必要なアプリの作り方
 
 認証が必要なアプリは **Clerk（共有開発インスタンス）+ Convex** を使う。
@@ -11,7 +16,7 @@ Clerkアプリケーションは全appsで1つを共有する（＝ユーザー�
 - `CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` が環境変数として供給されている
   （ローカルではリポジトリ直下の `.env`。スクリプトが自動で読む）
 - Clerkダッシュボードで Google ログインが有効化済み、JWTテンプレート `convex` 作成済み
-- 認証アプリはConvex前提。`docs/convex.md` も併せて参照
+- 認証アプリはConvex前提。`convex-app` スキルも併せて参照
 
 ## 手順
 
@@ -20,7 +25,7 @@ Clerkアプリケーションは全appsで1つを共有する（＝ユーザー�
 `apps/hello` から `apps/<name>` を作成した後:
 
 ```bash
-scripts/convex-provision.sh <name>   # Convexプロジェクト作成（docs/convex.md 参照）
+scripts/convex-provision.sh <name>   # Convexプロジェクト作成（convex-app スキル参照）
 scripts/clerk-provision.sh <name>    # Clerk認証対応（このスクリプトがやることは下記）
 ```
 
