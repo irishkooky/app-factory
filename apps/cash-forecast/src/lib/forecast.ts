@@ -103,7 +103,8 @@ export function buildForecast(input: {
 
   const manualOrOverrideTxs = transactions.filter((tx) => tx.addon !== true);
 
-  const overriddenKeys = occurrenceKeys(manualOrOverrideTxs);
+  // 予測期間外の上書き行は、その月の仮想行を抑止しない（上乗せが合算先を失うのを防ぐ）。
+  const inHorizonOverrideKeys = occurrenceKeys(manualOrOverrideTxs.filter((tx) => inHorizon(tx.date)));
   // 履歴側（date <= anchorDate）で既に確定・実績化済みのキー。
   // 仮想行の抑止には使うが、「吸収してくれる表示行がある」ことは意味しないので
   // overriddenKeys とは別集合にする（孤児アドオン判定に混ぜると、合算先も吸収先も無い
@@ -136,17 +137,6 @@ export function buildForecast(input: {
       };
     });
 
-  const hasRowToJoin = (key: string, ruleId: Id<"rules">) =>
-    overriddenKeys.has(key) || (ruleById.has(ruleId) && !settledInHistoryKeys.has(key));
-  const orphanAddonRows: UnpricedRow[] = [];
-  for (const [key, group] of addonsByKey) {
-    if (hasRowToJoin(key, group.ruleId)) continue;
-    for (const tx of group.txs) {
-      if (!inHorizon(tx.date)) continue;
-      orphanAddonRows.push({ ...txRow(tx), name: addonDisplayName(tx.name), rawName: tx.name });
-    }
-  }
-
   const virtualRows: UnpricedRow[] = [];
   const endMonth = monthOf(horizonEnd);
   for (const rule of rules) {
@@ -157,7 +147,7 @@ export function buildForecast(input: {
       if (!inHorizon(date)) continue;
       if (rule.endDate !== undefined && date > rule.endDate) continue;
       const key = occurrenceKey(rule._id, month);
-      if (overriddenKeys.has(key) || settledInHistoryKeys.has(key)) continue;
+      if (inHorizonOverrideKeys.has(key) || settledInHistoryKeys.has(key)) continue;
 
       const addonTxsForMonth = addonsByKey.get(key)?.txs ?? [];
       const signedTotal = addonTxsForMonth.reduce(
@@ -177,6 +167,28 @@ export function buildForecast(input: {
         baseAmount: rule.amount,
         addons: addonInfos(addonTxsForMonth),
       });
+    }
+  }
+
+  const joinableKeys = new Set<string>();
+  for (const row of txRows) {
+    if (row.ruleId !== undefined && row.ruleMonth !== undefined) {
+      joinableKeys.add(occurrenceKey(row.ruleId, row.ruleMonth));
+    }
+  }
+  for (const row of virtualRows) {
+    if (row.ruleId !== undefined && row.ruleMonth !== undefined) {
+      joinableKeys.add(occurrenceKey(row.ruleId, row.ruleMonth));
+    }
+  }
+
+  const orphanAddonRows: UnpricedRow[] = [];
+  for (const [, group] of addonsByKey) {
+    for (const tx of group.txs) {
+      const key = occurrenceKeyOf(tx);
+      if (key === undefined || joinableKeys.has(key)) continue;
+      if (!inHorizon(tx.date)) continue;
+      orphanAddonRows.push({ ...txRow(tx), name: addonDisplayName(tx.name), rawName: tx.name });
     }
   }
 

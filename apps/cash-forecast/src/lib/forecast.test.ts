@@ -149,6 +149,40 @@ describe("buildForecast", () => {
     expect(rows.map((r) => r.date)).toEqual(["2026-01-10", "2026-02-10", "2026-03-10"]);
   });
 
+  it("endDate を過ぎた月の上乗せは仮想行が無くても残高に入る", () => {
+    const rule = makeRule({
+      name: "サブスク",
+      kind: "expense",
+      amount: 1000,
+      dayOfMonth: 10,
+      endDate: "2026-03-10",
+    });
+    const rows = buildForecast({
+      anchorDate: "2026-03-11",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        makeTx({
+          date: "2026-04-10",
+          name: "4月分の上乗せ",
+          kind: "expense",
+          amount: 500,
+          ruleId: rule._id,
+          ruleMonth: "2026-04",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-05-31",
+    });
+
+    const aprilAddon = rows.find((r) => r.date === "2026-04-10");
+    expect(aprilAddon).toBeDefined();
+    expect(aprilAddon?.isVirtual).toBe(false);
+    expect(aprilAddon?.amount).toBe(500);
+    expect(aprilAddon?.balance).toBe(-500);
+  });
+
   it("date <= anchorDate の transaction は算入されない", () => {
     const rows = buildForecast({
       anchorDate: "2026-07-12",
@@ -343,6 +377,42 @@ describe("buildForecast: アドオン", () => {
     const decemberRow = rows.find((r) => r.date === "2026-12-10");
     expect(decemberRow?.isVirtual).toBe(false);
     expect(decemberRow?.amount).toBe(140_000);
+  });
+
+  it("上書き行の日付が予測期間外でも、同月の上乗せは残高に入る（仮想行に合算）", () => {
+    const rule = makeRule({ name: "AMEX", kind: "expense", amount: 130_000, dayOfMonth: 10 });
+    const rows = buildForecast({
+      anchorDate: "2026-11-01",
+      anchorBalance: 0,
+      threshold: 0,
+      rules: [rule],
+      transactions: [
+        makeTx({
+          date: "2026-12-15",
+          name: "AMEX(確定)",
+          kind: "expense",
+          amount: 140_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+        }),
+        makeTx({
+          date: "2026-11-10",
+          name: "ピーリング",
+          kind: "expense",
+          amount: 100_000,
+          ruleId: rule._id,
+          ruleMonth: "2026-11",
+          addon: true,
+        }),
+      ],
+      horizonEnd: "2026-11-30",
+    });
+
+    const novemberRow = rows.find((r) => r.date === "2026-11-10");
+    expect(novemberRow).toBeDefined();
+    expect(novemberRow?.isVirtual).toBe(true);
+    expect(novemberRow?.amount).toBe(230_000);
+    expect(novemberRow?.balance).toBe(-230_000);
   });
 
   it("孤児アドオン: rulesに無いruleIdを持ち上書きも無いアドオンは通常行として残高に入る", () => {
