@@ -1,5 +1,6 @@
 import type { Doc, Id } from "../../convex/_generated/dataModel";
-import { addonDisplayName } from "./forecast";
+import { addonDisplayName, compareEntries } from "./forecast";
+import { signedAmount, type Kind } from "./money";
 
 export type HistoryRow = {
   txId: Id<"transactions">;
@@ -7,14 +8,10 @@ export type HistoryRow = {
   name: string;
   rawName: string; // 保存されている生の名前（編集フォームの初期値用。アドオンで未入力なら ""）
   isAddon: boolean;
-  kind: "income" | "expense";
+  kind: Kind;
   amount: number;
   balance: number; // この行適用後の残高
 };
-
-function signed(kind: "income" | "expense", amount: number): number {
-  return kind === "income" ? amount : -amount;
-}
 
 /**
  * 実績（actual）取引から履歴行を組み立てる。
@@ -27,17 +24,13 @@ export function buildHistoryRows(input: {
 }): HistoryRow[] {
   const { anchorBalance, txs } = input;
 
-  const sorted = [...txs].sort((a, b) => {
-    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-    if (a.kind !== b.kind) return a.kind === "income" ? -1 : 1;
-    return a.name.localeCompare(b.name, "ja");
-  });
+  const sorted = [...txs].sort(compareEntries);
 
-  const totalSigned = sorted.reduce((sum, tx) => sum + signed(tx.kind, tx.amount), 0);
+  const totalSigned = sorted.reduce((sum, tx) => sum + signedAmount(tx.kind, tx.amount), 0);
   let balance = anchorBalance - totalSigned;
 
   return sorted.map((tx) => {
-    balance += signed(tx.kind, tx.amount);
+    balance += signedAmount(tx.kind, tx.amount);
     return {
       txId: tx._id,
       date: tx.date,

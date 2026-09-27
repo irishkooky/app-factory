@@ -1,11 +1,12 @@
 import type { Doc, Id } from "../../convex/_generated/dataModel";
-import { addMonths, clampDay, monthOf, usagePeriodLabel } from "./date";
+import { addMonths, dateInMonth, monthOf, usagePeriodLabel } from "./date";
+import { signedAmount, type Kind } from "./money";
 
 export type AddonInfo = {
   txId: Id<"transactions">;
   name: string; // 表示用（未入力なら "上乗せ"）
   rawName: string; // 保存されている生の名前（編集フォームの初期値用。未入力なら ""）
-  kind: "income" | "expense";
+  kind: Kind;
   amount: number;
 };
 
@@ -21,7 +22,7 @@ export type ForecastRow = {
   name: string;
   rawName?: string; // 表示用 name がフォールバックされている場合の生の名前。編集フォームの初期値用
   periodLabel?: string; // クレカ等の締め日が設定されたルール由来の行に付く利用期間表示「（8/19-9/18）」。name には混ぜない
-  kind: "income" | "expense";
+  kind: Kind;
   amount: number;
   balance: number; // この行適用後の残高
   isVirtual: boolean; // true = ルール由来の仮想行（未確定の予定）
@@ -35,8 +36,11 @@ export type ForecastRow = {
 
 type UnpricedRow = Omit<ForecastRow, "balance" | "belowThreshold">;
 
-function signed(kind: "income" | "expense", amount: number): number {
-  return kind === "income" ? amount : -amount;
+/** 予測行・実績行の並び順: date昇順 → 同日内は income が先 → 同種内は name の localeCompare */
+export function compareEntries(a: { date: string; kind: Kind; name: string }, b: { date: string; kind: Kind; name: string }): number {
+  if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+  if (a.kind !== b.kind) return a.kind === "income" ? -1 : 1;
+  return a.name.localeCompare(b.name, "ja");
 }
 
 export function buildForecast(input: {
@@ -173,11 +177,7 @@ export function buildForecast(input: {
     let month = startMonth;
     // 安全のため月数の上限を設ける（無限ループ防止）
     for (let i = 0; i < 1200 && month <= endMonth; i++, month = addMonths(month, 1)) {
-      const [yearStr, monthStr] = month.split("-");
-      const year = Number(yearStr);
-      const monthNum = Number(monthStr);
-      const day = clampDay(year, monthNum, rule.dayOfMonth);
-      const date = `${year}-${String(monthNum).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const date = dateInMonth(month, rule.dayOfMonth);
 
       if (!(anchorDate < date && date <= horizonEnd)) continue;
       if (rule.endDate !== undefined && date > rule.endDate) continue;
@@ -185,12 +185,11 @@ export function buildForecast(input: {
       if (overriddenKeys.has(key) || settledInHistoryKeys.has(key)) continue;
 
       const addonTxsForMonth = addonsByKey.get(key)?.txs ?? [];
-      const addonSignedSum = addonTxsForMonth.reduce(
-        (sum, tx) => sum + signed(tx.kind, tx.amount),
-        0,
+      const signedTotal = addonTxsForMonth.reduce(
+        (sum, tx) => sum + signedAmount(tx.kind, tx.amount),
+        signedAmount(rule.kind, rule.amount),
       );
-      const signedTotal = signed(rule.kind, rule.amount) + addonSignedSum;
-      const kind: "income" | "expense" =
+      const kind: Kind =
         signedTotal === 0 ? rule.kind : signedTotal > 0 ? "income" : "expense";
       const amount = Math.abs(signedTotal);
 
@@ -211,18 +210,14 @@ export function buildForecast(input: {
     }
   }
 
-  // 6. ソート: date昇順 → 同日内は income が先 → 同種内は name の localeCompare
+  // 6. ソート
   const allRows = [...txRows, ...orphanAddonRows, ...virtualRows];
-  allRows.sort((a, b) => {
-    if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-    if (a.kind !== b.kind) return a.kind === "income" ? -1 : 1;
-    return a.name.localeCompare(b.name, "ja");
-  });
+  allRows.sort(compareEntries);
 
   // 7. 残高計算としきい値判定
   let balance = anchorBalance;
   return allRows.map((row) => {
-    balance += row.kind === "income" ? row.amount : -row.amount;
+    balance += signedAmount(row.kind, row.amount);
     return {
       ...row,
       balance,

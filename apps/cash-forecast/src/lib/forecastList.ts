@@ -3,6 +3,7 @@
 
 import type { ForecastRow } from "./forecast";
 import { monthOf } from "./date";
+import { signedAmount } from "./money";
 
 /** 「今」の残高と、その残高がどの時点のものかを表す。 */
 export type CurrentPosition = {
@@ -77,13 +78,13 @@ export function buildForecastListItems(input: {
   const rest = rows.filter((row) => row.date >= today);
 
   if (past.length > 0) {
-    let net = 0;
-    let reviewCount = 0;
-    for (const row of past) {
-      net += row.kind === "income" ? row.amount : -row.amount;
-      if (row.isVirtual) reviewCount += 1;
-    }
-    items.push({ type: "past", key: "past", rows: past, net, reviewCount });
+    items.push({
+      type: "past",
+      key: "past",
+      rows: past,
+      net: past.reduce((sum, row) => sum + signedAmount(row.kind, row.amount), 0),
+      reviewCount: past.filter((row) => row.isVirtual).length,
+    });
   }
 
   let currentMonth: string | null = null;
