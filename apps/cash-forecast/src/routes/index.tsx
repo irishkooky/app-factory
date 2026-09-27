@@ -8,7 +8,7 @@ import { api } from '../../convex/_generated/api'
 import type { Doc } from '../../convex/_generated/dataModel'
 import { addMonthsToDateClamped, formatDateShort, todayJST } from '../lib/date'
 import { buildForecast, type ForecastRow } from '../lib/forecast'
-import { currentPosition } from '../lib/forecastList'
+import { currentPosition, lowestBalanceAhead } from '../lib/forecastList'
 import { buildHistoryRows, type HistoryRow } from '../lib/history'
 import { buildBalanceSeries } from '../lib/chart'
 import { formatYen } from '../lib/money'
@@ -184,21 +184,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     anchorBalance: settings.anchorBalance,
   })
   const currentBalance = position.balance
-
-  // 今後12ヶ月の最低残高: date >= today の行から。無ければ全行から。
-  const futureRows = forecast.filter((row) => row.date >= today)
-  const minSource = futureRows.length > 0 ? futureRows : forecast
-  let minBalance = currentBalance
-  let minDate = today
-  if (minSource.length > 0) {
-    let minRow = minSource[0]
-    for (const row of minSource) {
-      if (row.balance < minRow.balance) minRow = row
-    }
-    minBalance = minRow.balance
-    minDate = minRow.date
-  }
-  const belowThresholdNow = minBalance < settings.threshold
+  const lowest = lowestBalanceAhead(forecast, today, currentBalance)
 
   // Drawerを開いたまま上乗せの追加・削除等で予測が更新されても、
   // 内訳・合計の表示が追従するよう、対象行のライブ版を引き直して渡す
@@ -230,8 +216,8 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         <span className={`text-4xl font-bold tabular-nums ${currentBalance < 0 ? 'text-red-600' : ''}`}>
           {formatYen(currentBalance)}
         </span>
-        <span className={`text-sm tabular-nums ${belowThresholdNow ? 'text-warning' : 'text-muted'}`}>
-          今後12ヶ月の最低残高 {formatYen(minBalance)}（{formatDateShort(minDate)}）
+        <span className={`text-sm tabular-nums ${lowest.balance < settings.threshold ? 'text-warning' : 'text-muted'}`}>
+          今後12ヶ月の最低残高 {formatYen(lowest.balance)}（{formatDateShort(lowest.date)}）
         </span>
       </div>
 

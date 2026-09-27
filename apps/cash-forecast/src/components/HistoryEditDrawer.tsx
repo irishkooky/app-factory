@@ -13,6 +13,7 @@ import {
 import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { HistoryRow } from '../lib/history'
+import type { Kind } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { useConfirm } from './ConfirmDialog'
 import { MoneyField } from './MoneyField'
@@ -63,7 +64,7 @@ function HistoryEditForm({
   const [date, setDate] = useState(target.date)
   const [name, setName] = useState(target.rawName ?? target.name)
   const [amount, setAmount] = useState<number | undefined>(target.amount)
-  const [kind, setKind] = useState<'income' | 'expense'>(target.kind)
+  const [kind, setKind] = useState<Kind>(target.kind)
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
   const handleNameChange = (v: string) => {

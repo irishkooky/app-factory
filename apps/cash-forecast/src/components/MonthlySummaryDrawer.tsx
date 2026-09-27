@@ -3,7 +3,7 @@ import { Chip, Drawer, Table } from '@heroui/react'
 import type { ForecastRow } from '../lib/forecast'
 import type { HistoryRow } from '../lib/history'
 import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
-import { formatYen } from '../lib/money'
+import { formatYen, signPrefix, signedTone } from '../lib/money'
 import { averageSavings, summarizeByMonth } from '../lib/summary'
 import { ProGate } from './BillingControls'
 
@@ -78,22 +78,16 @@ function MonthlySummaryContent({
           <div key={summary.month} className="rounded-xl border border-border p-3">
             <div className="flex items-baseline justify-between gap-2">
               <span className="flex items-center gap-1.5 text-sm font-medium">
-                {formatMonthLabel(summary.month)}
-                {summary.month === anchorMonth && <span className="text-xs text-muted">*</span>}
-                {summary.month !== anchorMonth && historyMonths.has(summary.month) && (
-                  <Chip size="sm" variant="soft">
-                    実績
-                  </Chip>
-                )}
+                <MonthLabel month={summary.month} anchorMonth={anchorMonth} historyMonths={historyMonths} />
               </span>
-              <span className={`text-base font-semibold tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                収支 {summary.net >= 0 ? '+' : ''}{formatYen(summary.net)}
+              <span className={`text-base font-semibold tabular-nums ${signedTone(summary.net)}`}>
+                収支 {signPrefix(summary.net)}{formatYen(summary.net)}
               </span>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
               <SummaryStat label="収入" value={formatYen(summary.income)} />
               <SummaryStat label="支出" value={formatYen(summary.expense)} />
-              <SummaryStat label="貯蓄率" value={summary.savingsRate === null ? '—' : `${Math.round(summary.savingsRate * 100)}%`} />
+              <SummaryStat label="貯蓄率" value={formatRate(summary.savingsRate)} />
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-muted">最低残高</span>
                 <span className="flex flex-col items-end gap-0">
@@ -118,44 +112,29 @@ function MonthlySummaryContent({
                 <Table.Column className="text-right">最低残高</Table.Column>
               </Table.Header>
               <Table.Body>
-                {summaries.map((summary) => {
-                  const isAnchorMonth = summary.month === anchorMonth
-                  const isHistoryMonth = !isAnchorMonth && historyMonths.has(summary.month)
-                  return (
-                    <Table.Row key={summary.month}>
-                      <Table.Cell>
-                        <span className="flex items-center gap-1.5">
-                          {formatMonthLabel(summary.month)}
-                          {isAnchorMonth && <span className="text-xs text-muted">*</span>}
-                          {isHistoryMonth && (
-                            <Chip size="sm" variant="soft">
-                              実績
-                            </Chip>
-                          )}
+                {summaries.map((summary) => (
+                  <Table.Row key={summary.month}>
+                    <Table.Cell>
+                      <span className="flex items-center gap-1.5">
+                        <MonthLabel month={summary.month} anchorMonth={anchorMonth} historyMonths={historyMonths} />
+                      </span>
+                    </Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">{formatYen(summary.income)}</Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">{formatYen(summary.expense)}</Table.Cell>
+                    <Table.Cell className={`text-right tabular-nums ${signedTone(summary.net)}`}>
+                      {signPrefix(summary.net)}{formatYen(summary.net)}
+                    </Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">{formatRate(summary.savingsRate)}</Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">
+                      <div className="flex flex-col items-end gap-0">
+                        <span className={summary.minBalance < threshold ? 'text-red-600' : undefined}>
+                          {formatYen(summary.minBalance)}
                         </span>
-                      </Table.Cell>
-                      <Table.Cell className="text-right tabular-nums">{formatYen(summary.income)}</Table.Cell>
-                      <Table.Cell className="text-right tabular-nums">{formatYen(summary.expense)}</Table.Cell>
-                      <Table.Cell
-                        className={`text-right tabular-nums ${summary.net >= 0 ? 'text-blue-600' : 'text-red-600'}`}
-                      >
-                        {summary.net >= 0 ? '+' : ''}
-                        {formatYen(summary.net)}
-                      </Table.Cell>
-                      <Table.Cell className="text-right tabular-nums">
-                        {summary.savingsRate === null ? '—' : `${Math.round(summary.savingsRate * 100)}%`}
-                      </Table.Cell>
-                      <Table.Cell className="text-right tabular-nums">
-                        <div className="flex flex-col items-end gap-0">
-                          <span className={summary.minBalance < threshold ? 'text-red-600' : undefined}>
-                            {formatYen(summary.minBalance)}
-                          </span>
-                          <span className="text-xs text-muted">{formatDateShort(summary.minBalanceDate)}</span>
-                        </div>
-                      </Table.Cell>
-                    </Table.Row>
-                  )
-                })}
+                        <span className="text-xs text-muted">{formatDateShort(summary.minBalanceDate)}</span>
+                      </div>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
               </Table.Body>
             </Table.Content>
           </Table.ScrollContainer>
@@ -165,18 +144,45 @@ function MonthlySummaryContent({
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted">平均貯蓄率（基準月を除く{average.months}ヶ月）</span>
           <span className="tabular-nums">
-            {average.savingsRate === null ? '—' : `${Math.round(average.savingsRate * 100)}%`}
+            {formatRate(average.savingsRate)}
             {'（'}
-            <span className={average.totalNet >= 0 ? 'text-blue-600' : 'text-red-600'}>
-              {average.totalNet >= 0 ? '+' : ''}
-              {formatYen(average.totalNet)}
-            </span>
+            <span className={signedTone(average.totalNet)}>{signPrefix(average.totalNet)}{formatYen(average.totalNet)}</span>
             {'）'}
           </span>
         </div>
       )}
       <p className="text-xs text-muted">* 基準日以降の集計（平均には含めません）</p>
     </div>
+  )
+}
+
+function formatRate(rate: number | null): string {
+  return rate === null ? '—' : `${Math.round(rate * 100)}%`
+}
+
+// 基準月は「*」、それ以外で実績を含む月は「実績」チップを付ける。
+function MonthLabel({
+  month,
+  anchorMonth,
+  historyMonths,
+}: {
+  month: string
+  anchorMonth: string
+  historyMonths: Set<string>
+}) {
+  return (
+    <>
+      {formatMonthLabel(month)}
+      {month === anchorMonth ? (
+        <span className="text-xs text-muted">*</span>
+      ) : (
+        historyMonths.has(month) && (
+          <Chip size="sm" variant="soft">
+            実績
+          </Chip>
+        )
+      )}
+    </>
   )
 }
 

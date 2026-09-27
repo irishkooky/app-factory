@@ -1,3 +1,5 @@
+import type { Kind } from './money'
+
 export type RulePreset = {
   id: 'salary' | 'rent' | 'card' | 'other'
   /** ボタンの文言（動詞形） */
@@ -6,7 +8,7 @@ export type RulePreset = {
   hint: string
   /** フォームの初期値。name が空文字ならユーザーに入力させる */
   name: string
-  kind: 'income' | 'expense'
+  kind: Kind
   dayOfMonth: number
 }
 

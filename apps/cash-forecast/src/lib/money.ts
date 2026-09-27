@@ -14,6 +14,28 @@ export function formatYen(n: number): string {
   return n < 0 ? `-¥${formatted}` : `¥${formatted}`;
 }
 
+// 金額の符号と色は「入ってくるお金＝+・青、出ていくお金＝-・赤」で統一する。
+// 記号は formatYen と別のテキストノードで描画している（1つの文字列にすると "+" と "¥" の間で
+// カーニングが効いて表示がずれる）ので、記号だけを返す。
+
+/** 収支など符号付き金額 n の前に置く記号。負数は formatYen が "-" を付けるので空。 */
+export function signPrefix(n: number): "+" | "" {
+  return n >= 0 ? "+" : "";
+}
+
+export function signedTone(n: number): string {
+  return n >= 0 ? "text-blue-600" : "text-red-600";
+}
+
+/** 入出金1件の金額（0以上）の前に置く記号。支出の 0 円も "-"。 */
+export function kindSign(kind: Kind): "+" | "-" {
+  return kind === "expense" ? "-" : "+";
+}
+
+export function kindTone(kind: Kind): string {
+  return kind === "expense" ? "text-red-600" : "text-blue-600";
+}
+
 const ZENKAKU_DIGITS = "０１２３４５６７８９";
 
 function toHankaku(input: string): string {

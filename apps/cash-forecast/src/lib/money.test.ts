@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { moneyInputErrorMessage, parseMoneyInput, toMoneyInputText } from "./money";
+import {
+  formatYen,
+  kindSign,
+  kindTone,
+  moneyInputErrorMessage,
+  parseMoneyInput,
+  signPrefix,
+  signedAmount,
+  signedTone,
+  toMoneyInputText,
+} from "./money";
 
 describe("parseMoneyInput", () => {
   it("そのまま整数: '1000000' → ok 1000000", () => {
@@ -192,5 +202,22 @@ describe("moneyInputErrorMessage", () => {
 
   it("partial は undefined", () => {
     expect(moneyInputErrorMessage("partial")).toBeUndefined();
+  });
+});
+
+describe("符号付き表示", () => {
+  it("収支の記号は 0 以上だけ + で、負数は formatYen 側の - に任せる。色は 0 以上が青・負が赤", () => {
+    expect([1234, 0, -1234].map((n) => `${signPrefix(n)}${formatYen(n)}`)).toEqual(["+¥1,234", "+¥0", "-¥1,234"]);
+    expect([signedTone(0), signedTone(-1)]).toEqual(["text-blue-600", "text-red-600"]);
+  });
+
+  it("入出金の記号は種別で決まるので支出の 0 円も -", () => {
+    expect([kindSign("income"), kindSign("expense")]).toEqual(["+", "-"]);
+    expect(`${kindSign("expense")}${formatYen(0)}`).toBe("-¥0");
+    expect([kindTone("income"), kindTone("expense")]).toEqual(["text-blue-600", "text-red-600"]);
+  });
+
+  it("signedAmount は支出を負にする", () => {
+    expect([signedAmount("income", 300), signedAmount("expense", 300)]).toEqual([300, -300]);
   });
 });

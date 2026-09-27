@@ -58,6 +58,24 @@ export function currentPosition(input: {
 }
 
 /**
+ * 今後の最低残高とその日付。today 以降の行から、無ければ全行から、同値なら最初の行を選ぶ。
+ * 行が1つも無ければ currentBalance を today 時点の値として返す。
+ */
+export function lowestBalanceAhead(
+  rows: ForecastRow[],
+  today: string,
+  currentBalance: number,
+): { balance: number; date: string } {
+  const futureRows = rows.filter((row) => row.date >= today);
+  const candidates = futureRows.length > 0 ? futureRows : rows;
+  const lowest = candidates.reduce<ForecastRow | undefined>(
+    (min, row) => (min === undefined || row.balance < min.balance ? row : min),
+    undefined,
+  );
+  return lowest ? { balance: lowest.balance, date: lowest.date } : { balance: currentBalance, date: today };
+}
+
+/**
  * ForecastList 描画用のアイテム列を組み立てる。
  * 月見出し・「今日」マーカー・各行を、日付順を保ったまま並べる。
  */

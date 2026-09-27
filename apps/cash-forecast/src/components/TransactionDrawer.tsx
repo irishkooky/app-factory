@@ -14,7 +14,7 @@ import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { AddonInfo, ForecastRow } from '../lib/forecast'
 import { addDays, formatDateShort, formatMonthLabel } from '../lib/date'
-import { formatYen } from '../lib/money'
+import { formatYen, kindSign, kindTone, type Kind } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
@@ -129,17 +129,14 @@ function RuleMonthDetail({
     )
   }
 
-  const totalSign = target.kind === 'expense' ? '-' : '+'
-  const totalColor = target.kind === 'expense' ? 'text-red-600' : 'text-blue-600'
   const baseAmount = target.baseAmount ?? target.amount
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between">
         <span className="text-sm text-muted">合計</span>
-        <span className={`text-2xl font-bold tabular-nums ${totalColor}`}>
-          {totalSign}
-          {formatYen(target.amount)}
+        <span className={`text-2xl font-bold tabular-nums ${kindTone(target.kind)}`}>
+          {kindSign(target.kind)}{formatYen(target.amount)}
         </span>
       </div>
 
@@ -153,10 +150,7 @@ function RuleMonthDetail({
           <div key={addon.txId} className="flex items-center justify-between gap-2">
             <span className="min-w-0 truncate text-sm text-muted">{addon.name}</span>
             <div className="flex shrink-0 items-center gap-2">
-              <span className={`text-sm tabular-nums ${addon.kind === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
-                {addon.kind === 'expense' ? '-' : '+'}
-                {formatYen(addon.amount)}
-              </span>
+              <span className={`text-sm tabular-nums ${kindTone(addon.kind)}`}>{kindSign(addon.kind)}{formatYen(addon.amount)}</span>
               <Button variant="tertiary" size="sm" onPress={() => setEditingAddon(addon)}>
                 編集
               </Button>
@@ -205,7 +199,7 @@ function AddonForm({
 
   const [name, setName] = useState(addon?.rawName ?? '')
   const [amount, setAmount] = useState<number | undefined>(addon?.amount)
-  const [kind, setKind] = useState<'income' | 'expense'>(addon?.kind ?? 'expense')
+  const [kind, setKind] = useState<Kind>(addon?.kind ?? 'expense')
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
   const handleAmountChange = (v: number | undefined) => {
@@ -305,7 +299,7 @@ function ConfirmForm({
   const [date, setDate] = useState(target.date)
   const [name, setName] = useState(target.name)
   const [amount, setAmount] = useState<number | undefined>(target.amount)
-  const [kind, setKind] = useState<'income' | 'expense'>(target.kind)
+  const [kind, setKind] = useState<Kind>(target.kind)
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
   const hasAddons = (target.addons?.length ?? 0) > 0
@@ -433,7 +427,7 @@ function TransactionForm({
   const [date, setDate] = useState(initialDate)
   const [name, setName] = useState(target?.rawName ?? target?.name ?? '')
   const [amount, setAmount] = useState<number | undefined>(target?.amount)
-  const [kind, setKind] = useState<'income' | 'expense'>(target?.kind ?? 'expense')
+  const [kind, setKind] = useState<Kind>(target?.kind ?? 'expense')
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
   const isEdit = target !== null && !target.isVirtual
@@ -580,10 +574,7 @@ function TransactionForm({
             <div key={addon.txId} className="flex items-center justify-between gap-2">
               <span className="min-w-0 truncate text-sm text-muted">{addon.name}</span>
               <div className="flex shrink-0 items-center gap-2">
-                <span className={`text-sm tabular-nums ${addon.kind === 'expense' ? 'text-red-600' : 'text-blue-600'}`}>
-                  {addon.kind === 'expense' ? '-' : '+'}
-                  {formatYen(addon.amount)}
-                </span>
+                <span className={`text-sm tabular-nums ${kindTone(addon.kind)}`}>{kindSign(addon.kind)}{formatYen(addon.amount)}</span>
                 <Button
                   variant="tertiary"
                   size="sm"
