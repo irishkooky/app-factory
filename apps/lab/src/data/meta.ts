@@ -135,6 +135,12 @@ export const META: Record<string, AppMeta> = {
     category: 'demo',
     tags: ['Claude', '料金', '比較検証'],
   },
+  'meishi-mail': {
+    title: '名刺メール',
+    description: '名刺を撮るとAI（Gemini）がメールアドレスを読み取り、お礼メールの下書きをGmailで開くところまで一気に進める。',
+    category: 'tool',
+    tags: ['AI', 'Gemini', '名刺', 'Gmail'],
+  },
   'token-cost-checker-sonnet-only': {
     title: 'Token Cost Checker（Sonnet単独）',
     description: 'Sonnetだけで実装した料金電卓。単独モデルでどこまで作れるかの検証。',

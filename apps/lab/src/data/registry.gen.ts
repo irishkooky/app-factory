@@ -20,7 +20,7 @@ export type RegistryEntry = {
 }
 
 export const SUBDOMAIN = "ichigoooo"
-export const GENERATED_AT = "2026-09-19T01:49:18.671Z"
+export const GENERATED_AT = "2026-09-29T00:32:14.471Z"
 
 export const REGISTRY: RegistryEntry[] = [
   {
@@ -99,7 +99,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://jev-lab.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-09-18T10:12:07.853459Z",
-    modifiedAt: "2026-09-19T01:48:17.64887Z",
+    modifiedAt: "2026-09-19T02:19:58.550259Z",
     hasShot: true,
     binding: "APP_JEV_LAB",
   },
@@ -109,7 +109,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://lab.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-08-16T11:00:36.351525Z",
-    modifiedAt: "2026-09-19T01:04:17.676948Z",
+    modifiedAt: "2026-09-19T01:49:26.956399Z",
     hasShot: false,
     binding: null,
   },
@@ -132,6 +132,16 @@ export const REGISTRY: RegistryEntry[] = [
     modifiedAt: "2026-07-18T07:47:05.736223Z",
     hasShot: true,
     binding: "APP_LOXONIN_REMINDER",
+  },
+  {
+    slug: "meishi-mail",
+    workerName: "meishi-mail",
+    url: "https://meishi-mail.ichigoooo.workers.dev",
+    deployed: true,
+    createdAt: "2026-09-29T00:30:06.640807Z",
+    modifiedAt: "2026-09-29T00:31:30.737277Z",
+    hasShot: false,
+    binding: "APP_MEISHI_MAIL",
   },
   {
     slug: "pitch-battle",
@@ -242,5 +252,15 @@ export const REGISTRY: RegistryEntry[] = [
     modifiedAt: "2026-08-08T08:47:09.785524Z",
     hasShot: true,
     binding: "APP_TURING_WEREWOLF",
+  },
+  {
+    slug: "wan-video",
+    workerName: "wan-video",
+    url: "https://wan-video.ichigoooo.workers.dev",
+    deployed: false,
+    createdAt: null,
+    modifiedAt: null,
+    hasShot: false,
+    binding: null,
   },
 ]

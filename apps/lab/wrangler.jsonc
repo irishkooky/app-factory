@@ -49,6 +49,10 @@
       "service": "loxonin-reminder"
     },
     {
+      "binding": "APP_MEISHI_MAIL",
+      "service": "meishi-mail"
+    },
+    {
       "binding": "APP_PITCH_BATTLE",
       "service": "pitch-battle"
     },
