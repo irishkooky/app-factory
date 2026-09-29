@@ -16,8 +16,11 @@ export interface SenderProfile {
   company: string
   signature: string
   eventName: string
+  /** Gmail 側の自動署名を使う人向けに、アプリの署名を付けないこともできる */
+  includeSignature: boolean
 }
 
+/** body は署名を含まない。署名は送る直前に withSignature で付ける */
 export interface MailDraft {
   subject: string
   body: string

@@ -9,6 +9,7 @@ export const DEFAULT_PROFILE: SenderProfile = {
   company: '',
   signature: '',
   eventName: '経営者交流会',
+  includeSignature: true,
 }
 
 function read<T>(key: string): T | undefined {

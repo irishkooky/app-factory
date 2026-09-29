@@ -38,12 +38,16 @@ export function buildTemplateDraft(card: CardInfo, sender: SenderProfile, memo: 
     'また改めてゆっくりお話しできる機会をいただけますと嬉しいです。',
     '',
     '今後ともどうぞよろしくお願いいたします。',
-    '',
-    signatureBlock(sender),
   ]
     .filter((line, i, arr) => !(line === '' && arr[i - 1] === ''))
     .join('\n')
     .trim()
 
   return { subject: subjectLine(sender), body }
+}
+
+/** 送信・コピー用の本文。署名を付ける設定なら末尾に足す */
+export function withSignature(draft: MailDraft, sender: SenderProfile): MailDraft {
+  const signature = sender.includeSignature ? signatureBlock(sender) : ''
+  return signature ? { ...draft, body: `${draft.body.trimEnd()}\n\n${signature}` } : draft
 }
