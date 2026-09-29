@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { recipientLabel, signatureBlock, subjectLine } from '../lib/template'
+import { recipientLabel, subjectLine } from '../lib/template'
 import type { CardInfo, MailDraft, SenderProfile } from '../lib/types'
 import { generateJson } from './gemini'
 
@@ -48,6 +48,7 @@ function validateDraftInput(data: DraftInput): DraftInput {
       company: text(s.company),
       signature: text(s.signature),
       eventName: text(s.eventName),
+      includeSignature: s.includeSignature !== false,
     },
     memo: text(r.memo, MEMO_MAX),
   }
@@ -81,9 +82,6 @@ export const writeDraft = createServerFn({ method: 'POST' })
     const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
     const aiBody = text(r.body, 4000).trim()
     if (!aiBody) throw new Error('AI の文面が空でした')
-    const signature = signatureBlock(data.sender)
-    const body = [recipientLabel(data.card), '', aiBody, signature ? `\n${signature}` : '']
-      .join('\n')
-      .trim()
+    const body = [recipientLabel(data.card), '', aiBody].join('\n').trim()
     return { subject: text(r.subject, 100).trim() || subjectLine(data.sender), body }
   })

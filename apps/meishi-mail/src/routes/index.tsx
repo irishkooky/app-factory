@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   Alert,
   Anchor,
@@ -19,6 +19,7 @@ import {
   SegmentedControl,
   SimpleGrid,
   Stack,
+  Switch,
   Text,
   TextInput,
   Textarea,
@@ -28,7 +29,7 @@ import { scanCard } from '../server/scan'
 import { writeDraft } from '../server/draft'
 import { isValidEmail, normalizeEmail } from '../lib/email'
 import { prepareImage } from '../lib/image'
-import { buildTemplateDraft } from '../lib/template'
+import { buildTemplateDraft, signatureBlock, withSignature } from '../lib/template'
 import { detectPlatform, gmailAppUrl, gmailWebUrl, mailtoUrl, type Platform } from '../lib/compose'
 import { DEFAULT_PROFILE, loadHistory, loadProfile, saveHistory, saveProfile } from '../lib/storage'
 import { EMPTY_CARD, type CardInfo, type HistoryEntry, type MailDraft, type SenderProfile } from '../lib/types'
@@ -181,7 +182,12 @@ function HomePage() {
     setEntryId(entry.id)
     setCard(entry.card)
     setTo(entry.to)
-    setDraft(entry.draft)
+    // 署名を本文に含めていた頃の履歴は、署名を外してから戻す（送信時に付け直す）
+    const legacySignature = signatureBlock(profile)
+    const body = legacySignature && entry.draft.body.trimEnd().endsWith(legacySignature)
+      ? entry.draft.body.trimEnd().slice(0, -legacySignature.length).trimEnd()
+      : entry.draft.body
+    setDraft({ ...entry.draft, body })
     setMemo('')
     setPreview(null)
     setError(null)
@@ -197,6 +203,12 @@ function HomePage() {
     })
   }
 
+  function toggleSignature(includeSignature: boolean) {
+    const next = { ...profile, includeSignature }
+    setProfile(next)
+    saveProfile(next)
+  }
+
   function saveSettings(next: SenderProfile) {
     setProfile(next)
     saveProfile(next)
@@ -206,7 +218,10 @@ function HomePage() {
     }
   }
 
-  const primaryHref = platform === 'ios' ? gmailAppUrl(to, draft) : platform === 'android' ? mailtoUrl(to, draft) : gmailWebUrl(to, draft)
+  const outgoing = withSignature(draft, profile)
+  const signaturePreview = signatureBlock(profile)
+  const primaryHref =
+    platform === 'ios' ? gmailAppUrl(to, outgoing) : platform === 'android' ? mailtoUrl(to, outgoing) : gmailWebUrl(to, outgoing)
   const primaryHint =
     platform === 'ios'
       ? 'Gmail アプリの作成画面が開きます。送らずに左上の × で閉じると「下書きを保存」できます。'
@@ -234,7 +249,7 @@ function HomePage() {
         {profileMissing && (
           <Alert color="yellow" title="まず自分の名前を設定しましょう">
             <Stack gap="xs">
-              <Text size="sm">名乗りと署名がメールに自動で入ります。一度設定すればこの端末に保存されます。</Text>
+              <Text size="sm">名乗りと署名がメールに自動で入ります（署名はオフにもできます）。一度設定すればこの端末に保存されます。</Text>
               <Button size="xs" w="fit-content" onClick={() => setSettingsOpen(true)}>
                 設定する
               </Button>
@@ -377,6 +392,17 @@ function HomePage() {
                   value={draft.body}
                   onChange={(e) => setDraft({ ...draft, body: e.currentTarget.value })}
                 />
+                <Switch
+                  label="署名を付ける"
+                  description="Gmail の自動署名を使っているならオフに"
+                  checked={profile.includeSignature}
+                  onChange={(e) => toggleSignature(e.currentTarget.checked)}
+                />
+                {profile.includeSignature && (
+                  <Text size="xs" c="dimmed" style={{ whiteSpace: 'pre-wrap' }}>
+                    {signaturePreview || '署名が空です。「自分の情報」で名前と会社を入れると付きます。'}
+                  </Text>
+                )}
                 <Button
                   component="a"
                   href={toValid ? primaryHref : undefined}
@@ -396,14 +422,14 @@ function HomePage() {
                 <Group grow>
                   <Button
                     component="a"
-                    href={toValid ? mailtoUrl(to, draft) : undefined}
+                    href={toValid ? mailtoUrl(to, outgoing) : undefined}
                     variant="default"
                     disabled={!toValid}
                     onClick={markOpened}
                   >
                     他のメールアプリ
                   </Button>
-                  <CopyButton value={`${to}\n件名: ${draft.subject}\n\n${draft.body}`} timeout={1500}>
+                  <CopyButton value={`${to}\n件名: ${outgoing.subject}\n\n${outgoing.body}`} timeout={1500}>
                     {({ copied, copy }) => (
                       <Button variant="default" color={copied ? 'teal' : undefined} onClick={copy}>
                         {copied ? 'コピーしました' : '全文コピー'}
@@ -458,6 +484,22 @@ function HomePage() {
             ))}
           </Stack>
         )}
+
+        <Paper withBorder radius="lg" p="md" bg="var(--mantine-color-indigo-light)">
+          <Group justify="space-between" wrap="nowrap" gap="sm">
+            <Box>
+              <Text fw={600} size="sm">
+                ご意見・ご要望をお聞かせください
+              </Text>
+              <Text size="xs" c="dimmed">
+                「こんな機能がほしい」「うちの会社でも使いたい」など、なんでもどうぞ。
+              </Text>
+            </Box>
+            <Button component={Link} to="/contact" size="xs" style={{ flex: 'none' }}>
+              送る
+            </Button>
+          </Group>
+        </Paper>
 
         <Center>
           <Text size="xs" c="dimmed" ta="center">
@@ -541,6 +583,13 @@ function SettingsModal({
           minRows={3}
           value={form.signature}
           onChange={(e) => setForm({ ...form, signature: e.currentTarget.value })}
+          disabled={!form.includeSignature}
+        />
+        <Switch
+          label="署名を付ける"
+          description="Gmail の自動署名を使っているならオフに"
+          checked={form.includeSignature}
+          onChange={(e) => setForm({ ...form, includeSignature: e.currentTarget.checked })}
         />
         <Button onClick={() => onSave(form)}>保存</Button>
       </Stack>
