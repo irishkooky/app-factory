@@ -38,11 +38,20 @@ gh pr edit NUMBER --base docs/stacked-pr-chain
 
 ## 根からマージする
 
-根より先に子をマージすると、子の差分に親のコミットが残る。根からマージする。
+根より先に子を `main` へマージすると、子の PR に載っている親のコミットも `main` へ入る。先に根をマージする。
 
 1. 根の PR を `main` にマージする。
-2. GitHub が子 PR の base を `main` に付け替えるまで待つ。
-3. 子 PR をマージする。
-4. 孫がいるなら、同じ順で続ける。
+2. 根の head ブランチを、マージ済み PR の Delete branch で消す。自動削除がオンなら、マージ時の削除でもよい。
+3. GitHub は、消したブランチを base にしている未マージの PR を、根の base である `main` へ付け替える。
+4. 子の Files changed が子だけの差分になったことを確認してから、子をマージする。
+5. 孫がいるなら、同じ順で続ける。
+
+`gh pr merge --delete-branch` や `git push origin --delete` で根のブランチを消すと、子が付け替えられずに閉じることがある。`gh` で根をマージしたときは、ブランチを消す前に子の base を `main` へ移す。NUMBER は `gh pr list` で見た子の番号である。
+
+```bash
+gh pr edit NUMBER --base main
+```
+
+手順の根拠は GitHub Docs の [Managing branches within your repository](https://docs.github.com/en/pull-requests/how-tos/commit-changes/managing-branches-within-your-repository) にある。
 
 親ブランチを rebase したあとは、子をその新しい先端へ rebase してから push する。共有ブランチへの force push は、確認を取ってから行う。
