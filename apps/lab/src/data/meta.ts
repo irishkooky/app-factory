@@ -111,6 +111,12 @@ export const META: Record<string, AppMeta> = {
     category: 'tool',
     tags: ['予約', 'サイト', 'Convex'],
   },
+  'sql-basics': {
+    title: 'SQL の見える化ラボ',
+    description: 'やることリストを操作すると、API・Django のコード・実際に走った SQL・DB の中身が順番に光る SQL 入門。訪問者ごとに専用の SQLite が用意され、10 ステップのレッスンで SELECT から JOIN まで試せる。',
+    category: 'tool',
+    tags: ['SQL', '学習', 'Django', 'Durable Objects'],
+  },
   'token-cost-checker': {
     title: 'Token Cost Checker',
     description: 'Claude各モデルのトークン単価から、API利用料を日本円で試算する電卓。',

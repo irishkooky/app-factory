@@ -69,6 +69,10 @@
       "service": "salon-booking"
     },
     {
+      "binding": "APP_SQL_BASICS",
+      "service": "sql-basics"
+    },
+    {
       "binding": "APP_TOKEN_COST_CHECKER",
       "service": "token-cost-checker"
     },
