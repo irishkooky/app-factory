@@ -20,7 +20,7 @@ export type RegistryEntry = {
 }
 
 export const SUBDOMAIN = "ichigoooo"
-export const GENERATED_AT = "2026-09-29T00:32:14.471Z"
+export const GENERATED_AT = "2026-10-03T05:21:29.849Z"
 
 export const REGISTRY: RegistryEntry[] = [
   {
@@ -109,7 +109,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://lab.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-08-16T11:00:36.351525Z",
-    modifiedAt: "2026-09-19T01:49:26.956399Z",
+    modifiedAt: "2026-09-29T00:32:35.982317Z",
     hasShot: false,
     binding: null,
   },
@@ -139,8 +139,8 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://meishi-mail.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-09-29T00:30:06.640807Z",
-    modifiedAt: "2026-09-29T00:31:30.737277Z",
-    hasShot: false,
+    modifiedAt: "2026-09-29T01:20:45.328108Z",
+    hasShot: true,
     binding: "APP_MEISHI_MAIL",
   },
   {
@@ -182,6 +182,16 @@ export const REGISTRY: RegistryEntry[] = [
     modifiedAt: "2026-07-17T08:42:12.681805Z",
     hasShot: true,
     binding: "APP_SALON_BOOKING",
+  },
+  {
+    slug: "sql-basics",
+    workerName: "sql-basics",
+    url: "https://sql-basics.ichigoooo.workers.dev",
+    deployed: true,
+    createdAt: "2026-10-03T05:19:27.502853Z",
+    modifiedAt: "2026-10-03T05:19:32.096441Z",
+    hasShot: false,
+    binding: "APP_SQL_BASICS",
   },
   {
     slug: "token-cost-checker",

@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sql-basics",
+  "compatibility_date": "2026-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // 訪問者ごとの SQLite（Durable Object）をエクスポートするため、独自のサーバーエントリを使う
+  "main": "src/server.ts",
+  "durable_objects": {
+    "bindings": [{ "name": "SANDBOX", "class_name": "SqlSandbox" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SqlSandbox"] }]
+}
