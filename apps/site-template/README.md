@@ -1,11 +1,8 @@
 # site-template
 
 ホームページを持っていない会社に、先回りで作って見せるサイトの雛形。
-中身はただの会社紹介ページなので、Astro で静的 HTML に書き出し、Cloudflare Workers の Static Assets で配信する（Worker のコードは無い）。
-クライアント側の JavaScript は、スマホメニューを閉じる1行だけ。
-
-app-factory の他のアプリ（TanStack Start + Mantine）とは技術スタックが違う。
-サーバー処理も UI ライブラリも要らない静的サイトなので、軽さと引き渡しやすさを優先した。
+app-factory 標準の構成（TanStack Start + Mantine v9、Cloudflare Workers）で、`apps/hello` をもとにしている。
+中身は1社分の会社紹介ページだけで、DB・認証・課金は使わない。
 
 ## 1社分のサイトを作る手順
 
@@ -23,11 +20,11 @@ app-factory の他のアプリ（TanStack Start + Mantine）とは技術スタ�
    ```bash
    cd apps/site-<会社のslug>
    vp install
-   vp run build      # astro check（型チェック）+ astro build → dist/
-   vp run preview    # wrangler dev で http://localhost:8787
+   vp run build      # vite build + tsc
+   vp run preview    # ビルド結果を Workers ランタイムで表示
    ```
 
-6. デプロイは `vp run deploy`（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` が要る）
+6. デプロイは `vp run deploy`（build のあと `wrangler deploy`。`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` が要る）
 
 `gallery` を省略すると事例セクションとナビの項目が消える。`about.photo`・`services[].photo` も省略できる。
 
