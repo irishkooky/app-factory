@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#98ad8d"/><stop offset="1" stop-color="#566f4b"/></linearGradient></defs>
+<rect width="1200" height="800" fill="url(#g)"/>
+<g fill="#ffffff" fill-opacity="0.22">
+<polygon points="376,374.4 600,195.2 824,374.4"/>
+<rect x="420.79999999999995" y="374.4" width="358.4000000000001" height="201.60000000000002"/>
+</g>
+<rect x="566.4" y="464" width="67.2" height="112.00000000000001" fill="#566f4b" fill-opacity="0.5"/>
+<text x="600" y="704" text-anchor="middle" font-family="sans-serif" font-size="32" fill="#ffffff" fill-opacity="0.85">サービス写真 3（差し替え用）</text>
+</svg>

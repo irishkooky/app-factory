@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9a27f"/><stop offset="1" stop-color="#7d6544"/></linearGradient></defs>
+<rect width="1200" height="900" fill="url(#g)"/>
+<g fill="#ffffff" fill-opacity="0.22">
+<polygon points="348,421.19999999999993 600,219.59999999999997 852,421.19999999999993"/>
+<rect x="398.4" y="421.19999999999993" width="403.20000000000005" height="226.80000000000004"/>
+</g>
+<rect x="562.2" y="522" width="75.60000000000001" height="126.00000000000001" fill="#7d6544" fill-opacity="0.5"/>
+<text x="600" y="792" text-anchor="middle" font-family="sans-serif" font-size="36" fill="#ffffff" fill-opacity="0.85">会社・スタッフの写真（差し替え用）</text>
+</svg>
