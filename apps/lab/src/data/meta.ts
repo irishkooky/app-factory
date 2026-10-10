@@ -33,6 +33,13 @@ export const META: Record<string, AppMeta> = {
     tags: ['テンプレート'],
     hidden: true,
   },
+  'site-template': {
+    title: '制作サイト雛形',
+    description: 'ホームページを持たない会社向けに先回りで作るサイトの雛形。会社情報と写真を差し替えて1社分を出す。',
+    category: 'demo',
+    tags: ['テンプレート', 'Next.js'],
+    hidden: true,
+  },
   'jev-lab': {
     title: 'Jev 気づくフォーム',
     description: '入力の意味に気づく受付フォーム。Jev・GPT 5.6 Luna・Gemini 3.8 Flash・Claude・Qwenで、同じ入力の判断・応答時間・コストを比較できます。',

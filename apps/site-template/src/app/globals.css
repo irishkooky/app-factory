@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* 色は src/site.config.ts の theme から layout.tsx が CSS 変数として流し込む */
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-soft: var(--brand-soft);
+  --font-sans: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 4rem;
+}
+
+body {
+  @apply bg-white text-stone-800 antialiased;
+  font-feature-settings: "palt";
+}
