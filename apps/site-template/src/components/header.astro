@@ -1,0 +1,56 @@
+---
+import { site } from "~/site.config";
+import Icon from "./icon.astro";
+
+const tel = `tel:${site.contact.phone.replaceAll("-", "")}`;
+const items = [
+  { id: "about", title: "私たちについて" },
+  { id: "services", title: "サービス" },
+  ...(site.gallery?.photos.length ? [{ id: "works", title: site.gallery.title }] : []),
+  { id: "company", title: "会社概要・アクセス" },
+  { id: "contact", title: "お問い合わせ" },
+];
+---
+
+<header class="sticky top-0 z-40 border-stone-200 border-b bg-white/95 backdrop-blur">
+  <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
+    <a class="font-bold text-lg text-stone-900 sm:text-xl" href="#top">{site.company.shortName}</a>
+
+    <nav class="hidden items-center gap-6 lg:flex">
+      {
+        items.map((item) => (
+          <a class="font-medium text-sm text-stone-600 transition-colors hover:text-brand" href={`#${item.id}`}>
+            {item.title}
+          </a>
+        ))
+      }
+      <a
+        class="inline-flex items-center gap-2 rounded-full bg-brand px-4 py-2 font-semibold text-sm text-white transition-colors hover:bg-brand-dark"
+        href={tel}
+      >
+        <Icon class="h-4 w-4" name="phone" />
+        {site.contact.phone}
+      </a>
+    </nav>
+
+    {/* スマホは JS を使わず details で開閉する。リンクを押すと閉じる */}
+    <details class="group lg:hidden" id="mobile-menu">
+      <summary aria-label="メニュー" class="cursor-pointer list-none rounded-md p-2 text-stone-700">
+        <Icon class="h-6 w-6" name="menu" />
+      </summary>
+      <nav class="absolute inset-x-0 top-16 border-stone-200 border-t bg-white px-5 pb-4 shadow-md">
+        {
+          items.map((item) => (
+            <a
+              class="block border-stone-100 border-b py-3 font-medium text-stone-700"
+              href={`#${item.id}`}
+              onclick="this.closest('details').open = false"
+            >
+              {item.title}
+            </a>
+          ))
+        }
+      </nav>
+    </details>
+  </div>
+</header>

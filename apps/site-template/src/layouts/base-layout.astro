@@ -1,0 +1,33 @@
+---
+import { site } from "~/site.config";
+import "~/styles.css";
+
+type Props = { title?: string };
+
+const title = Astro.props.title ?? `${site.company.name}｜${site.company.industry}`;
+const ogImage = new URL(site.hero.photo.src, site.site.url).href;
+const themeVars = `--brand:${site.theme.primary};--brand-dark:${site.theme.primaryDark};--brand-soft:${site.theme.soft}`;
+---
+
+<!doctype html>
+<html lang="ja" style={themeVars}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={site.site.description} />
+    <link rel="canonical" href={site.site.url} />
+    {/* 提案用サンプルは検索結果に出さない */}
+    {site.site.isProposal && <meta name="robots" content="noindex, nofollow" />}
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:site_name" content={site.company.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={site.site.description} />
+    <meta property="og:url" content={site.site.url} />
+    <meta property="og:image" content={ogImage} />
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

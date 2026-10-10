@@ -1,3 +1,8 @@
 # https://developers.cloudflare.com/workers/static-assets/headers
-/_next/static/*
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/_astro/*
   Cache-Control: public,max-age=31536000,immutable

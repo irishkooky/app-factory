@@ -37,7 +37,7 @@ export const META: Record<string, AppMeta> = {
     title: '制作サイト雛形',
     description: 'ホームページを持たない会社向けに先回りで作るサイトの雛形。会社情報と写真を差し替えて1社分を出す。',
     category: 'demo',
-    tags: ['テンプレート', 'Next.js'],
+    tags: ['テンプレート', 'Astro'],
     hidden: true,
   },
   'jev-lab': {

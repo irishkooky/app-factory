@@ -1,0 +1,38 @@
+---
+import { site } from "~/site.config";
+import Section from "./section.astro";
+
+const { company, contact } = site;
+const rows = [
+  { label: "会社名", value: company.name },
+  company.representative && { label: "代表者", value: company.representative },
+  company.founded && { label: "創業", value: company.founded },
+  { label: "所在地", value: `${contact.postalCode ? `〒${contact.postalCode} ` : ""}${contact.address}` },
+  { label: "電話番号", value: contact.phone },
+  { label: "営業時間", value: `${contact.hours}${contact.holidays ? `（定休日: ${contact.holidays}）` : ""}` },
+  ...(company.extraRows ?? []),
+].filter((row): row is { label: string; value: string } => Boolean(row));
+
+const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(contact.mapQuery ?? contact.address)}&z=15&output=embed`;
+---
+
+<Section eyebrow="COMPANY" id="company" title="会社概要・アクセス">
+  <div class="grid gap-10 md:grid-cols-2">
+    <dl class="divide-y divide-stone-200 border-stone-200 border-y">
+      {
+        rows.map((row) => (
+          <div class="grid grid-cols-[7rem_1fr] gap-4 py-4 text-sm sm:text-base">
+            <dt class="font-semibold text-stone-500">{row.label}</dt>
+            <dd class="text-stone-800">{row.value}</dd>
+          </div>
+        ))
+      }
+    </dl>
+    <iframe
+      class="aspect-[4/3] w-full rounded-2xl border-0 bg-stone-100"
+      loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade"
+      src={mapSrc}
+      title={`${company.shortName}の地図`}></iframe>
+  </div>
+</Section>

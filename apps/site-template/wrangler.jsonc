@@ -1,19 +1,14 @@
 /**
+ * 静的サイトを Workers Static Assets で配信する（Worker のコードは無い）。
  * 1社 = 1 Worker。name がそのまま https://<name>.ichigoooo.workers.dev になる。
  * 雛形をコピーしたら name を site-<会社のslug> に変える。
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "site-template",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2025-03-01",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_date": "2026-07-01",
   "assets": {
-    "binding": "ASSETS",
-    "directory": ".open-next/assets"
-  },
-  "observability": {
-    "enabled": true
-  },
-  "minify": true
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
 }

@@ -1,6 +1,3 @@
-.next
-.open-next
+dist
+.astro
 .wrangler
-next-env.d.ts
-*.tsbuildinfo
-.dev.vars

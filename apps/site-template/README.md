@@ -1,10 +1,11 @@
 # site-template
 
 ホームページを持っていない会社に、先回りで作って見せるサイトの雛形。
-構成は sonnet-llc/corporate-website と同じ（Next.js 15 App Router + Tailwind CSS v4 + `@opennextjs/cloudflare` で Cloudflare Workers に載せる）。
+中身はただの会社紹介ページなので、Astro で静的 HTML に書き出し、Cloudflare Workers の Static Assets で配信する（Worker のコードは無い）。
+クライアント側の JavaScript は、スマホメニューを閉じる1行だけ。
 
 app-factory の他のアプリ（TanStack Start + Mantine）とは技術スタックが違う。
-納品先の会社に引き渡しやすく、corporate-website と同じ手順で運用できることを優先した。
+サーバー処理も UI ライブラリも要らない静的サイトなので、軽さと引き渡しやすさを優先した。
 
 ## 1社分のサイトを作る手順
 
@@ -22,8 +23,8 @@ app-factory の他のアプリ（TanStack Start + Mantine）とは技術スタ�
    ```bash
    cd apps/site-<会社のslug>
    vp install
-   vp run build      # next build（型チェック込み）
-   vp run preview    # Workers ランタイム（wrangler dev）で http://localhost:8787
+   vp run build      # astro check（型チェック）+ astro build → dist/
+   vp run preview    # wrangler dev で http://localhost:8787
    ```
 
 6. デプロイは `vp run deploy`（`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` が要る）
