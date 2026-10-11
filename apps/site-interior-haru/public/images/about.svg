@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+<defs><pattern id="p" width="60" height="60" patternUnits="userSpaceOnUse"><rect width="60" height="60" fill="#f1ebe2"/><circle cx="30" cy="30" r="6" fill="#ddd0bf"/></pattern></defs>
+<rect width="1200" height="900" fill="url(#p)"/>
+<rect x="0" width="520" height="900" fill="#e8dfd2"/>
+<g transform="translate(520 120) rotate(4)"><rect width="200" height="640" fill="#f8f4ee" stroke="#d8cbb9" stroke-width="4"/></g>
+<g transform="translate(760 260)"><rect width="260" height="34" rx="6" fill="#8a6a4f"/><rect x="40" y="34" width="180" height="220" fill="#5a7d8c"/><rect x="110" y="254" width="40" height="200" fill="#5a7d8c"/></g>
+<rect y="820" width="1200" height="80" fill="#a88a6e"/>
+</svg>
