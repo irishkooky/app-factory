@@ -1,31 +1,45 @@
-import { Box, Card, SimpleGrid, Text, Title } from '@mantine/core'
+import { Box, SimpleGrid, Text, Title } from '@mantine/core'
 import { site } from '../site.config'
+import { Img } from './Img'
 import { Section } from './Section'
 
 export function Services() {
   return (
-    <Section eyebrow="SERVICE" id="services" soft title="サービス">
-      <SimpleGrid cols={{ base: 1, md: 3 }} spacing="lg">
+    <Section
+      eyebrow="SERVICE"
+      id="services"
+      lead="小さな修理から新築まで、住まいのことはまとめてご相談いただけます。"
+      soft
+      title="できること"
+    >
+      <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing={{ base: 'xl', md: 32 }}>
         {site.services.map((service) => (
-          <Card key={service.title} padding={0} radius="lg" withBorder>
-            {service.photo && (
-              <Box
-                alt={service.photo.alt}
-                component="img"
-                loading="lazy"
-                src={service.photo.src}
-                style={{ aspectRatio: '3 / 2', display: 'block', objectFit: 'cover', width: '100%' }}
-              />
-            )}
-            <Box p="lg">
-              <Title fz="lg" order={3}>
+          <Box bg="white" key={service.title} style={{ borderRadius: 4, overflow: 'hidden', boxShadow: '0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(40,30,10,0.06)' }}>
+            {service.photo && <Img photo={service.photo} radius={0} ratio="3 / 2" />}
+            <Box p={{ base: 'lg', sm: 28 }}>
+              <Title fz={{ base: 'lg', sm: 21 }} order={3}>
                 {service.title}
               </Title>
-              <Text c="gray.7" fz="sm" lh={1.8} mt="sm">
+              <Text c="gray.7" fz="sm" lh={1.9} mt="sm">
                 {service.description}
               </Text>
+              {service.price && (
+                <Text
+                  c="brand.7"
+                  fw={700}
+                  fz="sm"
+                  mt="md"
+                  pt="sm"
+                  style={{ borderTop: '1px solid var(--mantine-color-gray-2)' }}
+                >
+                  <Text c="gray.6" component="span" fw={500} fz="xs" mr={8}>
+                    費用の目安
+                  </Text>
+                  {service.price}
+                </Text>
+              )}
             </Box>
-          </Card>
+          </Box>
         ))}
       </SimpleGrid>
     </Section>

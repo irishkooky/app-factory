@@ -1,13 +1,15 @@
 /**
  * 1社分のサイトの中身はすべてこのファイルにある。
  * 別の会社のサイトを作るときは、このファイルと public/images/ の写真だけを差し替える。
- * 項目の意味は SiteConfig の型コメントを参照。
+ * 項目の意味は SiteConfig の型コメントを参照。省略可能（?）な項目は、省くとセクションごと消える。
  */
 
 export type Photo = {
   /** public/ からのパス（例: /images/hero.jpg） */
   src: string;
   alt: string;
+  /** object-position。人物や建物が切れるときに調整する（例: "center 30%"） */
+  position?: string;
 };
 
 export type SiteConfig = {
@@ -16,7 +18,7 @@ export type SiteConfig = {
     name: string;
     /** ヘッダーなどで使う短い呼び名（例: 森田工務店） */
     shortName: string;
-    /** 業種（例: 工務店・リフォーム）。ヒーローの上の小見出しと title に出る */
+    /** 業種（例: 工務店・住まいのリフォーム）。ヒーローの小見出しと title に出る */
     industry: string;
     /** 代表者（例: 代表取締役 森田 浩二） */
     representative?: string;
@@ -44,23 +46,46 @@ export type SiteConfig = {
     catchcopy: string;
     lead: string;
     photo: Photo;
+    /** 見出しの下に並べる短い安心材料（例: 見積もり無料） */
+    badges?: string[];
   };
+  /** ヒーロー直下の数字（例: 創業 / 38 / 年）。3つが収まりよい */
+  stats?: { label: string; value: string; unit?: string }[];
   about: {
     title: string;
-    body: string;
+    /** 段落ごとに1要素 */
+    body: string[];
     photo?: Photo;
+    /** 文末の署名（例: 代表取締役 森田 浩二） */
+    signature?: string;
   };
-  services: { title: string; description: string; photo?: Photo }[];
-  strengths: { title: string; description: string }[];
+  services: {
+    title: string;
+    description: string;
+    photo?: Photo;
+    /** 例: 修理 1万円〜 / 浴室交換 80万円〜 */
+    price?: string;
+  }[];
+  strengths: { title: string; description: string; photo?: Photo }[];
   /** 施工事例・メニュー・店内など。不要なら省略するとセクションとナビから消える */
-  gallery?: { title: string; photos: Photo[] };
+  gallery?: {
+    title: string;
+    items: (Photo & { title: string; meta?: string })[];
+  };
+  /** ご依頼の流れ */
+  flow?: { title: string; description: string }[];
+  /** お客様の声。Google マップの口コミを本人の許可を得て載せる想定 */
+  voices?: { body: string; name: string; meta?: string }[];
+  faq?: { q: string; a: string }[];
   theme: {
     /** メインカラー（ボタン・見出しのアクセント） */
     primary: string;
-    /** メインカラーの濃い版（文字・ホバー） */
+    /** メインカラーの濃い版（文字・ホバー・問い合わせ帯） */
     primaryDark: string;
     /** セクション背景に敷く淡い色 */
     soft: string;
+    /** 小見出しや数字に使う差し色 */
+    accent: string;
   };
   site: {
     /** 公開 URL。canonical と sitemap に使う */
@@ -87,9 +112,9 @@ export const site: SiteConfig = {
     representative: "代表取締役 森田 浩二",
     founded: "1987年",
     extraRows: [
-      { label: "従業員数", value: "8名（大工 5名）" },
-      { label: "資格・許可", value: "一級建築士 / 二級建築施工管理技士 / 建設業許可" },
-      { label: "対応エリア", value: "さいたま市・川口市・戸田市とその周辺" },
+      { label: "従業員数", value: "8名（うち自社大工 5名）" },
+      { label: "資格・許可", value: "一級建築士 / 二級建築施工管理技士 / 埼玉県知事許可（般）" },
+      { label: "対応エリア", value: "さいたま市・川口市・戸田市・蕨市とその周辺" },
     ],
   },
   contact: {
@@ -102,50 +127,124 @@ export const site: SiteConfig = {
     mapQuery: "さいたま市南区役所",
   },
   hero: {
-    catchcopy: "地元で35年。\n住まいの「困った」に\nすぐ駆けつけます。",
-    lead: "雨漏りや水まわりの修理から、キッチン・お風呂のリフォーム、新築まで。自社の大工が最初から最後まで責任を持って仕上げます。",
-    photo: { src: "/images/hero.svg", alt: "施工した住宅の外観" },
+    catchcopy: "直すのも、建てるのも。\n地元の大工が\n最後まで。",
+    lead: "雨漏りや水まわりの修理から、キッチン・浴室のリフォーム、木の家の新築まで。さいたま市南区で38年、自社の大工が責任を持って仕上げます。",
+    photo: { src: "/images/hero.jpg", alt: "森田工務店が手がけた木の家の外観", position: "center 60%" },
+    badges: ["お見積もり無料", "小さな修理も歓迎", "工事後の定期点検つき"],
   },
+  stats: [
+    { label: "創業", value: "38", unit: "年" },
+    { label: "施工実績", value: "2,400", unit: "件以上" },
+    { label: "自社の大工", value: "5", unit: "名" },
+  ],
   about: {
-    title: "顔の見える工務店です",
-    body: "森田工務店は、さいたま市南区で1987年から家づくりを続けてきました。ご相談をいただいたら、代表の森田が自分で現地を見に伺います。下請けに丸投げはせず、自社の大工が工事をして、終わったあとの点検まで同じ顔ぶれでお付き合いします。",
-    photo: { src: "/images/about.svg", alt: "代表と大工のスタッフ" },
+    title: "ご相談には、代表の私が伺います。",
+    body: [
+      "森田工務店は、1987年にさいたま市南区で父が始めた小さな工務店です。いまも変わらず、ご相談をいただいたら代表の私が自分で現地を見に伺い、工事の中身と費用をご説明しています。",
+      "工事は下請けに任せず、自社の大工が最初から最後まで担当します。だから、仕上がりに責任を持てますし、何年たっても「あのとき工事した家」として、同じ顔ぶれでお付き合いが続きます。",
+      "ドアの建て付けひとつでも、遠慮なくお電話ください。",
+    ],
+    photo: { src: "/images/about.jpg", alt: "現場で木材を加工する大工", position: "center 40%" },
+    signature: "代表取締役 森田 浩二",
   },
   services: [
     {
       title: "修理・メンテナンス",
-      description: "雨漏り、建具の不具合、外壁のひび割れなど。小さな工事でもお気軽にご相談ください。",
-      photo: { src: "/images/service-1.svg", alt: "屋根の修理" },
+      description: "雨漏り、建具の不具合、外壁のひび割れ、床のきしみ。半日で終わる小さな工事でも、すぐに伺います。",
+      photo: { src: "/images/service-1.jpg", alt: "屋根の修理" },
+      price: "1万円〜",
     },
     {
       title: "水まわりリフォーム",
-      description: "キッチン、浴室、トイレ、洗面台の交換。最短1日で工事が終わるプランもあります。",
-      photo: { src: "/images/service-2.svg", alt: "リフォームしたキッチン" },
+      description: "キッチン、浴室、トイレ、洗面台の交換。住みながら工事ができ、トイレ交換なら1日で終わります。",
+      photo: { src: "/images/service-2.jpg", alt: "リフォームしたキッチン" },
+      price: "トイレ交換 15万円〜",
     },
     {
       title: "新築・増改築",
-      description: "木の家の新築、二世帯への増築、間取りの変更まで。設計からご一緒します。",
-      photo: { src: "/images/service-3.svg", alt: "新築の木造住宅" },
+      description: "国産材を使った木の家の新築、二世帯への増築、間取りの変更。設計から一緒に考えます。",
+      photo: { src: "/images/service-3.jpg", alt: "建築中の木造住宅" },
+      price: "ご予算に合わせてご提案",
     },
   ],
   strengths: [
-    { title: "見積もりは無料", description: "現地を見てから、工事の内訳がわかる見積書をお出しします。" },
-    { title: "自社の大工が施工", description: "丸投げをしないので、品質と責任の所在がはっきりしています。" },
-    { title: "工事後も点検に伺います", description: "引き渡しのあとも、1年・5年の点検で住まいを見守ります。" },
+    {
+      title: "見積もりは無料。内訳まで隠さずに。",
+      description:
+        "現地を見てから、材料と手間の内訳がわかる見積書をお出しします。「一式」でまとめず、何にいくらかかるかを一緒に確かめてから決めていただけます。",
+      photo: { src: "/images/strength-1.jpg", alt: "図面を前にした打ち合わせ" },
+    },
+    {
+      title: "自社の大工が、最初から最後まで。",
+      description:
+        "工事を丸投げしないので、現場の判断が早く、仕上がりの責任もはっきりしています。現場で気づいたことは、その日のうちにご報告します。",
+      photo: { src: "/images/strength-2.jpg", alt: "木材を加工する大工の手元" },
+    },
+    {
+      title: "引き渡しのあとも、点検に伺います。",
+      description:
+        "1年・5年の無料点検で、住まいの小さな変化を見逃しません。「近くまで来たので」と顔を出せるのも、地元の工務店だからです。",
+      photo: { src: "/images/strength-3.jpg", alt: "完成した住まいの室内" },
+    },
   ],
   gallery: {
     title: "施工事例",
-    photos: [
-      { src: "/images/gallery-1.svg", alt: "施工事例 1" },
-      { src: "/images/gallery-2.svg", alt: "施工事例 2" },
-      { src: "/images/gallery-3.svg", alt: "施工事例 3" },
-      { src: "/images/gallery-4.svg", alt: "施工事例 4" },
+    items: [
+      { src: "/images/works-1.jpg", alt: "木の家の新築", title: "木の家の新築", meta: "さいたま市南区・工期5か月" },
+      { src: "/images/works-2.jpg", alt: "キッチンのリフォーム", title: "対面キッチンへの交換", meta: "川口市・工期6日" },
+      { src: "/images/works-3.jpg", alt: "浴室のリフォーム", title: "在来浴室からユニットバスへ", meta: "戸田市・工期4日" },
+      { src: "/images/works-4.jpg", alt: "リビングの改装", title: "和室とつなげたリビング", meta: "さいたま市浦和区・工期3週間" },
+      { src: "/images/works-5.jpg", alt: "外壁の塗り替え", title: "外壁・屋根の塗り替え", meta: "蕨市・工期2週間" },
+      { src: "/images/works-6.jpg", alt: "ウッドデッキ", title: "ウッドデッキの新設", meta: "さいたま市南区・工期3日" },
     ],
   },
+  flow: [
+    { title: "お電話・メール", description: "困っていることを、そのままお聞かせください。" },
+    { title: "現地の確認", description: "代表が伺い、状態を見て、ご希望を伺います。" },
+    { title: "お見積もり", description: "内訳つきの見積書をお持ちします。無料です。" },
+    { title: "工事", description: "自社の大工が施工。ご近所へのご挨拶もします。" },
+    { title: "点検・アフター", description: "1年・5年の点検。気になることはいつでも。" },
+  ],
+  voices: [
+    {
+      body: "雨漏りでお電話したら、その日の夕方に見に来てくれました。原因を写真で見せてもらえたので納得して頼めました。",
+      name: "K様",
+      meta: "さいたま市南区・屋根の修理",
+    },
+    {
+      body: "母の家の浴室を、手すりの位置まで相談しながら決めてくれました。工事中も毎日声をかけてもらえて安心でした。",
+      name: "S様",
+      meta: "川口市・浴室リフォーム",
+    },
+    {
+      body: "新築から10年、点検のたびに同じ大工さんが来てくれます。何かあってもここに電話すればいい、という安心感があります。",
+      name: "T様",
+      meta: "戸田市・新築",
+    },
+  ],
+  faq: [
+    {
+      q: "見積もりだけでもお願いできますか？",
+      a: "はい、無料です。見積もりのあとにお断りいただいても費用はかかりません。",
+    },
+    {
+      q: "電球の交換や網戸の張り替えのような小さなことでも来てもらえますか？",
+      a: "もちろんです。小さな工事こそ地元の工務店の仕事だと考えています。まずはお電話ください。",
+    },
+    {
+      q: "どのあたりまで対応していますか？",
+      a: "さいたま市・川口市・戸田市・蕨市とその周辺です。それ以外の地域もご相談ください。",
+    },
+    {
+      q: "支払い方法は？",
+      a: "現金・銀行振込に対応しています。大きな工事は、着工時と完成時の分割払いもできます。",
+    },
+  ],
   theme: {
-    primary: "#3f6b4a",
-    primaryDark: "#26402c",
-    soft: "#f3f6f1",
+    primary: "#35624a",
+    primaryDark: "#1f3a2c",
+    soft: "#f6f3ec",
+    accent: "#a87b4f",
   },
   site: {
     url: "https://site-template.ichigoooo.workers.dev",
