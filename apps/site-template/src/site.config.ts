@@ -129,7 +129,7 @@ export const site: SiteConfig = {
   hero: {
     catchcopy: "直すのも、建てるのも。\n地元の大工が\n最後まで。",
     lead: "雨漏りや水まわりの修理から、キッチン・浴室のリフォーム、木の家の新築まで。さいたま市南区で38年、自社の大工が責任を持って仕上げます。",
-    photo: { src: "/images/hero.jpg", alt: "森田工務店が手がけた木の家の外観", position: "center 60%" },
+    photo: { src: "/images/hero.jpg", alt: "木と石を使った二階建ての住まいの外観", position: "60% 45%" },
     badges: ["お見積もり無料", "小さな修理も歓迎", "工事後の定期点検つき"],
   },
   stats: [
@@ -144,14 +144,14 @@ export const site: SiteConfig = {
       "工事は下請けに任せず、自社の大工が最初から最後まで担当します。だから、仕上がりに責任を持てますし、何年たっても「あのとき工事した家」として、同じ顔ぶれでお付き合いが続きます。",
       "ドアの建て付けひとつでも、遠慮なくお電話ください。",
     ],
-    photo: { src: "/images/about.jpg", alt: "現場で木材を加工する大工", position: "center 40%" },
+    photo: { src: "/images/about.jpg", alt: "鉋（かんな）で木材を削る大工の手元", position: "45% center" },
     signature: "代表取締役 森田 浩二",
   },
   services: [
     {
       title: "修理・メンテナンス",
       description: "雨漏り、建具の不具合、外壁のひび割れ、床のきしみ。半日で終わる小さな工事でも、すぐに伺います。",
-      photo: { src: "/images/service-1.jpg", alt: "屋根の修理" },
+      photo: { src: "/images/service-1.jpg", alt: "屋根に上って点検・修理をする職人", position: "center 35%" },
       price: "1万円〜",
     },
     {
@@ -163,7 +163,7 @@ export const site: SiteConfig = {
     {
       title: "新築・増改築",
       description: "国産材を使った木の家の新築、二世帯への増築、間取りの変更。設計から一緒に考えます。",
-      photo: { src: "/images/service-3.jpg", alt: "建築中の木造住宅" },
+      photo: { src: "/images/service-3.jpg", alt: "骨組みができた建築中の住宅" },
       price: "ご予算に合わせてご提案",
     },
   ],
@@ -172,30 +172,30 @@ export const site: SiteConfig = {
       title: "見積もりは無料。内訳まで隠さずに。",
       description:
         "現地を見てから、材料と手間の内訳がわかる見積書をお出しします。「一式」でまとめず、何にいくらかかるかを一緒に確かめてから決めていただけます。",
-      photo: { src: "/images/strength-1.jpg", alt: "図面を前にした打ち合わせ" },
+      photo: { src: "/images/strength-1.jpg", alt: "間取りの図面を手に取って確認する様子" },
     },
     {
       title: "自社の大工が、最初から最後まで。",
       description:
         "工事を丸投げしないので、現場の判断が早く、仕上がりの責任もはっきりしています。現場で気づいたことは、その日のうちにご報告します。",
-      photo: { src: "/images/strength-2.jpg", alt: "木材を加工する大工の手元" },
+      photo: { src: "/images/strength-2.jpg", alt: "作業場で木材を削る大工" },
     },
     {
       title: "引き渡しのあとも、点検に伺います。",
       description:
         "1年・5年の無料点検で、住まいの小さな変化を見逃しません。「近くまで来たので」と顔を出せるのも、地元の工務店だからです。",
-      photo: { src: "/images/strength-3.jpg", alt: "完成した住まいの室内" },
+      photo: { src: "/images/strength-3.jpg", alt: "住宅街の格子戸の玄関" },
     },
   ],
   gallery: {
     title: "施工事例",
     items: [
-      { src: "/images/works-1.jpg", alt: "木の家の新築", title: "木の家の新築", meta: "さいたま市南区・工期5か月" },
-      { src: "/images/works-2.jpg", alt: "キッチンのリフォーム", title: "対面キッチンへの交換", meta: "川口市・工期6日" },
-      { src: "/images/works-3.jpg", alt: "浴室のリフォーム", title: "在来浴室からユニットバスへ", meta: "戸田市・工期4日" },
-      { src: "/images/works-4.jpg", alt: "リビングの改装", title: "和室とつなげたリビング", meta: "さいたま市浦和区・工期3週間" },
-      { src: "/images/works-5.jpg", alt: "外壁の塗り替え", title: "外壁・屋根の塗り替え", meta: "蕨市・工期2週間" },
-      { src: "/images/works-6.jpg", alt: "ウッドデッキ", title: "ウッドデッキの新設", meta: "さいたま市南区・工期3日" },
+      { src: "/images/works-1.jpg", alt: "板張りの外壁と縁側のある木の家", title: "縁側のある木の家の新築", meta: "さいたま市南区・工期5か月", position: "center 72%" },
+      { src: "/images/works-2.jpg", alt: "キッチンのリフォーム", title: "明るいキッチンへの入れ替え", meta: "川口市・工期6日" },
+      { src: "/images/works-3.jpg", alt: "リフォームした明るい浴室", title: "在来浴室からユニットバスへ", meta: "戸田市・工期4日", position: "center 60%" },
+      { src: "/images/works-4.jpg", alt: "畳の小上がりがあるリビング", title: "畳の小上がりがあるリビング", meta: "さいたま市浦和区・工期3週間" },
+      { src: "/images/works-5.jpg", alt: "床と壁を張り替えた洋室", title: "床と壁紙の張り替え", meta: "蕨市・工期3日" },
+      { src: "/images/works-6.jpg", alt: "庭に面したウッドデッキ", title: "庭に面したウッドデッキ", meta: "さいたま市南区・工期3日" },
     ],
   },
   flow: [

@@ -49,7 +49,7 @@ body { color: var(--mantine-color-black); -webkit-font-smoothing: antialiased; }
 h1, h2, h3 { font-feature-settings: 'palt'; letter-spacing: 0.04em; }
 img { display: block; }
 .flow-step + .flow-step { border-top: 1px dashed var(--mantine-color-gray-4); }
-@media (min-width: 62em) { .flow-step + .flow-step { border-top: 0; } }
+@media (min-width: 62em) { .flow-step + .flow-step { border-top: 0; } .strength-reverse > :first-child { order: 2; } }
 @media (max-width: 47.99em) { body { padding-bottom: 64px; } }
 `
 

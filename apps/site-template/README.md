@@ -14,7 +14,7 @@ app-factory 標準の構成（TanStack Start + Mantine v9、Cloudflare Workers�
 
 2. `package.json` と `wrangler.jsonc` の `name` を `site-<会社のslug>` に変える（Worker 名 = URL）
 3. `src/site.config.ts` を書き換える。会社名・業種・キャッチコピー・サービス・強み・連絡先・色はすべてここにある
-4. `public/images/` の写真を差し替え、`site.config.ts` の `src` を合わせる（jpg / webp でよい）
+4. `public/images/` の写真を差し替え、`site.config.ts` の `src` を合わせる（jpg、長辺 1200px・ヒーローは 2000px 程度）。写真の選び方は下の「写真」を参照
 5. ビルドとプレビュー
 
    ```bash
@@ -26,7 +26,16 @@ app-factory 標準の構成（TanStack Start + Mantine v9、Cloudflare Workers�
 
 6. デプロイは `vp run deploy`（build のあと `wrangler deploy`。`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` が要る）
 
-`gallery` を省略すると事例セクションとナビの項目が消える。`about.photo`・`services[].photo` も省略できる。
+`stats`・`gallery`・`flow`・`voices`・`faq` は省略するとセクションごと消える（ナビの項目も連動する）。`about.photo`・`services[].photo`・`strengths[].photo` も省略できる。
+
+## 写真
+
+1. **その会社が公開している写真を最優先する。** Google マップの写真、Instagram、チラシなど。施工事例は実物でないと意味が薄い
+2. 足りない分はフリー素材で埋める。商用利用可・クレジット不要のもの（Pexels、ぱくたそ など）を使い、出典を `public/images/CREDITS.md` に残す
+3. フリー素材の人物を「代表」や「スタッフ」として見せない。人物は手元や後ろ姿にとどめる
+4. お客様の声（`voices`）は実在の口コミだけを載せる。サンプルの文面は架空なので、実在の会社では Google の口コミを本人の了承を得て使うか、項目ごと消す
+
+サンプルの写真は Pexels から選んだ（`public/images/CREDITS.md`）。
 
 ## 提案用サンプルとしての表示
 

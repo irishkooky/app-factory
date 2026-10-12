@@ -1,4 +1,4 @@
-import { Anchor, Box, Button, Container, Group, Text, Title } from '@mantine/core'
+import { Anchor, Box, Button, Container, Text, Title } from '@mantine/core'
 import { site } from '../site.config'
 import { tel } from './Header'
 import { Icon } from './Icon'
@@ -55,14 +55,10 @@ export function Contact() {
         </Text>
 
         {contact.email && (
-          <Group justify="center" mt="xl">
-            <Anchor c="white" href={`mailto:${contact.email}`} underline="always">
-              <Group gap={8}>
-                <Icon name="mail" size={20} />
-                メールでのお問い合わせ（{contact.email}）
-              </Group>
-            </Anchor>
-          </Group>
+          <Anchor c="white" display="inline-flex" href={`mailto:${contact.email}`} mt="xl" style={{ alignItems: 'center', gap: 8 }} underline="always">
+            <Icon name="mail" size={20} />
+            メールでのお問い合わせ
+          </Anchor>
         )}
       </Container>
     </Box>

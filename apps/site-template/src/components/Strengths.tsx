@@ -27,13 +27,14 @@ export function Strengths() {
           )
           if (!item.photo) return <Box key={item.title}>{text}</Box>
           return (
-            <SimpleGrid cols={{ base: 1, md: 2 }} key={item.title} spacing={{ base: 'xl', md: 72 }} style={{ alignItems: 'center' }}>
-              <Box style={{ order: i % 2 === 1 ? 2 : 0 }} visibleFrom="md">
-                <Img photo={item.photo} ratio="3 / 2" />
-              </Box>
-              <Box hiddenFrom="md">
-                <Img photo={item.photo} ratio="3 / 2" />
-              </Box>
+            <SimpleGrid
+              className={i % 2 === 1 ? 'strength-reverse' : undefined}
+              cols={{ base: 1, md: 2 }}
+              key={item.title}
+              spacing={{ base: 'xl', md: 72 }}
+              style={{ alignItems: 'center' }}
+            >
+              <Img photo={item.photo} ratio="3 / 2" />
               {text}
             </SimpleGrid>
           )
