@@ -18,15 +18,20 @@ export function Company() {
 
   return (
     <Section eyebrow="COMPANY" id="company" title="会社概要・アクセス">
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing={40}>
-        <Table fz={{ base: 'sm', sm: 'md' }} verticalSpacing="md" withRowBorders>
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 40, md: 64 }}>
+        <Table
+          fz={{ base: 'sm', sm: 'md' }}
+          verticalSpacing="md"
+          withRowBorders
+          style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}
+        >
           <Table.Tbody>
             {rows.map((row) => (
               <Table.Tr key={row.label}>
-                <Table.Th c="gray.6" w={112}>
+                <Table.Th c="gray.6" fw={500} w={{ base: 96, sm: 128 }} style={{ verticalAlign: 'top' }}>
                   {row.label}
                 </Table.Th>
-                <Table.Td>{row.value}</Table.Td>
+                <Table.Td lh={1.8}>{row.value}</Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>
@@ -37,7 +42,7 @@ export function Company() {
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
           src={mapSrc}
-          style={{ aspectRatio: '4 / 3', border: 0, borderRadius: 16, width: '100%' }}
+          style={{ border: 0, borderRadius: 4, minHeight: 360, height: '100%', width: '100%' }}
           title={`${company.shortName}の地図`}
         />
       </SimpleGrid>

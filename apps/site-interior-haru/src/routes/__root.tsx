@@ -30,10 +30,28 @@ export const Route = createRootRoute({
       { property: 'og:url', content: site.site.url },
       { property: 'og:image', content: new URL(site.hero.photo.src, site.site.url).href },
     ],
-    links: [{ rel: 'canonical', href: site.site.url }],
+    links: [
+      { rel: 'canonical', href: site.site.url },
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@500;600;700&display=swap',
+      },
+    ],
   }),
   component: RootComponent,
 })
+
+const globalCss = `
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+body { color: var(--mantine-color-black); -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-feature-settings: 'palt'; letter-spacing: 0.04em; }
+img { display: block; }
+.flow-step + .flow-step { border-top: 1px dashed var(--mantine-color-gray-4); }
+@media (min-width: 62em) { .flow-step + .flow-step { border-top: 0; } .strength-reverse > :first-child { order: 2; } }
+@media (max-width: 47.99em) { body { padding-bottom: 64px; } }
+`
 
 function RootComponent() {
   return (
@@ -49,7 +67,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       <head>
         <ColorSchemeScript defaultColorScheme="light" />
         <HeadContent />
-        <style>{'html { scroll-behavior: smooth; scroll-padding-top: 64px; }'}</style>
+        <style>{globalCss}</style>
       </head>
       <body>
         <MantineProvider theme={theme} forceColorScheme="light">
