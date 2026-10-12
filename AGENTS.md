@@ -54,6 +54,10 @@ rigor が要る作業は `/poteto-mode` で始める。playbook の選択は pst
 役割ごとのモデルは `.cursor/rules/pstack-models.mdc`（全役割 `auto`）が決める。
 このリポジトリ独自のサブエージェントは置かない。委任は `poteto-mode` の Subagents 節に従う。
 
+pstack が入っていない環境（Claude Code など）では `/poteto-mode` も playbook も無い。
+その場合は上のスキルと第5節の規則だけで進め、PR 本文は第5節2の5見出しで書く。
+サブエージェントへの委任は、独立して並列に進められる作業があるときだけにする。
+
 ## 5. pstack の既定をこのリポジトリで上書きする規則
 
 pstack の指示とこの節が食い違ったら、この節を優先する。
