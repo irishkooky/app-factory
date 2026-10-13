@@ -76,6 +76,12 @@ export const META: Record<string, AppMeta> = {
     category: 'demo',
     tags: ['Convex', 'リアルタイム', 'DB'],
   },
+  'family-tree': {
+    title: '家系図メーカー',
+    description: '人物と親子・夫婦のつながりを入れるだけで家系図を自動レイアウト。ブラウザに保存し、JSON や SVG で書き出せます。',
+    category: 'tool',
+    tags: ['家系図', '家族', 'SVG'],
+  },
   guestbook: {
     title: 'ゲストブック',
     description: 'ひとことメッセージを投稿して並べるだけの、シンプルな公開掲示板。',
