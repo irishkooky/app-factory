@@ -181,7 +181,7 @@ export const site: SiteConfig = {
     accent: "#b08d57",
   },
   site: {
-    url: "https://site-robust.ichigoooo.workers.dev",
+    url: "https://robust.sonnet.co.jp",
     description:
       "川崎市宮前区の内装リフォーム、ROBUST。壁紙・床の張り替え、トイレや洗面の内装、マンションの全面リフォーム、店舗の退去工事までまとめてお受けします。",
     isProposal: true,

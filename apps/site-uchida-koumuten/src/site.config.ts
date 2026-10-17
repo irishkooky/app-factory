@@ -180,7 +180,7 @@ export const site: SiteConfig = {
     accent: "#6f8a3c",
   },
   site: {
-    url: "https://site-uchida-koumuten.ichigoooo.workers.dev",
+    url: "https://uchida-koumuten.sonnet.co.jp",
     description:
       "所沢市美原町の内田工務店。壁塗り、外壁・屋根の塗装、雨漏りやトイレの修理まで。お見積もりどおりの金額で、ご依頼どおりに仕上げます。",
     isProposal: true,

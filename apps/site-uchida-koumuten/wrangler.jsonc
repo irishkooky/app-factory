@@ -3,5 +3,6 @@
   "name": "site-uchida-koumuten",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry"
+  "main": "@tanstack/react-start/server-entry",
+  "routes": [{ "pattern": "uchida-koumuten.sonnet.co.jp", "custom_domain": true }]
 }

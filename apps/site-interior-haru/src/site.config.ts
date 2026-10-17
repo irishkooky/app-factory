@@ -179,7 +179,7 @@ export const site: SiteConfig = {
     accent: "#c08a4f",
   },
   site: {
-    url: "https://site-interior-haru.ichigoooo.workers.dev",
+    url: "https://interior-haru.sonnet.co.jp",
     description:
       "埼玉県草加市の壁紙張り替え専門店、インテリアHARU。お部屋や洗面所のクロス張り替え、傷や穴の補修まで、職人がひとりで責任を持って仕上げます。",
     isProposal: true,

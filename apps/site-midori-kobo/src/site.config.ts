@@ -181,7 +181,7 @@ export const site: SiteConfig = {
     accent: "#a08a4a",
   },
   site: {
-    url: "https://site-midori-kobo.ichigoooo.workers.dev",
+    url: "https://midori-kobo.sonnet.co.jp",
     description:
       "立川市西砂町の塗装屋、みどり工房。外壁・屋根の塗装とシーリングの打ち直し。不必要な工事はおすすめせず、ていねいな説明から始めます。",
     isProposal: true,

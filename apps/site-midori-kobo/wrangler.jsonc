@@ -3,5 +3,6 @@
   "name": "site-midori-kobo",
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry"
+  "main": "@tanstack/react-start/server-entry",
+  "routes": [{ "pattern": "midori-kobo.sonnet.co.jp", "custom_domain": true }]
 }

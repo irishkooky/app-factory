@@ -179,7 +179,7 @@ export const site: SiteConfig = {
     accent: "#d08a2e",
   },
   site: {
-    url: "https://site-tokushu-gaiso.ichigoooo.workers.dev",
+    url: "https://tokushu-gaiso.sonnet.co.jp",
     description:
       "埼玉県川口市の特殊外装。ロープアクセス（無足場工法）で、足場を組まずに外壁塗装・屋上防水・補修を行います。足場の費用を抑えたい方に。",
     isProposal: true,

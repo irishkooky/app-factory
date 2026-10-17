@@ -180,7 +180,7 @@ export const site: SiteConfig = {
     accent: "#d0894c",
   },
   site: {
-    url: "https://site-rm-tosou.ichigoooo.workers.dev",
+    url: "https://rm-tosou.sonnet.co.jp",
     description:
       "横浜市泉区のアール・エム塗装。屋根の葺き替え、外壁塗装、屋上・ベランダの防水まで。工事中は毎日、作業の様子を動画でお送りします。",
     isProposal: true,
