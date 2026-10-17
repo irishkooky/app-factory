@@ -45,4 +45,3 @@ app-factory 標準の構成（TanStack Start + Mantine v9、Cloudflare Workers�
 - `<meta name="robots" content="noindex, nofollow">` と `robots.txt` の `Disallow: /` で検索エンジンに載せない
 
 先方の許可なく本物の会社サイトに見える状態で公開しないための既定。契約後に本公開するときだけ `false` にし、`site.url` を本番ドメインに変える。
-
