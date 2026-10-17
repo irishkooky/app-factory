@@ -1,0 +1,106 @@
+# PR で変更されたアプリをビルドし、本番に出さずに Worker のバージョンだけを上げて
+# プレビュー URL（https://pr-<番号>-<worker名>.ichigoooo.workers.dev）を PR にコメントする。
+# Convex を使うアプリ（convex/ を持つもの）はデプロイキーが要るので対象外。
+name: preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "apps/**"
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    # フォークからの PR には Secrets が渡らない
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 変更されたアプリを調べる
+        id: apps
+        run: |
+          apps=$(git diff --name-only "$BASE_SHA...$HEAD_SHA" -- apps/ \
+            | cut -d/ -f2 | sort -u \
+            | while read -r app; do
+                [ -f "apps/$app/wrangler.jsonc" ] || continue
+                [ -d "apps/$app/convex" ] && continue
+                echo "$app"
+              done | tr '\n' ' ')
+          echo "list=$apps" >> "$GITHUB_OUTPUT"
+          echo "対象: ${apps:-なし}"
+
+      - uses: actions/setup-node@v4
+        if: steps.apps.outputs.list != ''
+        with:
+          node-version: 22
+
+      - name: 依存関係を入れる
+        if: steps.apps.outputs.list != ''
+        run: |
+          npm i -g vite-plus
+          vp install
+
+      - name: ビルドしてプレビュー版を上げる
+        if: steps.apps.outputs.list != ''
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Secrets に CLOUDFLARE_API_TOKEN と CLOUDFLARE_ACCOUNT_ID を追加してください"
+            exit 1
+          fi
+          alias="pr-$PR_NUMBER"
+          : > "$RUNNER_TEMP/rows.md"
+          status=0
+          for app in ${{ steps.apps.outputs.list }}; do
+            echo "::group::$app"
+            if (cd "apps/$app" && vp run build && vp exec wrangler versions upload --preview-alias "$alias" --message "PR #$PR_NUMBER" 2>&1 | tee "$RUNNER_TEMP/$app.log"); then
+              url=$(grep -oE "https://$alias-[a-z0-9.-]+\.workers\.dev" "$RUNNER_TEMP/$app.log" | head -1)
+              echo "| $app | ${url:-（URL を取得できませんでした）} |" >> "$RUNNER_TEMP/rows.md"
+            else
+              echo "| $app | ビルドかアップロードに失敗しました |" >> "$RUNNER_TEMP/rows.md"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - name: PR にプレビュー URL をコメントする
+        if: always() && steps.apps.outputs.list != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -s "$RUNNER_TEMP/rows.md" ] || exit 0
+          marker="<!-- preview-urls -->"
+          {
+            echo "$marker"
+            echo "### プレビュー"
+            echo
+            echo "本番には出ていません。\`${HEAD_SHA:0:7}\` 時点の版です。"
+            echo
+            echo "| アプリ | URL |"
+            echo "|---|---|"
+            cat "$RUNNER_TEMP/rows.md"
+          } > "$RUNNER_TEMP/body.md"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"$marker\")) | .id" | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$RUNNER_TEMP/body.md"
+          else
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/body.md"
+          fi
