@@ -181,7 +181,7 @@ export const site: SiteConfig = {
     accent: "#c48a3a",
   },
   site: {
-    url: "https://site-makoto-tosou.ichigoooo.workers.dev",
+    url: "https://makoto-tosou.sonnet.co.jp",
     description:
       "藤沢市本鵠沼の塗装屋、まこと塗装。外壁・屋根の塗り替えから部分塗装まで。試し塗りで色を確かめてから、細かい所までていねいに仕上げます。",
     isProposal: true,

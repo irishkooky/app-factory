@@ -180,7 +180,7 @@ export const site: SiteConfig = {
     accent: "#c9a04a",
   },
   site: {
-    url: "https://site-asaka-kenso.ichigoooo.workers.dev",
+    url: "https://asaka-kenso.sonnet.co.jp",
     description:
       "稲城市矢野口の塗装会社、アサカ建装。屋根・外壁の塗装を下請けに出さず自社で施工。元大工の社長が、家のつくりから見てご提案します。",
     isProposal: true,

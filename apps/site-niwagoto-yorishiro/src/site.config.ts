@@ -181,7 +181,7 @@ export const site: SiteConfig = {
     accent: "#8a9a4a",
   },
   site: {
-    url: "https://site-niwagoto-yorishiro.ichigoooo.workers.dev",
+    url: "https://niwagoto-yorishiro.sonnet.co.jp",
     description:
       "杉並区天沼の植木屋、庭事よりしろ。庭木の剪定・伐採・草取りまで、一本一本の木の状態に合わせてていねいに手入れします。小さなお庭も歓迎です。",
     isProposal: true,

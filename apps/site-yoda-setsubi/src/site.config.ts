@@ -180,7 +180,7 @@ export const site: SiteConfig = {
     accent: "#4c97c9",
   },
   site: {
-    url: "https://site-yoda-setsubi.ichigoooo.workers.dev",
+    url: "https://yoda-setsubi.sonnet.co.jp",
     description:
       "横浜市金沢区の水道屋、依田設備。キッチンの水漏れ、トイレのつまり、給湯配管、地中の漏水まで。お電話をいただいたらすぐに伺います。",
     isProposal: true,
