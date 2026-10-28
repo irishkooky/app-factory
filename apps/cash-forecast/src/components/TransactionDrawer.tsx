@@ -19,6 +19,8 @@ import { KindYen, kindTone } from './Amount'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
+import { initAmountLines, sumAmountLines, type AmountLine } from '../lib/amountLines'
+import { AmountLinesField } from './AmountLinesField'
 import { MoneyField } from './MoneyField'
 
 type TransactionDrawerProps = {
@@ -427,7 +429,7 @@ function TransactionForm({
 
   const [date, setDate] = useState(initialDate)
   const [name, setName] = useState(target?.rawName ?? target?.name ?? '')
-  const [amount, setAmount] = useState<number | undefined>(target?.amount)
+  const [lines, setLines] = useState<AmountLine[]>(() => initAmountLines(target?.amount))
   const [kind, setKind] = useState<Kind>(target?.kind ?? 'expense')
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
@@ -440,22 +442,25 @@ function TransactionForm({
     if (v.trim().length > 0) setErrors((prev) => (prev.name ? { ...prev, name: undefined } : prev))
   }
 
-  const handleAmountChange = (v: number | undefined) => {
-    setAmount(v)
-    if (v !== undefined) setErrors((prev) => (prev.amount ? { ...prev, amount: undefined } : prev))
+  const handleLinesChange = (next: AmountLine[]) => {
+    setLines(next)
+    if (sumAmountLines(next) !== undefined) {
+      setErrors((prev) => (prev.amount ? { ...prev, amount: undefined } : prev))
+    }
   }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    const total = sumAmountLines(lines)
     const nextErrors: typeof errors = {}
     if (name.trim().length === 0) nextErrors.name = '名前を入力してください'
-    if (amount === undefined) nextErrors.amount = '金額を入力してください'
+    if (total === undefined) nextErrors.amount = '金額を入力してください'
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0 || amount === undefined) return
+    if (Object.keys(nextErrors).length > 0 || total === undefined) return
 
     setSubmitting(true)
     try {
-      const roundedAmount = Math.round(amount)
+      const roundedAmount = Math.round(total)
       if (isEdit && target?.txId) {
         await updateTx({ id: target.txId, date, name, kind, amount: roundedAmount })
       } else {
@@ -549,7 +554,12 @@ function TransactionForm({
         {errors.name && <FieldError>{errors.name}</FieldError>}
       </TextField>
 
-      <MoneyField label="金額" value={amount} onChange={handleAmountChange} error={errors.amount} isDisabled={submitting} />
+      <AmountLinesField
+        lines={lines}
+        onChange={handleLinesChange}
+        error={errors.amount}
+        isDisabled={submitting}
+      />
 
       <ToggleButtonGroup
         selectionMode="single"
