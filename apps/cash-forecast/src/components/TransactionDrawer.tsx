@@ -468,7 +468,8 @@ function TransactionForm({
     setSubmitting(true)
     try {
       const roundedAmount = Math.round(total)
-      const amountBreakdown = toAmountBreakdown(lines)
+      // update では undefined 省略が「触らない」なので、内訳なしは [] で明示クリアする
+      const amountBreakdown = toAmountBreakdown(lines) ?? []
       if (isEdit && target?.txId) {
         await updateTx({
           id: target.txId,
@@ -484,7 +485,7 @@ function TransactionForm({
           name,
           kind,
           amount: roundedAmount,
-          amountBreakdown,
+          amountBreakdown: amountBreakdown.length > 0 ? amountBreakdown : undefined,
         })
       }
       notifySaved()

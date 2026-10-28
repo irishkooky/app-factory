@@ -200,13 +200,16 @@ export const update = mutation({
       throw new ConvexError(`基準日(${settings.anchorDate})以前の日付には追加できません`);
     }
 
-    // Convex patch ignores undefined; clear with [] when no breakdown to keep.
+    // amountBreakdown omitted → leave existing field (AddonForm など内訳を触らない更新)。
+    // [] を渡したときだけクリア。Convex の patch は undefined を無視する。
     await ctx.db.patch(id, {
       date,
       name: trimmedName,
       kind,
       amount,
-      amountBreakdown: breakdown !== undefined && breakdown.length > 0 ? breakdown : [],
+      ...(amountBreakdown !== undefined
+        ? { amountBreakdown: breakdown !== undefined && breakdown.length > 0 ? breakdown : [] }
+        : {}),
     });
   },
 });

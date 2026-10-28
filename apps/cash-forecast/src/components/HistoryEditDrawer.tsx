@@ -106,7 +106,8 @@ function HistoryEditForm({
         name,
         kind,
         amount: roundedAmount,
-        amountBreakdown: toAmountBreakdown(lines),
+        // update では省略が「触らない」なので、内訳なしは [] で明示クリアする
+        amountBreakdown: toAmountBreakdown(lines) ?? [],
       })
       notifySaved()
       onClose()
