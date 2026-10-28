@@ -1,4 +1,4 @@
-import { Button, FieldError } from '@heroui/react'
+import { Button } from '@heroui/react'
 import { formatYen } from '../lib/money'
 import {
   createAmountLine,
