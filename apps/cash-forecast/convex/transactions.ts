@@ -3,6 +3,36 @@ import { ConvexError, v } from "convex/values";
 import { assertAmount, assertDateString, assertMonthString, assertName, assertOptionalName } from "./validate";
 import { requirePro } from "./billing";
 
+const amountBreakdownArg = v.optional(
+  v.array(
+    v.object({
+      amount: v.number(),
+      label: v.optional(v.string()),
+    }),
+  ),
+);
+
+type AmountBreakdownEntry = { amount: number; label?: string };
+
+/** Validate each line; when non-empty, require rounded sum === amount. */
+function assertAmountBreakdown(
+  amount: number,
+  amountBreakdown: AmountBreakdownEntry[] | undefined,
+): AmountBreakdownEntry[] | undefined {
+  if (amountBreakdown === undefined || amountBreakdown.length === 0) {
+    return amountBreakdown;
+  }
+  let sum = 0;
+  for (const entry of amountBreakdown) {
+    assertAmount(entry.amount);
+    sum += entry.amount;
+  }
+  if (Math.round(sum) !== amount) {
+    throw new ConvexError("金額の内訳の合計が金額と一致しません");
+  }
+  return amountBreakdown;
+}
+
 export const listAfter = query({
   args: { after: v.string() },
   handler: async (ctx, { after }) => {
@@ -46,11 +76,12 @@ export const create = mutation({
     name: v.string(),
     kind: v.union(v.literal("income"), v.literal("expense")),
     amount: v.number(),
+    amountBreakdown: amountBreakdownArg,
     ruleId: v.optional(v.id("rules")),
     ruleMonth: v.optional(v.string()),
     addon: v.optional(v.boolean()),
   },
-  handler: async (ctx, { date, name, kind, amount, ruleId, ruleMonth, addon }) => {
+  handler: async (ctx, { date, name, kind, amount, amountBreakdown, ruleId, ruleMonth, addon }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new ConvexError("ログインが必要です");
@@ -69,6 +100,7 @@ export const create = mutation({
 
     const trimmedName = addon === true ? assertOptionalName(name) : assertName(name);
     assertAmount(amount);
+    const breakdown = assertAmountBreakdown(amount, amountBreakdown);
     assertDateString(date, "日付");
     if (ruleMonth !== undefined) {
       assertMonthString(ruleMonth);
@@ -116,6 +148,7 @@ export const create = mutation({
       name: trimmedName,
       kind,
       amount,
+      ...(breakdown !== undefined && breakdown.length > 0 ? { amountBreakdown: breakdown } : {}),
       ruleId,
       ruleMonth,
       addon,
@@ -130,8 +163,9 @@ export const update = mutation({
     name: v.string(),
     kind: v.union(v.literal("income"), v.literal("expense")),
     amount: v.number(),
+    amountBreakdown: amountBreakdownArg,
   },
-  handler: async (ctx, { id, date, name, kind, amount }) => {
+  handler: async (ctx, { id, date, name, kind, amount, amountBreakdown }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new ConvexError("ログインが必要です");
@@ -143,6 +177,7 @@ export const update = mutation({
 
     const trimmedName = existing.addon === true ? assertOptionalName(name) : assertName(name);
     assertAmount(amount);
+    const breakdown = assertAmountBreakdown(amount, amountBreakdown);
     assertDateString(date, "日付");
 
     const settings = await ctx.db
@@ -165,7 +200,14 @@ export const update = mutation({
       throw new ConvexError(`基準日(${settings.anchorDate})以前の日付には追加できません`);
     }
 
-    await ctx.db.patch(id, { date, name: trimmedName, kind, amount });
+    // Convex patch ignores undefined; clear with [] when no breakdown to keep.
+    await ctx.db.patch(id, {
+      date,
+      name: trimmedName,
+      kind,
+      amount,
+      amountBreakdown: breakdown !== undefined && breakdown.length > 0 ? breakdown : [],
+    });
   },
 });
 

@@ -16,7 +16,12 @@ import type { HistoryRow } from '../lib/history'
 import type { Kind } from '../lib/money'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { useConfirm } from './ConfirmDialog'
-import { initAmountLines, sumAmountLines, type AmountLine } from '../lib/amountLines'
+import {
+  initAmountLinesFromTx,
+  sumAmountLines,
+  toAmountBreakdown,
+  type AmountLine,
+} from '../lib/amountLines'
 import { AmountLinesField } from './AmountLinesField'
 
 type HistoryEditDrawerProps = {
@@ -64,7 +69,9 @@ function HistoryEditForm({
   const [submitting, setSubmitting] = useState(false)
   const [date, setDate] = useState(target.date)
   const [name, setName] = useState(target.rawName ?? target.name)
-  const [lines, setLines] = useState<AmountLine[]>(() => initAmountLines(target.amount))
+  const [lines, setLines] = useState<AmountLine[]>(() =>
+    initAmountLinesFromTx({ amount: target.amount, amountBreakdown: target.amountBreakdown }),
+  )
   const [kind, setKind] = useState<Kind>(target.kind)
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
@@ -93,7 +100,14 @@ function HistoryEditForm({
     setSubmitting(true)
     try {
       const roundedAmount = Math.round(total)
-      await updateTx({ id: target.txId, date, name, kind, amount: roundedAmount })
+      await updateTx({
+        id: target.txId,
+        date,
+        name,
+        kind,
+        amount: roundedAmount,
+        amountBreakdown: toAmountBreakdown(lines),
+      })
       notifySaved()
       onClose()
     } catch (err) {

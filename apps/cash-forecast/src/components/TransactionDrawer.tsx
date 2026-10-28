@@ -19,7 +19,12 @@ import { KindYen, kindTone } from './Amount'
 import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
-import { initAmountLines, sumAmountLines, type AmountLine } from '../lib/amountLines'
+import {
+  initAmountLinesFromTx,
+  sumAmountLines,
+  toAmountBreakdown,
+  type AmountLine,
+} from '../lib/amountLines'
 import { AmountLinesField } from './AmountLinesField'
 import { MoneyField } from './MoneyField'
 
@@ -429,7 +434,9 @@ function TransactionForm({
 
   const [date, setDate] = useState(initialDate)
   const [name, setName] = useState(target?.rawName ?? target?.name ?? '')
-  const [lines, setLines] = useState<AmountLine[]>(() => initAmountLines(target?.amount))
+  const [lines, setLines] = useState<AmountLine[]>(() =>
+    initAmountLinesFromTx({ amount: target?.amount, amountBreakdown: target?.amountBreakdown }),
+  )
   const [kind, setKind] = useState<Kind>(target?.kind ?? 'expense')
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
@@ -461,10 +468,24 @@ function TransactionForm({
     setSubmitting(true)
     try {
       const roundedAmount = Math.round(total)
+      const amountBreakdown = toAmountBreakdown(lines)
       if (isEdit && target?.txId) {
-        await updateTx({ id: target.txId, date, name, kind, amount: roundedAmount })
+        await updateTx({
+          id: target.txId,
+          date,
+          name,
+          kind,
+          amount: roundedAmount,
+          amountBreakdown,
+        })
       } else {
-        await createTx({ date, name, kind, amount: roundedAmount })
+        await createTx({
+          date,
+          name,
+          kind,
+          amount: roundedAmount,
+          amountBreakdown,
+        })
       }
       notifySaved()
       onClose()
