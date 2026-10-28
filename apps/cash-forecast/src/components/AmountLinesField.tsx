@@ -1,4 +1,4 @@
-import { Button } from '@heroui/react'
+import { Button, Input, Label, TextField } from '@heroui/react'
 import { formatYen } from '../lib/money'
 import {
   createAmountLine,
@@ -22,6 +22,10 @@ export function AmountLinesField({ lines, onChange, error, isDisabled }: AmountL
     onChange(lines.map((line) => (line.id === id ? { ...line, value } : line)))
   }
 
+  const setLineLabel = (id: string, label: string) => {
+    onChange(lines.map((line) => (line.id === id ? { ...line, label } : line)))
+  }
+
   const addLine = () => {
     onChange([...lines, createAmountLine()])
   }
@@ -34,30 +38,39 @@ export function AmountLinesField({ lines, onChange, error, isDisabled }: AmountL
   return (
     <div className="flex flex-col gap-3">
       {lines.map((line, index) => (
-        <MoneyField
-          key={line.id}
-          className="w-full"
-          label={index === 0 ? '金額' : `金額 ${index + 1}`}
-          value={line.value}
-          onChange={(value) => setLineValue(line.id, value)}
-          error={!multi && index === 0 ? error : undefined}
-          isDisabled={isDisabled}
-          // 複数行では行ごとの整形プレビューが次ラベルと密着し、合計と二重になるので隠す
-          showFormattedPreview={!multi}
-          labelAside={
-            multi ? (
-              <Button
-                variant="tertiary"
-                size="sm"
-                isDisabled={isDisabled}
-                aria-label="削除"
-                onPress={() => removeLine(line.id)}
-              >
-                削除
-              </Button>
-            ) : undefined
-          }
-        />
+        <div key={line.id} className="flex flex-col gap-1.5">
+          <TextField isDisabled={isDisabled}>
+            <Label>{index === 0 ? '項目名' : `項目名 ${index + 1}`}</Label>
+            <Input
+              placeholder="任意"
+              value={line.label}
+              onChange={(e) => setLineLabel(line.id, e.target.value)}
+            />
+          </TextField>
+          <MoneyField
+            className="w-full"
+            label={index === 0 ? '金額' : `金額 ${index + 1}`}
+            value={line.value}
+            onChange={(value) => setLineValue(line.id, value)}
+            error={!multi && index === 0 ? error : undefined}
+            isDisabled={isDisabled}
+            // 複数行では行ごとの整形プレビューが次ラベルと密着し、合計と二重になるので隠す
+            showFormattedPreview={!multi}
+            labelAside={
+              multi ? (
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  isDisabled={isDisabled}
+                  aria-label="削除"
+                  onPress={() => removeLine(line.id)}
+                >
+                  削除
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
       ))}
 
       <div className="flex w-full flex-col gap-2">

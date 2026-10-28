@@ -1,4 +1,5 @@
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import type { AmountBreakdownEntry } from "./amountLines";
 import { addonDisplayName, compareEntries } from "./forecast";
 import { signedAmount, type Kind } from "./money";
 
@@ -10,6 +11,8 @@ export type HistoryRow = {
   isAddon: boolean;
   kind: Kind;
   amount: number;
+  /** Edit-form memory for optional line labels. List UI ignores this. */
+  amountBreakdown?: AmountBreakdownEntry[];
   balance: number; // この行適用後の残高
 };
 
@@ -39,6 +42,7 @@ export function buildHistoryRows(input: {
       isAddon: tx.addon === true,
       kind: tx.kind,
       amount: tx.amount,
+      amountBreakdown: tx.amountBreakdown,
       balance,
     };
   });

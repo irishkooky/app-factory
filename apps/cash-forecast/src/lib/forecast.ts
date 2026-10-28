@@ -1,4 +1,5 @@
 import type { Doc, Id } from "../../convex/_generated/dataModel";
+import type { AmountBreakdownEntry } from "./amountLines";
 import { addMonths, clampedDateInMonth, monthOf, usagePeriodLabel } from "./date";
 import { signedAmount, type Kind } from "./money";
 
@@ -24,6 +25,8 @@ export type ForecastRow = {
   periodLabel?: string; // クレカ等の締め日が設定されたルール由来の行に付く利用期間表示「（8/19-9/18）」。name には混ぜない
   kind: Kind;
   amount: number;
+  /** Edit-form memory for optional line labels. List UI ignores this. */
+  amountBreakdown?: AmountBreakdownEntry[];
   balance: number; // この行適用後の残高
   isVirtual: boolean; // true = ルール由来の仮想行（未確定の予定）
   txId?: Id<"transactions">;
@@ -64,6 +67,7 @@ function txRow(tx: Tx) {
     date: tx.date,
     kind: tx.kind,
     amount: tx.amount,
+    amountBreakdown: tx.amountBreakdown,
     isVirtual: false,
     txId: tx._id,
     ruleId: tx.ruleId,

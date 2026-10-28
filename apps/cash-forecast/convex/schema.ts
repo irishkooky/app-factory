@@ -24,7 +24,16 @@ export default defineSchema({
     date: v.string(), // "YYYY-MM-DD"
     name: v.string(),
     kind: v.union(v.literal("income"), v.literal("expense")),
-    amount: v.number(), // 整数円 >= 0
+    amount: v.number(), // 整数円 >= 0。合算行がある場合はその合計
+    // 任意の金額内訳。[] または欠落 = 内訳なし（amount のみ）。各行の label は任意メモ。
+    amountBreakdown: v.optional(
+      v.array(
+        v.object({
+          amount: v.number(),
+          label: v.optional(v.string()),
+        }),
+      ),
+    ),
     ruleId: v.optional(v.id("rules")), // ルール確定（上書き）の場合のみ
     ruleMonth: v.optional(v.string()), // "YYYY-MM"。どの月の仮想行を置き換えるか
     addon: v.optional(v.boolean()), // true = ルール月への上乗せ。ruleId/ruleMonth とセットで使う
