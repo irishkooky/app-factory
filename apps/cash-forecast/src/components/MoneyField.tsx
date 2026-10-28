@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type ReactNode } from 'react'
 import { CloseButton, Description, FieldError, InputGroup, Label, TextField } from '@heroui/react'
 import { formatYen, moneyInputErrorMessage, parseMoneyInput, toMoneyInputText } from '../lib/money'
 
@@ -16,6 +16,10 @@ type MoneyFieldProps = {
   isDisabled?: boolean
   /** 負数を許可（残高フィールド用）。既定 false */
   allowNegative?: boolean
+  /** 入力下の整形プレビュー（例: ¥1,234）。複数行合算時は合計側に任せるためオフにできる */
+  showFormattedPreview?: boolean
+  /** ラベル行の右側（削除ボタンなど）。あるときラベルと横並びにする */
+  labelAside?: ReactNode
   className?: string
 }
 
@@ -26,6 +30,8 @@ export function MoneyField({
   error,
   isDisabled,
   allowNegative = false,
+  showFormattedPreview = true,
+  labelAside,
   className,
 }: MoneyFieldProps) {
   const [text, setText] = useState(() => toMoneyInputText(value))
@@ -83,7 +89,15 @@ export function MoneyField({
 
   return (
     <TextField className={className} isInvalid={shownError !== undefined} isDisabled={isDisabled}>
-      <Label>{label}</Label>
+      {labelAside !== undefined ? (
+        // TextField は align-items:start のため、横並び行は w-full を明示しないと内容幅に縮む
+        <div className="flex w-full items-center justify-between gap-2">
+          <Label>{label}</Label>
+          {labelAside}
+        </div>
+      ) : (
+        <Label>{label}</Label>
+      )}
       <InputGroup>
         <InputGroup.Prefix>¥</InputGroup.Prefix>
         <InputGroup.Input
@@ -104,7 +118,9 @@ export function MoneyField({
           </InputGroup.Suffix>
         )}
       </InputGroup>
-      {parsed.ok && text !== '' && <Description>{formatYen(parsed.value)}</Description>}
+      {showFormattedPreview && parsed.ok && text !== '' && (
+        <Description>{formatYen(parsed.value)}</Description>
+      )}
       {shownError !== undefined && <FieldError>{shownError}</FieldError>}
     </TextField>
   )
