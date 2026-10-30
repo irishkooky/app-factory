@@ -315,6 +315,8 @@ button:focus-visible {
 
 .yd-trouble {
   display: grid;
+  /* 横スクロールのタブの幅に引っぱられて、パネルが画面からはみ出さないようにする */
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -328,6 +330,7 @@ button:focus-visible {
 
 .yd-panel-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 28px;
 }
 
