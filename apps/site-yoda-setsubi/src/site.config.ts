@@ -4,6 +4,8 @@
  * 項目の意味は SiteConfig の型コメントを参照。省略可能（?）な項目は、省くとセクションごと消える。
  */
 
+import type { IconName } from './components/Icon'
+
 export type Photo = {
   /** public/ からのパス（例: /images/hero.jpg） */
   src: string;
@@ -36,6 +38,11 @@ export type SiteConfig = {
     postalCode?: string;
     /** 営業時間（例: 8:00〜18:00） */
     hours: string;
+    /**
+     * 曜日ごとの受付時間（日曜を0とする7要素、時の数値、休みは null）。
+     * あると「ただいま受付中」を日本時間で出す
+     */
+    schedule?: ([number, number] | null)[];
     /** 定休日（例: 日曜・祝日） */
     holidays?: string;
     /** 地図の検索語。省略時は住所で Google マップを埋め込む */
@@ -66,7 +73,18 @@ export type SiteConfig = {
     /** 例: 修理 1万円〜 / 浴室交換 80万円〜 */
     price?: string;
   }[];
-  strengths: { title: string; description: string; photo?: Photo }[];
+  strengths: { title: string; description: string; photo?: Photo; icon?: IconName }[];
+  /** 「こんな症状ありませんか」。お客様が困っている場面から電話につなげる */
+  symptoms?: { title: string; description: string; icon: IconName }[];
+  /**
+   * Google マップの評価と、クチコミに多く書かれていることの要約。
+   * クチコミの原文は転載しない（著作権）。こちらで要約した言葉で書く
+   */
+  reviews?: { rating: string; count: number; mapsUrl: string; points: { title: string; description: string; icon: IconName }[] };
+  /** 自分でできる確認の手順（例: 漏水のセルフチェック） */
+  selfCheck?: { title: string; lead: string; steps: { title: string; description: string }[]; note?: string };
+  /** 対応エリアの地名。地図の代わりに並べて「うちの近所だ」と分かるようにする */
+  area?: { title: string; places: string[]; note?: string };
   /** 施工事例・メニュー・店内など。不要なら省略するとセクションとナビから消える */
   gallery?: {
     title: string;
@@ -106,6 +124,7 @@ export type SiteConfig = {
 // 文面は Google マップの公開情報（住所・電話・営業時間・評価）とクチコミに書かれた事実だけを元にしている。
 // 代表者名・創業年・資格・料金など確認できていないことは書かない。
 // 写真は Pexels のフリー素材（public/images/CREDITS.md）。お客様の声はご本人の了承がないので載せない。
+// クチコミは原文を載せず、多く書かれていることをこちらの言葉で要約する（2026-10-30 時点の Google マップ）。
 
 export const site: SiteConfig = {
   company: {
@@ -119,12 +138,13 @@ export const site: SiteConfig = {
     postalCode: "236-0046",
     address: "神奈川県横浜市金沢区釜利谷西1丁目59-12",
     hours: "月〜土 8:00〜20:00／日 8:00〜17:00",
+    schedule: [[8, 17], [8, 20], [8, 20], [8, 20], [8, 20], [8, 20], [8, 20]],
   },
   hero: {
     catchcopy: "水のトラブル、\nその日のうちに\n伺います。",
     lead: "横浜市金沢区の水道屋です。キッチンの水漏れ、トイレのつまり、給湯の配管まで。お電話をいただいたら、できるだけ早く見に伺います。",
     photo: { src: "/images/hero.jpg", alt: "流し台の下で配管を締め直す手元", position: "center center" },
-    badges: ["日曜も受付", "小さな水漏れも", "古い部品もご相談を"],
+    badges: ["日曜も受付", "作業の前に金額をご説明", "古い部品もご相談を"],
   },
   stats: [
     { label: "Googleマップの評価", value: "5.0", unit: "／5" },
@@ -157,11 +177,45 @@ export const site: SiteConfig = {
       photo: { src: "/images/service-3.jpg", alt: "壁から出ている古い水道管" },
     },
   ],
-  strengths: [
-    { title: "連絡したら、すぐ見に来る", description: "お電話をいただいたその日に伺えることもあります。水のトラブルは待てないので、できるだけ早く動きます。" },
-    { title: "必要な工事だけを", description: "無理に交換をすすめず、お客様の立場で一番よい直し方を考えます。" },
-    { title: "水道局の手続きまで", description: "漏水の修理のあとは、水道料金の減額に必要な書類の作成と提出もお手伝いします。" },
+  symptoms: [
+    { icon: "droplet", title: "蛇口からポタポタ", description: "閉めても止まらない、根元から漏れる" },
+    { icon: "waves", title: "トイレがつまった", description: "水が引かない、流すとあふれそう" },
+    { icon: "home", title: "シンク下が濡れている", description: "収納の床が湿っている、カビくさい" },
+    { icon: "flame", title: "給湯の配管から水漏れ", description: "お風呂や給湯器のまわりが濡れている" },
+    { icon: "gauge", title: "「漏水の可能性」の通知", description: "検針票に書かれていた、水道代が急に上がった" },
+    { icon: "wrench", title: "古い蛇口が直らない", description: "部品が見つからない、交換しかないと言われた" },
   ],
+  strengths: [
+    { icon: "clock", title: "連絡したら、すぐ見に来る", description: "お電話をいただいたその日に伺えることもあります。留守番電話にお名前とご用件を残していただければ、折り返しお電話します。" },
+    { icon: "yen", title: "作業の前に、金額をご説明", description: "見てから直し方と金額をお伝えし、ご了承をいただいてから作業します。無理に交換はすすめません。" },
+    { icon: "file", title: "水道局の手続きまで", description: "漏水の修理のあとは、水道料金の減額に必要な書類の作成と提出もお手伝いします。" },
+  ],
+  reviews: {
+    rating: "5.0",
+    count: 18,
+    mapsUrl: "https://www.google.com/maps/search/?api=1&query=%E4%BE%9D%E7%94%B0%E8%A8%AD%E5%82%99&query_place_id=ChIJO1fPFCpFGGARiRZY_jfcshs",
+    points: [
+      { icon: "clock", title: "電話したその日に来てくれた", description: "朝にトイレのつまりに気づいて電話したら、その日のうちに来てもらえた、という声があります。" },
+      { icon: "yen", title: "作業の前に金額を説明してくれる", description: "直す前に金額の提示があり、納得できる値段だった、という声があります。" },
+      { icon: "wrench", title: "古い部品も探して直してくれる", description: "交換しかないと思っていた古い蛇口を、合う部品を見つけて直してもらえた、という声があります。" },
+      { icon: "file", title: "水道局の書類まで任せられた", description: "地中の漏水を見つけて直し、水道料金の減額の書類まで出してもらえた、という声があります。" },
+    ],
+  },
+  selfCheck: {
+    title: "水道代が急に上がったら",
+    lead: "見えないところで水が漏れているかもしれません。ご自分で確かめる方法があります。",
+    steps: [
+      { title: "家じゅうの蛇口を閉める", description: "キッチン、洗面、お風呂、トイレ、外の水栓も。洗濯機や食洗機も止めます。" },
+      { title: "水道メーターを見る", description: "メーターボックスのふたを開け、銀色の小さなコマ（パイロット）を見ます。" },
+      { title: "コマが回っていたら漏水", description: "水を使っていないのに回っていれば、どこかで漏れています。お電話ください。" },
+    ],
+    note: "漏水を直したあとは、条件を満たせば水道料金が減額されることがあります。届け出の書類づくりもお手伝いします。",
+  },
+  area: {
+    title: "金沢区とその周辺に伺います",
+    places: ["釜利谷", "能見台", "金沢文庫", "金沢八景", "六浦", "富岡", "並木", "西柴", "谷津町", "泥亀", "瀬戸", "大道", "朝比奈町", "幸浦", "柴町", "堀口"],
+    note: "上記以外の地域も、まずはお電話でご相談ください。",
+  },
   flow: [
     { title: "お電話", description: "どこから、どんなふうに水が漏れているかをお聞かせください。" },
     { title: "現地の確認", description: "伺って状態を見て、直し方と費用をご説明します。" },
@@ -170,6 +224,8 @@ export const site: SiteConfig = {
   ],
   faq: [
     { q: "日曜日も来てもらえますか？", a: "日曜日も17時まで受け付けています。平日と土曜日は20時までです。" },
+    { q: "費用はいつわかりますか？", a: "伺って状態を見てから、直し方と金額をご説明します。ご了承をいただいてから作業しますので、ご安心ください。" },
+    { q: "電話がつながらないときは？", a: "作業中で出られないことがあります。留守番電話にお名前とご用件を残していただければ、折り返しお電話します。" },
     { q: "古い蛇口でも直せますか？", a: "合う部品を探して直せる場合があります。まずは型番や写真を見せてください。" },
     { q: "どのあたりまで来てもらえますか？", a: "横浜市金沢区とその周辺です。それ以外の地域もご相談ください。" },
   ],

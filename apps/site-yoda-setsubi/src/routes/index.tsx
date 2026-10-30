@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { About } from '../components/About'
+import { Area } from '../components/Area'
 import { Company } from '../components/Company'
 import { Contact } from '../components/Contact'
 import { Faq } from '../components/Faq'
@@ -10,9 +11,12 @@ import { Header } from '../components/Header'
 import { Hero } from '../components/Hero'
 import { MobileCta } from '../components/MobileCta'
 import { ProposalBanner } from '../components/ProposalBanner'
+import { Reviews } from '../components/Reviews'
+import { SelfCheck } from '../components/SelfCheck'
 import { Services } from '../components/Services'
 import { Stats } from '../components/Stats'
 import { Strengths } from '../components/Strengths'
+import { Symptoms } from '../components/Symptoms'
 import { Voices } from '../components/Voices'
 import { site } from '../site.config'
 
@@ -28,12 +32,16 @@ function HomeComponent() {
       <main>
         <Hero />
         <Stats />
-        <About />
+        <Symptoms />
         <Services />
         <Strengths />
+        <Reviews />
+        <SelfCheck />
+        <About />
         <Gallery />
         <Flow />
         <Voices />
+        <Area />
         <Faq />
         <Company />
         <Contact />

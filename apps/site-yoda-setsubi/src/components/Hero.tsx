@@ -2,6 +2,8 @@ import { Box, Button, Container, Flex, Group, Text, Title } from '@mantine/core'
 import { site } from '../site.config'
 import { tel } from './Header'
 import { Icon } from './Icon'
+import { OpenNow } from './OpenNow'
+import { Stars } from './Reviews'
 
 export function Hero() {
   const { hero, company, contact } = site
@@ -26,6 +28,36 @@ export function Hero() {
         <Text c="white" fw={500} fz={{ base: 'xs', sm: 'sm' }} opacity={0.85} style={{ letterSpacing: '0.2em' }}>
           {company.industry}｜{company.shortName}
         </Text>
+        {site.reviews && (
+          <Box
+            component="a"
+            href="#reviews"
+            mt="lg"
+            px={14}
+            py={8}
+            style={{
+              alignItems: 'center',
+              alignSelf: 'flex-start',
+              display: 'flex',
+              gap: 10,
+              background: 'rgba(255,255,255,0.95)',
+              borderRadius: 999,
+              color: 'var(--mantine-color-dark-7)',
+              textDecoration: 'none',
+            }}
+          >
+            <Text fw={700} fz={{ base: 'xs', sm: 'sm' }}>
+              Googleマップ
+            </Text>
+            <Stars size={16} />
+            <Text fw={700} fz={{ base: 'xs', sm: 'sm' }}>
+              {site.reviews.rating}
+              <Text c="gray.6" component="span" fw={500} fz="xs" ml={4}>
+                （クチコミ{site.reviews.count}件）
+              </Text>
+            </Text>
+          </Box>
+        )}
         <Title
           c="white"
           fw={600}
@@ -74,6 +106,7 @@ export function Hero() {
             {contact.phone}
           </Button>
           <Text c="white" fz="sm" opacity={0.85}>
+            <OpenNow />
             受付 {contact.hours}
             {contact.holidays && `（${contact.holidays}休み）`}
             <br />
