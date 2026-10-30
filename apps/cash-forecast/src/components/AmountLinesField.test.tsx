@@ -48,7 +48,8 @@ describe('AmountLinesField', () => {
 
     expect(screen.getByTestId('total').textContent).toBe('80000')
     expect(screen.getByText('合計')).toBeTruthy()
-    expect(screen.getByText('¥80,000（この金額で保存）')).toBeTruthy()
+    expect(screen.getByText('¥80,000')).toBeTruthy()
+    expect(screen.getByText('（この金額で保存）')).toBeTruthy()
   })
 
   it('編集初期値は1行で、削除ボタンは出ない。2行目を足すと削除できる', async () => {
