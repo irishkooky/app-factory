@@ -4,23 +4,21 @@ import { site } from '../site.config'
 import { Section } from './Section'
 
 export function Faq() {
-  if (!site.faq?.length) return null
-
   return (
-    <Section center eyebrow="FAQ" id="faq" title="よくあるご質問">
-      <Accordion maw={800} mx="auto" variant="default">
+    <Section id="faq" kicker="よくあるご質問" no="08" title="お電話の前に。">
+      <Accordion chevronPosition="right" className="yd-faq" maw={880} variant="default">
         {site.faq.map((item) => (
           <Accordion.Item key={item.q} value={item.q}>
-            <Accordion.Control py="xs">
-              <Text fw={600} fz={{ base: 'sm', sm: 'md' }}>
-                <Text c="accent" component="span" ff={serif} fw={600} mr={12}>
+            <Accordion.Control px={0} py={10}>
+              <Text fw={700} fz={{ base: 15, sm: 17 }} lh={1.6} style={{ display: 'flex', gap: 14 }}>
+                <Text c="var(--yd-brass-deep)" component="span" ff={serif} fw={800} fz={18}>
                   Q
                 </Text>
                 {item.q}
               </Text>
             </Accordion.Control>
             <Accordion.Panel>
-              <Text c="gray.7" fz="sm" lh={1.9} pl={28}>
+              <Text c="var(--yd-sub)" className="yd-phrase" fz={{ base: 15, sm: 16 }} lh={1.95} pb={8} pl={30}>
                 {item.a}
               </Text>
             </Accordion.Panel>
