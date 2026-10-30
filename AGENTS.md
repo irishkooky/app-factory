@@ -125,3 +125,11 @@ pstack の指示とこの節が食い違ったら、この節を優先する。
   `lsof -i :<port>` で PID を引いて `kill $PID`
 - 裏で起動したプロセスは PID を控える
 - プロセスの kill とデプロイなどの重要な操作を1つの複合コマンドに連結しない
+
+## 7. Cursor Cloud specific instructions
+
+- Node.js 22 はイメージにある。パッケージマネージャは `package.json` の `pnpm@11.5.2`。`vp` が無い、または 1.4.0 でないときは `npm i -g vite-plus@1.4.0`
+- 依存関係はリポジトリルートで `vp install --frozen-lockfile`
+- 開発サーバーは `cd apps/<name> && vp run dev`。Vite+ 1.4 の `vp dev` は組み込みコマンドで、このリポジトリは upstream の Vite 8 を使っているため `Expected @voidzero-dev/vite-plus-core` で失敗する。ビルドは `vp run build`。テスト用 npm script があるアプリは `vp run test`（`vp test` は組み込みの Vitest になり、その script を実行しない）
+- 雛形 `apps/hello` は秘密情報なしで起動できる。dev サーバは `localhost` の IPv6（`::1`）にバインドする。`127.0.0.1` では繋がらない
+- デプロイには `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` が要る。Convex / Clerk / Stripe のプロビジョニングはそれぞれのトークンが無いとできない
