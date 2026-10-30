@@ -151,21 +151,16 @@ function HistoryEditForm({
         />
       </label>
 
+      <TextField isInvalid={!!errors.name} isDisabled={submitting}>
+        <Label>名前</Label>
+        <Input placeholder="例: 家賃" value={name} onChange={(e) => handleNameChange(e.target.value)} />
+        {errors.name && <FieldError>{errors.name}</FieldError>}
+      </TextField>
+
       <AmountLinesField
-        header={
-          <TextField isInvalid={!!errors.name} isDisabled={submitting}>
-            <Label>名前</Label>
-            <Input
-              className="text-base font-semibold"
-              placeholder="例: 家賃"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-            />
-            {errors.name && <FieldError>{errors.name}</FieldError>}
-          </TextField>
-        }
         lines={lines}
         onChange={handleLinesChange}
+        kind={kind}
         error={errors.amount}
         isDisabled={submitting}
       />

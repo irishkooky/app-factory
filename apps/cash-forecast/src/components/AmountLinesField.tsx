@@ -1,26 +1,34 @@
-import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { Button, Input, Label, TextField } from '@heroui/react'
-import { IconPlus, IconTrash } from '@tabler/icons-react'
-import { formatYen } from '../lib/money'
+import type { Kind } from '../lib/money'
 import {
   createAmountLine,
   sumAmountLines,
   type AmountLine,
 } from '../lib/amountLines'
+import { KindYen, kindTone } from './Amount'
 import { MoneyField } from './MoneyField'
 
 type AmountLinesFieldProps = {
   lines: AmountLine[]
   onChange: (lines: AmountLine[]) => void
-  /** 親（取引の名前）。カードの見出しに置き、項目行をその子として字下げして並べる */
-  header?: ReactNode
+  /** 合計・各項目の符号と色に使う */
+  kind: Kind
   error?: string
   isDisabled?: boolean
 }
 
-export function AmountLinesField({ lines, onChange, header, error, isDisabled }: AmountLinesFieldProps) {
+/**
+ * 取引の金額欄。項目が無いうちは金額1つの入力欄。
+ * 項目を足すと、上乗せの詳細ビュー（RuleMonthDetail）と同じく
+ * 「大きな合計 → 項目ごとの行（編集・削除）→ 追加ボタン」の並びになり、項目は1行ずつ開いて編集する。
+ */
+export function AmountLinesField({ lines, onChange, kind, error, isDisabled }: AmountLinesFieldProps) {
+  const [editingId, setEditingId] = useState<string | null>(null)
   const total = sumAmountLines(lines)
-  const multi = lines.length > 1
+  // ラベル付きの1行も内訳として見せる（保存済みの項目名を隠さない）。
+  // 編集中は、項目名を消しても入力欄が単一表示に切り替わらないようにする
+  const itemized = lines.length > 1 || (lines[0]?.label ?? '') !== '' || editingId !== null
 
   const setLineValue = (id: string, value: number | undefined) => {
     onChange(lines.map((line) => (line.id === id ? { ...line, value } : line)))
@@ -31,90 +39,126 @@ export function AmountLinesField({ lines, onChange, header, error, isDisabled }:
   }
 
   const addLine = () => {
-    onChange([...lines, createAmountLine()])
+    const line = createAmountLine()
+    onChange([...lines, line])
+    setEditingId(line.id)
   }
 
   const removeLine = (id: string) => {
     if (lines.length <= 1) return
     onChange(lines.filter((line) => line.id !== id))
+    if (editingId === id) setEditingId(null)
+  }
+
+  if (!itemized) {
+    const line = lines[0]
+    return (
+      <div className="flex flex-col gap-2">
+        {line && (
+          <MoneyField
+            className="w-full"
+            label="金額"
+            value={line.value}
+            onChange={(value) => setLineValue(line.id, value)}
+            error={error}
+            isDisabled={isDisabled}
+          />
+        )}
+        <Button className="self-start" variant="secondary" size="sm" onPress={addLine} isDisabled={isDisabled}>
+          ＋項目を追加
+        </Button>
+      </div>
+    )
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-secondary p-3">
-      {header}
-
-      {/* 左の罫線と字下げで、項目行が親（名前）の内訳であることを示す */}
-      <div className="ml-1 flex flex-col gap-3 border-l-2 border-border pl-3">
-        <span className="text-xs text-muted">内訳</span>
-        {lines.map((line, index) => (
-          <div key={line.id} className="flex items-start gap-1.5">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <TextField isDisabled={isDisabled}>
-                {/* 行ごとの見出しは繰り返しになるので視覚的には隠し、プレースホルダで伝える */}
-                <Label className="sr-only">{index === 0 ? '項目名' : `項目名 ${index + 1}`}</Label>
-                <Input
-                  placeholder="項目名（任意）"
-                  value={line.label}
-                  onChange={(e) => setLineLabel(line.id, e.target.value)}
-                />
-              </TextField>
-              <MoneyField
-                className="w-full"
-                label={index === 0 ? '金額' : `金額 ${index + 1}`}
-                hideLabel
-                value={line.value}
-                onChange={(value) => setLineValue(line.id, value)}
-                error={!multi && index === 0 ? error : undefined}
-                isDisabled={isDisabled}
-                // 複数行では行ごとの整形プレビューが合計と二重になるので隠す
-                showFormattedPreview={!multi}
-              />
-            </div>
-            {multi && (
-              <Button
-                isIconOnly
-                variant="ghost"
-                size="sm"
-                className="mt-1 shrink-0 text-muted"
-                isDisabled={isDisabled}
-                aria-label="削除"
-                onPress={() => removeLine(line.id)}
-              >
-                <IconTrash size={16} />
-              </Button>
-            )}
-          </div>
-        ))}
-
-        <Button
-          className="self-start"
-          variant="ghost"
-          size="sm"
-          onPress={addLine}
-          isDisabled={isDisabled}
-        >
-          <IconPlus size={16} />
-          項目を追加
-        </Button>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <span className="text-sm text-muted">合計</span>
+        {total === undefined ? (
+          <span className="text-sm text-muted">—（保存時に合算）</span>
+        ) : (
+          <span className={`text-2xl font-bold tabular-nums ${kindTone(kind)}`}>
+            <KindYen kind={kind} amount={total} />
+          </span>
+        )}
       </div>
 
-      {multi && (
-        <div className="flex w-full items-baseline justify-between gap-3 border-t border-border pt-2">
-          <span className="shrink-0 text-sm text-muted">合計</span>
-          <span className="text-right">
-            {total === undefined ? (
-              <span className="text-sm text-muted">—（保存時に合算）</span>
-            ) : (
-              <>
-                <span className="text-base font-semibold tabular-nums">{formatYen(total)}</span>
-                <span className="text-xs text-muted">（この金額で保存）</span>
-              </>
-            )}
-          </span>
-        </div>
-      )}
+      <div className="flex flex-col gap-1.5">
+        {lines.map((line, index) => {
+          const n = index === 0 ? '' : ` ${index + 1}`
+          if (editingId === line.id) {
+            return (
+              <div key={line.id} className="flex flex-col gap-2 rounded-xl bg-surface-secondary p-3">
+                <TextField isDisabled={isDisabled}>
+                  <Label>{`項目名${n}`}</Label>
+                  <Input
+                    placeholder="任意"
+                    value={line.label}
+                    onChange={(e) => setLineLabel(line.id, e.target.value)}
+                  />
+                </TextField>
+                <MoneyField
+                  className="w-full"
+                  label={`金額${n}`}
+                  value={line.value}
+                  onChange={(value) => setLineValue(line.id, value)}
+                  isDisabled={isDisabled}
+                  showFormattedPreview={false}
+                />
+                <div className="flex justify-end gap-2">
+                  {lines.length > 1 && (
+                    <Button variant="tertiary" size="sm" isDisabled={isDisabled} onPress={() => removeLine(line.id)}>
+                      削除
+                    </Button>
+                  )}
+                  <Button variant="secondary" size="sm" isDisabled={isDisabled} onPress={() => setEditingId(null)}>
+                    完了
+                  </Button>
+                </div>
+              </div>
+            )
+          }
+          return (
+            <div key={line.id} className="flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-sm text-muted">
+                {line.label !== '' ? line.label : `項目${index + 1}`}
+              </span>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className={`text-sm tabular-nums ${line.value === undefined ? 'text-muted' : kindTone(kind)}`}>
+                  {line.value === undefined ? '未入力' : <KindYen kind={kind} amount={line.value} />}
+                </span>
+                <Button
+                  variant="tertiary"
+                  size="sm"
+                  isDisabled={isDisabled}
+                  aria-label={`編集${n}`}
+                  onPress={() => setEditingId(line.id)}
+                >
+                  編集
+                </Button>
+                {lines.length > 1 && (
+                  <Button
+                    variant="tertiary"
+                    size="sm"
+                    isDisabled={isDisabled}
+                    aria-label={`削除${n}`}
+                    onPress={() => removeLine(line.id)}
+                  >
+                    削除
+                  </Button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
 
-      {error !== undefined && multi && (
+      <Button className="self-start" variant="secondary" onPress={addLine} isDisabled={isDisabled}>
+        ＋項目を追加
+      </Button>
+
+      {error !== undefined && (
         <p className="text-sm text-danger" role="alert">
           {error}
         </p>
