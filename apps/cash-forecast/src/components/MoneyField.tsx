@@ -20,6 +20,8 @@ type MoneyFieldProps = {
   showFormattedPreview?: boolean
   /** ラベル行の右側（削除ボタンなど）。あるときラベルと横並びにする */
   labelAside?: ReactNode
+  /** ラベルを視覚的に隠す（読み上げ用には残す）。行が並ぶ内訳などで使う */
+  hideLabel?: boolean
   className?: string
 }
 
@@ -32,6 +34,7 @@ export function MoneyField({
   allowNegative = false,
   showFormattedPreview = true,
   labelAside,
+  hideLabel = false,
   className,
 }: MoneyFieldProps) {
   const [text, setText] = useState(() => toMoneyInputText(value))
@@ -96,13 +99,13 @@ export function MoneyField({
           {labelAside}
         </div>
       ) : (
-        <Label>{label}</Label>
+        <Label className={hideLabel ? 'sr-only' : undefined}>{label}</Label>
       )}
       <InputGroup>
         <InputGroup.Prefix>¥</InputGroup.Prefix>
         <InputGroup.Input
           ref={inputRef}
-          className="flex-1 tabular-nums"
+          className="min-w-0 flex-1 tabular-nums"
           type="text"
           // iPhoneのソフトキーボードは numeric/decimal のどちらにもマイナスキーが無いため、
           // 負数を許可するフィールドでは text キーボード（フルキーボード）に切り替える。
