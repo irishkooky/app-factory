@@ -7,10 +7,13 @@ import { Icon } from './Icon'
 export const tel = `tel:${site.contact.phone.replaceAll('-', '')}`
 
 export const navItems = [
-  { id: 'about', title: '私たちについて' },
   { id: 'services', title: 'できること' },
+  ...(site.reviews ? [{ id: 'reviews', title: 'クチコミ' }] : []),
+  ...(site.selfCheck ? [{ id: 'check', title: '漏水チェック' }] : []),
+  { id: 'about', title: '私たちについて' },
   ...(site.gallery?.items.length ? [{ id: 'works', title: site.gallery.title }] : []),
   ...(site.flow?.length ? [{ id: 'flow', title: 'ご依頼の流れ' }] : []),
+  ...(site.area ? [{ id: 'area', title: '対応エリア' }] : []),
   { id: 'company', title: '会社概要' },
 ]
 
