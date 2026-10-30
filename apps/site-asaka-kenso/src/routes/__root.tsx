@@ -50,6 +50,13 @@ h1, h2, h3 { font-feature-settings: 'palt'; letter-spacing: 0.04em; }
 img { display: block; }
 .flow-step + .flow-step { border-top: 1px dashed var(--mantine-color-gray-4); }
 @media (min-width: 62em) { .flow-step + .flow-step { border-top: 0; } .strength-reverse > :first-child { order: 2; } }
+/* Instagram のプロフィール埋め込みを、プロフィール欄と最新3件の1段目までで切る。
+   プロフィール欄の高さは幅で変わるので、枠の幅ごとに合わせる */
+.ig-frame { container-type: inline-size; max-width: 600px; margin-inline: auto; overflow: hidden; border-radius: 12px; border: 1px solid var(--mantine-color-gray-3); background: white; }
+.ig-frame iframe { display: block; width: 100%; border: 0; height: calc(165px + 33.2cqw); }
+@container (min-width: 430px) { .ig-frame iframe { height: calc(147px + 33.2cqw); } }
+@container (min-width: 490px) { .ig-frame iframe { height: calc(182px + 33.2cqw); } }
+@container (min-width: 540px) { .ig-frame iframe { height: calc(158px + 33.2cqw); } }
 @media (max-width: 47.99em) { body { padding-bottom: 64px; } }
 `
 

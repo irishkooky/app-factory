@@ -77,6 +77,13 @@ export type SiteConfig = {
   /** お客様の声。Google マップの口コミを本人の許可を得て載せる想定 */
   voices?: { body: string; name: string; meta?: string }[];
   faq?: { q: string; a: string }[];
+  /** SNS。省くとセクションごと消える */
+  sns?: {
+    /** Instagram のユーザー名（@なし）。Instagram のプロフィール埋め込みで最新の投稿が自動で並ぶ */
+    instagram?: string;
+    /** YouTube。url が無ければ「準備中」として note を出す */
+    youtube?: { url?: string; note: string };
+  };
   theme: {
     /** メインカラー（ボタン・見出しのアクセント） */
     primary: string;
@@ -173,6 +180,12 @@ export const site: SiteConfig = {
     { q: "屋根にひびがあるのですが、すぐ来てもらえますか？", a: "まずご連絡ください。状態によっては応急処置をしてから、工事の計画を立てます。" },
     { q: "どのあたりまで来てもらえますか？", a: "稲城市とその周辺です。それ以外の地域もご相談ください。" },
   ],
+  sns: {
+    instagram: "asakakensou",
+    youtube: {
+      note: "YouTube チャンネルを準備しています。塗装のことを分かりやすくお伝えする動画をお届けする予定です。公開まで少々お待ちください。",
+    },
+  },
   theme: {
     primary: "#2d5d8a",
     primaryDark: "#163049",

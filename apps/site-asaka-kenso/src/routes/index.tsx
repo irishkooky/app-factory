@@ -11,6 +11,7 @@ import { Hero } from '../components/Hero'
 import { MobileCta } from '../components/MobileCta'
 import { ProposalBanner } from '../components/ProposalBanner'
 import { Services } from '../components/Services'
+import { Sns } from '../components/Sns'
 import { Stats } from '../components/Stats'
 import { Strengths } from '../components/Strengths'
 import { Voices } from '../components/Voices'
@@ -32,6 +33,7 @@ function HomeComponent() {
         <Services />
         <Strengths />
         <Gallery />
+        <Sns />
         <Flow />
         <Voices />
         <Faq />

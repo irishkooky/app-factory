@@ -10,6 +10,7 @@ export const navItems = [
   { id: 'about', title: '私たちについて' },
   { id: 'services', title: 'できること' },
   ...(site.gallery?.items.length ? [{ id: 'works', title: site.gallery.title }] : []),
+  ...(site.sns ? [{ id: 'sns', title: 'SNS' }] : []),
   ...(site.flow?.length ? [{ id: 'flow', title: 'ご依頼の流れ' }] : []),
   { id: 'company', title: '会社概要' },
 ]
