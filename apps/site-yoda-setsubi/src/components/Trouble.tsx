@@ -125,12 +125,13 @@ export function Trouble() {
                 h={54}
                 href={tel}
                 leftSection={<Icon name="phone" size={20} />}
+                maw="100%"
                 mt={28}
-                px={26}
+                px={{ base: 18, sm: 26 }}
                 radius="xl"
-                styles={{ label: { fontSize: 17, letterSpacing: '0.03em' } }}
+                styles={{ label: { fontSize: 'clamp(14px, 4vw, 17px)', letterSpacing: '0.03em' } }}
               >
-                {trouble.label}のことで電話する
+                電話で相談する
               </Button>
             </Box>
 
