@@ -1,65 +1,57 @@
-import { Anchor, Box, Button, Container, Text, Title } from '@mantine/core'
+import { Box, Button, Container, Text, Title } from '@mantine/core'
+import { serif } from '../theme'
 import { site } from '../site.config'
 import { tel } from './Header'
 import { Icon } from './Icon'
+import { OpenNow } from './OpenNow'
 
 export function Contact() {
-  const { contact, company, about } = site
+  const { contact, company, credentials } = site
 
   return (
-    <Box
-      c="white"
-      component="section"
-      id="contact"
-      style={{
-        backgroundColor: 'var(--mantine-color-brand-9)',
-        backgroundImage: about.photo
-          ? `linear-gradient(rgba(25,40,30,0.88), rgba(25,40,30,0.92)), url(${about.photo.src})`
-          : undefined,
-        backgroundPosition: 'center',
-        backgroundSize: 'cover',
-      }}
-    >
-      <Container py={{ base: 80, sm: 120 }} size="md" ta="center">
-        <Text fw={700} fz="xs" opacity={0.7} style={{ letterSpacing: '0.3em' }}>
-          CONTACT
+    <Box className="yd-hero" component="section" id="contact">
+      <div aria-hidden className="yd-ripples" style={{ left: '50%', marginLeft: -380, right: 'auto', top: -220 }}>
+        <span />
+        <span />
+        <span />
+      </div>
+      <Container pos="relative" py={{ base: 88, sm: 128 }} size="md" ta="center">
+        <Text c="var(--yd-brass)" fw={700} fz={13} style={{ letterSpacing: '0.2em' }}>
+          お問い合わせ
         </Text>
-        <Title fz={{ base: 26, sm: 36 }} lh={1.5} mt={12} order={2}>
-          まずは、お電話ください。
-        </Title>
-        <Text fz={{ base: 'sm', sm: 'md' }} lh={2} mt="lg" opacity={0.85}>
-          {company.shortName}が直接お話を伺います。
+        <Title c="white" fz={{ base: 30, sm: 44 }} lh={1.45} mt={14} order={2}>
+          水のことで困ったら、
           <br />
-          お見積もりのご相談もお気軽にどうぞ。
+          まずはお電話を。
+        </Title>
+        <Text c="rgba(255,255,255,0.8)" fz={{ base: 15, sm: 17 }} lh={2} mt={20}>
+          {company.name}が、直接お話をうかがいます。
         </Text>
 
         <Button
-          c="brand.8"
-          color="white"
+          className="yd-cta"
           component="a"
-          h="auto"
+          h={{ base: 72, sm: 84 }}
           href={tel}
           leftSection={<Icon name="phone" size={30} />}
           mt={40}
-          px={{ base: 28, sm: 44 }}
-          py={20}
+          px={{ base: 28, sm: 48 }}
           radius="xl"
-          styles={{ label: { fontSize: 'clamp(24px, 6vw, 34px)', letterSpacing: '0.04em' } }}
-          variant="white"
+          styles={{ label: { fontFamily: serif, fontSize: 'clamp(26px, 7vw, 36px)', fontWeight: 700, letterSpacing: '0.05em' } }}
         >
           {contact.phone}
         </Button>
-        <Text fz="sm" mt="md" opacity={0.75}>
+        <Box mt={20}>
+          <OpenNow tone="light" />
+        </Box>
+        <Text c="rgba(255,255,255,0.7)" fz={14} lh={1.9} mt={8}>
           受付 {contact.hours}
-          {contact.holidays && `（${contact.holidays}を除く）`}
+          <br />
+          {contact.missedCall}
         </Text>
-
-        {contact.email && (
-          <Anchor c="white" display="inline-flex" href={`mailto:${contact.email}`} mt="xl" style={{ alignItems: 'center', gap: 8 }} underline="always">
-            <Icon name="mail" size={20} />
-            メールでのお問い合わせ
-          </Anchor>
-        )}
+        <Text c="rgba(255,255,255,0.5)" fz={12} mt={28}>
+          {credentials[0].title}（{credentials[0].value}）
+        </Text>
       </Container>
     </Box>
   )

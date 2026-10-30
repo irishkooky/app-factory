@@ -1,34 +1,48 @@
-import { Box, SimpleGrid, Table } from '@mantine/core'
+import { Anchor, Box, Table } from '@mantine/core'
 import { site } from '../site.config'
+import { tel } from './Header'
 import { Section } from './Section'
 
 export function Company() {
-  const { company, contact } = site
+  const { company, contact, credentials } = site
   const rows = [
-    { label: '会社名', value: company.name },
-    company.representative && { label: '代表者', value: company.representative },
-    company.founded && { label: '創業', value: company.founded },
-    { label: '所在地', value: `${contact.postalCode ? `〒${contact.postalCode} ` : ''}${contact.address}` },
-    { label: '電話番号', value: contact.phone },
-    { label: '営業時間', value: `${contact.hours}${contact.holidays ? `（定休日: ${contact.holidays}）` : ''}` },
-    ...(company.extraRows ?? []),
-  ].filter((row): row is { label: string; value: string } => Boolean(row))
+    { label: '屋号', value: `${company.name}（${company.kana}）` },
+    { label: '所在地', value: `〒${contact.postalCode} ${contact.address}` },
+    {
+      label: '電話番号',
+      value: (
+        <Anchor c="black" fw={700} href={tel} underline="never">
+          {contact.phone}
+        </Anchor>
+      ),
+    },
+    { label: '受付時間', value: contact.hours },
+    ...credentials.map((c) => ({
+      label: c === credentials[0] ? '指定' : '掲載',
+      value: (
+        <>
+          {c.title}（{c.value}）
+          <br />
+          <Anchor c="var(--yd-brass-deep)" fz={12} href={c.href} rel="noopener" target="_blank">
+            {c.source}
+          </Anchor>
+        </>
+      ),
+    })),
+    { label: 'おもな仕事', value: site.work },
+    { label: '対応エリア', value: '横浜市金沢区とその周辺' },
+  ]
 
-  const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(contact.mapQuery ?? contact.address)}&z=15&output=embed`
+  const mapSrc = `https://maps.google.com/maps?q=${encodeURIComponent(`${company.name} ${contact.address}`)}&z=15&output=embed`
 
   return (
-    <Section eyebrow="COMPANY" id="company" title="会社概要・アクセス">
-      <SimpleGrid cols={{ base: 1, md: 2 }} spacing={{ base: 40, md: 64 }}>
-        <Table
-          fz={{ base: 'sm', sm: 'md' }}
-          verticalSpacing="md"
-          withRowBorders
-          style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}
-        >
+    <Section id="company" kicker="会社案内" no="09" title={`${company.name}について`} tone="white">
+      <Box className="yd-company-grid">
+        <Table fz={{ base: 14, sm: 15 }} style={{ borderTop: '1px solid var(--yd-line)' }} verticalSpacing={14} withRowBorders>
           <Table.Tbody>
             {rows.map((row) => (
-              <Table.Tr key={row.label}>
-                <Table.Th c="gray.6" fw={500} w={{ base: 96, sm: 128 }} style={{ verticalAlign: 'top' }}>
+              <Table.Tr key={row.label} style={{ borderColor: 'var(--yd-line)' }}>
+                <Table.Th c="var(--yd-sub)" fw={700} pl={0} style={{ verticalAlign: 'top', whiteSpace: 'nowrap' }} w={{ base: 92, sm: 120 }}>
                   {row.label}
                 </Table.Th>
                 <Table.Td lh={1.8}>{row.value}</Table.Td>
@@ -37,15 +51,15 @@ export function Company() {
           </Table.Tbody>
         </Table>
         <Box
-          bg="gray.1"
+          bg="var(--yd-paper)"
           component="iframe"
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
           src={mapSrc}
-          style={{ border: 0, borderRadius: 4, minHeight: 360, height: '100%', width: '100%' }}
-          title={`${company.shortName}の地図`}
+          style={{ border: 0, borderRadius: 18, height: '100%', minHeight: 380, width: '100%' }}
+          title={`${company.name}の地図`}
         />
-      </SimpleGrid>
+      </Box>
     </Section>
   )
 }
