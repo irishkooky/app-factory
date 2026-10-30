@@ -1,9 +1,0 @@
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "site-interior-haru",
-  "compatibility_date": "2026-07-01",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "@tanstack/react-start/server-entry",
-  "observability": { "enabled": true, "head_sampling_rate": 1 },
-  "routes": [{ "pattern": "interior-haru.sonnet.co.jp", "custom_domain": true }]
-}
