@@ -81,8 +81,8 @@ export type SiteConfig = {
   sns?: {
     /** Instagram のユーザー名（@なし）。Instagram のプロフィール埋め込みで最新の投稿が自動で並ぶ */
     instagram?: string;
-    /** YouTube。url が無ければ「準備中」として note を出す */
-    youtube?: { url?: string; note: string };
+    /** YouTube。url が無ければ「近日公開」として出す */
+    youtube?: { url?: string; title?: string; body: string[] };
   };
   theme: {
     /** メインカラー（ボタン・見出しのアクセント） */
@@ -182,8 +182,14 @@ export const site: SiteConfig = {
   ],
   sns: {
     instagram: "asakakensou",
+    // 文面は先方の YouTube 開始告知（Instagram の投稿）から
     youtube: {
-      note: "YouTube チャンネルを準備しています。塗装のことを分かりやすくお伝えする動画をお届けする予定です。公開まで少々お待ちください。",
+      title: "塗装業者選びで、\n後悔しないために。",
+      body: [
+        "見積り、塗料、資格、施工方法、そして業者選び。塗装工事は、分からないことが多すぎます。",
+        "ネットにはたくさんの情報があるけれど、答えは現場にあります。実際に現場に立つ塗装屋だからこそ、伝えられることがあります。",
+        "塗装業界のこと、現場のこと、そして業者を選ぶときに本当に見てほしいことを、ひとつずつお話ししていきます。",
+      ],
     },
   },
   theme: {

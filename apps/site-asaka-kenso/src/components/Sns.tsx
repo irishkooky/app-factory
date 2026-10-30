@@ -1,4 +1,5 @@
 import { Badge, Box, Button, Group, Paper, Stack, Text, Title } from '@mantine/core'
+import { serif } from '../theme'
 import { site } from '../site.config'
 import { Icon } from './Icon'
 import { Section } from './Section'
@@ -24,7 +25,7 @@ export function Sns() {
               <iframe
                 loading="lazy"
                 scrolling="no"
-                src={`${instagramUrl}embed/`}
+                src={`${instagramUrl}embed/?hl=ja`}
                 title={`${site.company.shortName}の Instagram の最新の投稿`}
               />
             </Box>
@@ -45,29 +46,42 @@ export function Sns() {
         )}
 
         {sns.youtube && (
-          <Paper p={{ base: 'lg', sm: 'xl' }} radius="md" ta="center" withBorder>
+          <Paper p={{ base: 'lg', sm: 40 }} radius="md" ta="center" withBorder>
             <Group gap={8} justify="center">
               <Box c="#ff0033" style={{ display: 'flex' }}>
                 <Icon name="youtube" size={26} />
               </Box>
-              <Title fz={{ base: 18, sm: 20 }} order={3}>
+              <Text fw={700} fz={{ base: 'md', sm: 'lg' }}>
                 YouTube
-              </Title>
+              </Text>
               {!sns.youtube.url && (
-                <Badge color="gray" radius="sm" variant="light">
-                  準備中
+                <Badge color="red" radius="sm" variant="light">
+                  近日公開
                 </Badge>
               )}
             </Group>
-            <Text c="gray.7" fz={{ base: 'sm', sm: 'md' }} lh={1.9} mt="md">
-              {sns.youtube.note}
-            </Text>
-            {sns.youtube.url && (
+            {sns.youtube.title && (
+              <Title ff={serif} fz={{ base: 21, sm: 26 }} lh={1.6} mt="lg" order={3} style={{ whiteSpace: 'pre-line' }}>
+                {sns.youtube.title}
+              </Title>
+            )}
+            <Stack gap="sm" mt="md">
+              {sns.youtube.body.map((line) => (
+                <Text c="gray.7" fz={{ base: 'sm', sm: 'md' }} key={line} lh={1.9} ta="left">
+                  {line}
+                </Text>
+              ))}
+            </Stack>
+            {sns.youtube.url ? (
               <Group justify="center" mt="lg">
                 <Button component="a" href={sns.youtube.url} radius="xl" rel="noopener noreferrer" target="_blank">
                   YouTube を見る
                 </Button>
               </Group>
+            ) : (
+              <Text c="gray.6" fz="sm" mt="lg">
+                公開まで、少々お待ちください。
+              </Text>
             )}
           </Paper>
         )}
