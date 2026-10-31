@@ -1,0 +1,218 @@
+import { Box, Button, Container, Text, Title } from '@mantine/core'
+import { serif } from '../theme'
+import { site } from '../site.config'
+import { GoogleImg, PhotoCredit, Stars, useGooglePlace } from './GooglePlace'
+import { tel } from './Header'
+import { Icon } from './Icon'
+import { LogoMark } from './Logo'
+import { OpenNow } from './OpenNow'
+
+export function Hero() {
+  const { hero, contact } = site
+
+  return (
+    <Box className="st-hero" component="section" id="top">
+      <AirLines />
+      <Container pos="relative" pb={{ base: 56, md: 104 }} pt={{ base: 40, md: 88 }} size="lg">
+        <div className="st-hero-grid">
+          <Box style={{ gridArea: 'copy' }}>
+            <Box
+              className="st-rise"
+              component="a"
+              href="#credentials"
+              style={{
+                alignItems: 'center',
+                border: '1px solid rgba(var(--st-accent-rgb),0.5)',
+                borderRadius: 999,
+                color: 'var(--st-accent)',
+                display: 'inline-flex',
+                fontSize: 13,
+                fontWeight: 700,
+                gap: 8,
+                letterSpacing: '0.04em',
+                padding: '7px 14px 7px 12px',
+                textDecoration: 'none',
+              }}
+            >
+              <Icon name={hero.badge.icon} size={16} />
+              <Box component="span" style={{ color: '#fff' }}>
+                {hero.badge.text}
+              </Box>
+            </Box>
+            <Title
+              c="white"
+              className="st-rise st-rise-2"
+              fw={700}
+              fz={{ base: 38, xs: 44, sm: 54, lg: 62 }}
+              lh={1.32}
+              mt={{ base: 22, md: 28 }}
+              order={1}
+              style={{ letterSpacing: '0.06em', whiteSpace: 'pre-line' }}
+            >
+              {hero.catchcopy}
+            </Title>
+            <Text className="st-rise st-rise-3 st-phrase" c="rgba(255,255,255,0.86)" fz={{ base: 15, sm: 17 }} lh={2} maw={540} mt={{ base: 20, md: 28 }}>
+              {hero.lead}
+            </Text>
+          </Box>
+
+          <Box className="st-rise st-rise-3" style={{ gridArea: 'photos' }}>
+            <PhotoStack />
+          </Box>
+
+          <Box className="st-rise st-rise-4" style={{ gridArea: 'call' }}>
+            <Button
+              className="st-cta"
+              component="a"
+              fullWidth
+              h={{ base: 66, sm: 72 }}
+              href={tel}
+              leftSection={<Icon name="phone" size={26} />}
+              maw={{ sm: 400 }}
+              radius="xl"
+              styles={{ label: { fontFamily: serif, fontSize: 28, fontWeight: 700, letterSpacing: '0.05em' } }}
+            >
+              {contact.phone}
+            </Button>
+            <Box mt={16}>
+              <OpenNow tone="light" />
+            </Box>
+            <Text c="rgba(255,255,255,0.7)" fz={13} lh={1.9} mt={8}>
+              {contact.hours && (
+                <>
+                  受付 {contact.hours}
+                  <br />
+                </>
+              )}
+              {contact.callTip}
+            </Text>
+          </Box>
+        </div>
+      </Container>
+    </Box>
+  )
+}
+
+/** 先方が Googleマップに載せた作業写真を、印画紙のように3枚重ねる */
+function PhotoStack() {
+  const { heroPhotos, rating, count, reviewsUri } = useGooglePlace()
+  // CSS の重なり順は 奥左・奥右・手前。heroPhotos の先頭を手前に置く
+  const prints = [heroPhotos[1], heroPhotos[2], heroPhotos[0]].filter((photo) => photo !== undefined)
+
+  return (
+    <Box>
+      <Box pb={{ base: 40, md: 16 }} pos="relative">
+        {prints.length ? (
+          <div className="st-stack">
+            {prints.map((photo) => (
+              <figure className="st-print" key={photo.src} style={{ margin: 0 }}>
+                <div className="st-print-photo">
+                  <GoogleImg eager photo={photo} />
+                </div>
+                <figcaption>
+                  <span>{photo.note?.title ?? '作業写真'}</span>
+                  {photo.note?.price && <b>{photo.note.price}</b>}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : (
+          // 写真が無い店は、クチコミの要約を「お見積もりのメモ」のように見せる
+          site.hero.voices ? (
+            // カードの高さに合わせ、下に★のカードの場所を空ける
+            <Box pb={{ base: 64, md: 76 }} pt={8} style={{ display: 'flex', justifyContent: 'center' }}>
+              <VoiceCard voices={site.hero.voices} />
+            </Box>
+          ) : (
+            <Box className="st-stack" style={{ alignItems: 'center', display: 'flex', justifyContent: 'center' }}>
+              <LogoMark size={200} />
+            </Box>
+          )
+        )}
+
+        <Box
+          aria-label={`Googleマップの評価 ${rating.toFixed(1)}、クチコミ${count}件`}
+          className="st-rating-card"
+          component="a"
+          href={reviewsUri}
+          rel="noopener"
+          target="_blank"
+        >
+          <Text c="dimmed" fw={700} fz={11} style={{ letterSpacing: '0.08em' }}>
+            Googleマップの評価
+          </Text>
+          <Box style={{ alignItems: 'center', display: 'flex', gap: 10 }}>
+            <Text ff={serif} fw={800} fz={34} lh={1.1}>
+              {rating.toFixed(1)}
+            </Text>
+            <Box>
+              <Stars size={15} />
+              <Text c="dimmed" fw={500} fz={12} mt={2}>
+                クチコミ {count}件
+              </Text>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+
+      {prints.length > 0 && (
+        <Box mt={{ base: 14, md: 18 }} ta={{ base: 'left', md: 'right' }}>
+          <PhotoCredit dark photos={prints} />
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+/** 写真の代わりに出す、クチコミの要約のカード */
+function VoiceCard({ voices }: { voices: string[] }) {
+  return (
+    <Box
+      bg="white"
+      c="var(--st-ink)"
+      maw={420}
+      p={{ base: 24, sm: 32 }}
+      style={{ borderRadius: 20, boxShadow: '0 30px 70px rgba(0,0,0,0.35)', transform: 'rotate(-2deg)', width: '100%' }}
+    >
+      <Box style={{ alignItems: 'center', display: 'flex', gap: 12 }}>
+        <LogoMark size={44} />
+        <Box>
+          <Text c="var(--st-accent-deep)" fw={700} fz={12} style={{ letterSpacing: '0.14em' }}>
+            クチコミより
+          </Text>
+          <Text fw={900} fz={20} lh={1.3}>
+            料金のこと
+          </Text>
+        </Box>
+      </Box>
+      <Box component="ul" m={0} mt={20} p={0} style={{ listStyle: 'none' }}>
+        {voices.map((voice) => (
+          <Box component="li" key={voice} py={14} style={{ borderTop: '1px dashed var(--st-line)', display: 'flex', gap: 10 }}>
+            <Box c="var(--st-accent-deep)" mt={3} style={{ flex: 'none' }}>
+              <Icon name="check" size={18} stroke={2.6} />
+            </Box>
+            <Text className="st-phrase" fw={700} fz={{ base: 15, sm: 16 }} lh={1.7}>
+              {voice}
+            </Text>
+          </Box>
+        ))}
+      </Box>
+      <Text c="dimmed" fz={11} mt={6}>
+        Googleマップのクチコミを要約しています（原文ではありません）
+      </Text>
+    </Box>
+  )
+}
+
+/** 背景を流れる線（飾り） */
+function AirLines() {
+  return (
+    <svg aria-hidden className="st-air" viewBox="0 0 980 620">
+      <path d="M980 120 C 760 90, 620 170, 420 140 S 120 80, -40 130" />
+      <path d="M980 210 C 800 190, 640 260, 460 230 S 160 170, -40 220" />
+      <path d="M980 300 C 780 280, 600 350, 400 320 S 140 270, -40 310" />
+      <path d="M980 390 C 820 370, 650 440, 470 410 S 180 350, -40 400" />
+      <path d="M980 480 C 790 460, 610 530, 420 500 S 150 450, -40 490" />
+    </svg>
+  )
+}

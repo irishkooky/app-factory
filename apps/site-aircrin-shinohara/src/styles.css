@@ -1,0 +1,632 @@
+/* Mantine の props で書きにくいもの（重ね方・動き・段組み）だけをここに置く */
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 76px;
+}
+
+body {
+  background: var(--st-paper);
+  color: var(--st-ink);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'palt' 0;
+}
+
+h1,
+h2,
+h3 {
+  font-feature-settings: 'palt';
+  letter-spacing: 0.04em;
+  /* 日本語の見出しを文節で折り返す（対応ブラウザのみ） */
+  word-break: auto-phrase;
+  /* 長いカタカナの屋号など、文節で切れずにはみ出すときだけ途中で折る */
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.st-phrase {
+  word-break: auto-phrase;
+}
+
+::selection {
+  background: rgba(var(--st-accent-rgb), 0.35);
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--st-accent);
+  outline-offset: 3px;
+}
+
+/* ---- ヒーロー ---- */
+
+.st-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 85% 10%, rgba(var(--st-glow), 0.28) 0%, rgba(var(--st-glow), 0) 55%),
+    radial-gradient(80% 60% at 0% 100%, rgba(var(--st-accent-rgb), 0.12) 0%, rgba(var(--st-accent-rgb), 0) 60%),
+    linear-gradient(160deg, var(--st-deep-soft) 0%, var(--st-deep) 45%, var(--st-deepest) 100%);
+  color: #fff;
+}
+
+/* 冷たい風の流れ。細い線がゆっくり右から左へ流れる */
+.st-air {
+  position: absolute;
+  pointer-events: none;
+  right: -120px;
+  top: -40px;
+  width: 980px;
+  height: 620px;
+  opacity: 0.9;
+}
+
+.st-air path {
+  fill: none;
+  stroke: rgba(var(--st-accent-rgb), 0.38);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-dasharray: 220 900;
+  animation: st-flow 9s linear infinite;
+}
+
+.st-air path:nth-child(2) {
+  animation-delay: -2.2s;
+  stroke: rgba(255, 255, 255, 0.18);
+}
+
+.st-air path:nth-child(3) {
+  animation-delay: -4.6s;
+}
+
+.st-air path:nth-child(4) {
+  animation-delay: -6.4s;
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.st-air path:nth-child(5) {
+  animation-delay: -7.8s;
+}
+
+@keyframes st-flow {
+  from {
+    stroke-dashoffset: 1120;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.st-rise {
+  animation: st-rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.st-rise-2 {
+  animation-delay: 0.12s;
+}
+
+.st-rise-3 {
+  animation-delay: 0.24s;
+}
+
+.st-rise-4 {
+  animation-delay: 0.36s;
+}
+
+@keyframes st-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.st-hero-grid {
+  display: grid;
+  grid-template-areas: 'copy' 'photos' 'call';
+  row-gap: 36px;
+}
+
+@media (min-width: 62em) {
+  .st-hero-grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-areas: 'copy photos' 'call photos';
+    column-gap: 64px;
+    row-gap: 40px;
+  }
+  .st-hero-grid > :nth-child(1) {
+    align-self: end;
+  }
+  .st-hero-grid > :nth-child(2) {
+    align-self: center;
+  }
+  .st-hero-grid > :nth-child(3) {
+    align-self: start;
+  }
+}
+
+/* 写真を印画紙のように重ねる */
+.st-stack {
+  position: relative;
+  aspect-ratio: 1 / 0.98;
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+.st-print {
+  position: absolute;
+  width: 62%;
+  padding: 8px 8px 0;
+  background: #fbfaf7;
+  border-radius: 4px;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.18),
+    0 24px 48px rgba(0, 0, 0, 0.35);
+  color: var(--st-ink);
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.st-print figcaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 4px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.st-print figcaption b {
+  color: var(--st-accent-deep);
+  font-weight: 700;
+}
+
+.st-print-photo {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--st-paper-deep);
+}
+
+.st-print:nth-child(1) {
+  left: 0;
+  top: 8%;
+  transform: rotate(-7deg);
+  z-index: 1;
+}
+
+.st-print:nth-child(2) {
+  right: 0;
+  top: 0;
+  transform: rotate(6deg);
+  z-index: 2;
+}
+
+.st-print:nth-child(3) {
+  left: 19%;
+  top: 30%;
+  transform: rotate(-1.5deg);
+  z-index: 3;
+}
+
+@media (hover: hover) {
+  .st-stack:hover .st-print:nth-child(1) {
+    transform: rotate(-10deg) translate(-12px, -6px);
+  }
+  .st-stack:hover .st-print:nth-child(2) {
+    transform: rotate(9deg) translate(12px, -8px);
+  }
+}
+
+.st-rating-card {
+  position: absolute;
+  z-index: 4;
+  left: -4px;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.97);
+  color: var(--st-ink);
+  border-radius: 14px;
+  padding: 12px 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
+  text-decoration: none;
+}
+
+.st-trust-item:not(:first-child) {
+  border-top: 1px solid var(--st-line);
+}
+
+@media (min-width: 36em) {
+  .st-trust-item:nth-child(2) {
+    border-top: 0;
+  }
+  .st-trust-item:nth-child(even) {
+    border-left: 1px solid var(--st-line);
+    padding-left: 20px;
+  }
+}
+
+@media (min-width: 62em) {
+  .st-trust-item:not(:first-child) {
+    border-top: 0;
+    border-left: 1px solid var(--st-line);
+  }
+}
+
+/* ---- ボタン ---- */
+
+.st-cta {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--st-accent) 78%, #fff) 0%, var(--st-accent) 55%, color-mix(in srgb, var(--st-accent) 88%, #000) 100%);
+  color: var(--st-accent-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 10px 24px rgba(var(--st-accent-rgb), 0.25);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.st-cta:hover {
+  color: var(--st-accent-ink);
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 14px 32px rgba(var(--st-accent-rgb), 0.38);
+}
+
+.st-cta-ink {
+  background: var(--st-deep-soft);
+  color: #fff;
+  transition: background 0.2s ease;
+}
+
+.st-cta-ink:hover {
+  background: var(--st-deep);
+  color: #fff;
+}
+
+/* ---- 見出しの番号 ---- */
+
+main {
+  counter-reset: st-sec;
+}
+
+.st-sec {
+  counter-increment: st-sec;
+}
+
+.st-no::before {
+  content: counter(st-sec, decimal-leading-zero);
+}
+
+.st-kicker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.st-kicker::after {
+  content: '';
+  flex: 0 0 48px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+/* ---- お困りごと ---- */
+
+.st-trouble {
+  display: grid;
+  /* 横スクロールのタブの幅に引っぱられて、パネルが画面からはみ出さないようにする */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (min-width: 62em) {
+  .st-trouble {
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 28px;
+    align-items: start;
+  }
+}
+
+.st-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+}
+
+@media (min-width: 48em) {
+  .st-panel-grid[data-photos] {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: 40px;
+  }
+}
+
+.st-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 16px 6px;
+  margin-inline: -16px;
+  scroll-snap-type: x proximity;
+}
+
+.st-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.st-tab {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--st-line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--st-sub);
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.st-tab[aria-selected='true'] {
+  background: var(--st-deep-soft);
+  border-color: var(--st-deep-soft);
+  color: #fff;
+}
+
+@media (min-width: 62em) {
+  .st-tabs {
+    flex-direction: column;
+    overflow: visible;
+    padding: 0;
+    margin: 0;
+  }
+  .st-tab {
+    justify-content: flex-start;
+    width: 100%;
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+  .st-tab:hover:not([aria-selected='true']) {
+    border-color: color-mix(in srgb, var(--st-line) 70%, var(--st-ink));
+    color: var(--st-ink);
+  }
+}
+
+.st-panel {
+  animation: st-fade 0.35s ease both;
+}
+
+@keyframes st-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---- 施工写真 ---- */
+
+.st-masonry {
+  column-count: 2;
+  column-gap: 12px;
+}
+
+.st-masonry > figure {
+  break-inside: avoid;
+  margin: 0 0 12px;
+}
+
+@media (min-width: 62em) {
+  .st-masonry {
+    column-count: 3;
+    column-gap: 20px;
+  }
+  .st-masonry > figure {
+    margin-bottom: 20px;
+  }
+}
+
+.st-shot {
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--st-paper-deep);
+}
+
+.st-shot img {
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (hover: hover) {
+  .st-shot:hover img {
+    transform: scale(1.03);
+  }
+}
+
+/* ---- 選ばれる理由（濃い帯） ---- */
+
+.st-band {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(var(--st-glow), 0.18) 0%, rgba(var(--st-glow), 0) 60%),
+    linear-gradient(180deg, var(--st-deep) 0%, var(--st-deepest) 100%);
+  color: #fff;
+}
+
+.st-reasons-grid {
+  display: grid;
+  gap: 24px;
+}
+
+@media (min-width: 62em) {
+  .st-reasons-grid {
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 72px;
+    align-items: start;
+  }
+  .st-reasons-side {
+    position: sticky;
+    top: 110px;
+  }
+  .st-reason:first-child {
+    padding-top: 0;
+  }
+}
+
+.st-reason + .st-reason {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ---- 漏水 ---- */
+
+.st-guide-grid {
+  display: grid;
+  gap: 40px;
+}
+
+@media (min-width: 62em) {
+  .st-guide-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 72px;
+    align-items: center;
+  }
+}
+
+.st-steps > * + * {
+  border-top: 1px dashed var(--st-line);
+}
+
+.st-side {
+  display: grid;
+  gap: 28px;
+  padding: 30px 22px;
+  border-radius: 22px;
+  background:
+    radial-gradient(80% 90% at 100% 0%, rgba(var(--st-glow), 0.22) 0%, rgba(var(--st-glow), 0) 60%),
+    linear-gradient(160deg, var(--st-deep-soft) 0%, var(--st-deep) 100%);
+  color: #fff;
+}
+
+@media (min-width: 48em) {
+  .st-side {
+    padding: 44px;
+  }
+}
+
+@media (min-width: 62em) {
+  .st-side {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 48px;
+    padding: 52px 56px;
+  }
+}
+
+.st-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: st-spin 3.2s linear infinite;
+}
+
+@keyframes st-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- 地図 ---- */
+
+.st-map-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: st-pulse 2.8s ease-out infinite;
+}
+
+@keyframes st-pulse {
+  from {
+    transform: scale(0.4);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.st-area-grid {
+  display: grid;
+  gap: 36px;
+}
+
+@media (min-width: 62em) {
+  .st-area-grid {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 64px;
+    align-items: center;
+  }
+}
+
+/* ---- 会社案内 ---- */
+
+.st-company-grid {
+  display: grid;
+  gap: 36px;
+}
+
+@media (min-width: 62em) {
+  .st-company-grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 64px;
+  }
+}
+
+/* ---- 流れ ---- */
+
+.st-flow {
+  counter-reset: flow;
+}
+
+/* ---- FAQ ---- */
+
+.st-faq .mantine-Accordion-item {
+  border-bottom: 1px solid var(--st-line);
+}
+
+.st-faq .mantine-Accordion-control:hover {
+  background: transparent;
+}
+
+/* スマホでは下に電話の帯が固定されるので、その分だけフッターの下に余白を足す */
+@media (max-width: 47.99em) {
+  .st-footer {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
