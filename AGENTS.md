@@ -11,6 +11,9 @@
 - 作業の進め方は Cursor の pstack プラグイン（`/poteto-mode`）を主軸にする。
   このファイルは「常に正しい事実」と「pstack の既定をこのリポジトリで上書きする規則」だけを持つ。
   手順は `.agents/skills/` のスキルにある
+- **実験（Cloud Agent）**: pstack の skills（`poteto-mode` 含む）を `.agents/skills/` に vendor し、
+  Custom Mode でも固定版の poteto-mode を読めるか試している。ピンは pstack `0.15.36` /
+  commit `1ba91fc25c0977741dd0e267849e6234b037ed0a`。app-factory 固有スキル（`new-app` 等）は上書きしない
 - `CLAUDE.md` は `AGENTS.md` へのシンボリックリンク、`.claude` は `.agents` へのシンボリックリンク。
   編集は実体の `AGENTS.md` と `.agents/` に対して行う
 
