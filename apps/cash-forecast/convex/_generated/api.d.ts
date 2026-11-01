@@ -10,6 +10,8 @@
 
 import type * as admin from "../admin.js";
 import type * as billing from "../billing.js";
+import type * as checkpoints from "../checkpoints.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as imports from "../imports.js";
 import type * as reconcile from "../reconcile.js";
@@ -27,6 +29,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   billing: typeof billing;
+  checkpoints: typeof checkpoints;
+  crons: typeof crons;
   http: typeof http;
   imports: typeof imports;
   reconcile: typeof reconcile;

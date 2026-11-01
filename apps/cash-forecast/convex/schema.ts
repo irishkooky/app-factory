@@ -57,4 +57,36 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_customer", ["stripeCustomerId"]),
+
+  // 予測チェックポイント: 固定ターゲット日に向けた予測の四半期スナップショット。
+  forecastSeries: defineTable({
+    userId: v.string(),
+    startedAt: v.string(), // "YYYY-MM-DD"
+    targetDate: v.string(), // startedAt のちょうど1年後
+    status: v.union(v.literal("in_progress"), v.literal("reached")),
+    source: v.union(v.literal("quarter"), v.literal("manual")),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_started", ["userId", "startedAt"]),
+
+  forecastObservations: defineTable({
+    userId: v.string(),
+    seriesId: v.id("forecastSeries"),
+    slot: v.union(
+      v.literal("m0"),
+      v.literal("m3"),
+      v.literal("m6"),
+      v.literal("m9"),
+      v.literal("actual"),
+    ),
+    dueDate: v.string(),
+    observedAt: v.string(),
+    predictedBalanceAtTarget: v.number(),
+    balanceToday: v.number(),
+    kind: v.union(v.literal("forecast"), v.literal("actual")),
+  })
+    .index("by_series_slot", ["seriesId", "slot"])
+    .index("by_series", ["seriesId"])
+    .index("by_user", ["userId"]),
 });
