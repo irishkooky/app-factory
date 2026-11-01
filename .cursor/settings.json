@@ -1,6 +1,6 @@
 {
   "plugins": {
-    "pstack": {
+    "pstack@cursor-plugins": {
       "enabled": true
     }
   }
