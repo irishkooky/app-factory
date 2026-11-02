@@ -1,6 +1,6 @@
 import { clerk } from '@clerk/testing/playwright'
 import { expect, test } from '@playwright/test'
-import { copyFileSync, mkdirSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -20,6 +20,30 @@ function saveShot(localName: string, pageShotPath: string) {
   copyFileSync(pageShotPath, localDest)
   copyFileSync(pageShotPath, storeDest)
   return { localDest, storeDest }
+}
+
+function copyVideoIfAny(destName: string) {
+  const resultsRoot = path.join(root, 'test-results')
+  if (!existsSync(resultsRoot)) return null
+  const walk = (dir: string): string | null => {
+    for (const name of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, name.name)
+      if (name.isDirectory()) {
+        const found = walk(full)
+        if (found) return found
+      } else if (name.name === 'video.webm') {
+        return full
+      }
+    }
+    return null
+  }
+  const video = walk(resultsRoot)
+  if (!video) return null
+  mkdirSync(storeMediaDir, { recursive: true })
+  const dest = path.join(storeMediaDir, destName)
+  copyFileSync(video, dest)
+  copyFileSync(video, path.join(artifactsDir, destName))
+  return dest
 }
 
 test.describe('Clerk authenticated shell', () => {
@@ -42,14 +66,15 @@ test.describe('Clerk authenticated shell', () => {
       timeout: 45_000,
     })
 
-    // Either onboarding (new test user) or the forecast shell.
-    const onboarding = page.getByText('初期設定', { exact: false })
+    // New users land on onboarding ("ようこそ"); returning users see the forecast shell.
+    const onboardingHeading = page.getByRole('heading', { name: 'ようこそ' })
+    const startButton = page.getByRole('button', { name: 'はじめる' })
     const forecastTitle = page.getByRole('heading', { name: '残高予測' })
     const userButton = page.locator('.cl-userButtonTrigger, [data-clerk-component="UserButton"]')
 
     await expect
       .poll(async () => {
-        const hasOnboarding = await onboarding.count()
+        const hasOnboarding = await onboardingHeading.count()
         const hasForecast = await forecastTitle.count()
         const hasUser = await userButton.count()
         return hasOnboarding + hasForecast + hasUser > 0
@@ -63,17 +88,24 @@ test.describe('Clerk authenticated shell', () => {
     console.log(`screenshot: ${localDest}`)
     console.log(`screenshot: ${storeDest}`)
 
-    // Best-effort: open menu / look for Pro-gated or checkpoint UI without failing the suite.
-    const menu = page.getByRole('button', { name: /メニュー|menu/i }).or(
-      page.locator('button').filter({ has: page.locator('svg') }).first(),
-    )
+    // Complete onboarding when present so we can capture the forecast shell + menu.
+    if ((await onboardingHeading.count()) > 0 && (await startButton.count()) > 0) {
+      await startButton.click()
+      await expect(forecastTitle).toBeVisible({ timeout: 45_000 })
+      const tmpForecast = path.join(artifactsDir, '_tmp-forecast.png')
+      await page.screenshot({ path: tmpForecast, fullPage: true })
+      saveShot('02-forecast-shell.png', tmpForecast)
+    }
+
+    // Best-effort: open app menu (Pro / checkpoint entries live here).
+    const menu = page.getByRole('button', { name: 'メニュー' })
     if ((await menu.count()) > 0) {
       try {
-        await menu.first().click({ timeout: 5_000 })
+        await menu.click({ timeout: 5_000 })
         await page.waitForTimeout(500)
-        const tmp2 = path.join(artifactsDir, '_tmp-menu.png')
-        await page.screenshot({ path: tmp2, fullPage: true })
-        saveShot('02-authenticated-menu.png', tmp2)
+        const tmpMenu = path.join(artifactsDir, '_tmp-menu.png')
+        await page.screenshot({ path: tmpMenu, fullPage: true })
+        saveShot('03-authenticated-menu.png', tmpMenu)
       } catch {
         // Menu affordance varies; shell shot is enough proof of auth.
       }
@@ -99,5 +131,13 @@ test.describe('Clerk authenticated shell', () => {
       path.join(storeMediaDir, 'verified.json'),
       JSON.stringify(proved, null, 2) + '\n',
     )
+
+    // Video is attached after the test ends; copy best-effort from prior runs' outputDir mid-test
+    // is unreliable — afterAll below handles the final copy.
+  })
+
+  test.afterAll(() => {
+    const dest = copyVideoIfAny('04-authenticated-session.webm')
+    if (dest) console.log(`video: ${dest}`)
   })
 })
