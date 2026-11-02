@@ -1,5 +1,114 @@
+import Stripe from "stripe";
 import { ConvexError, v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalAction, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
+
+declare const process: { env: Record<string, string | undefined> };
+
+const ACTIVE_STATUSES = ["active", "trialing"];
+/** E2E / 運用テスト用トライアル日数（支払い方法なし）。trialing は isPro 扱い。 */
+const E2E_TRIAL_DAYS = 365;
+
+function stripeClient(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throw new Error(
+      "STRIPE_SECRET_KEY が未設定です。scripts/stripe-provision.sh を実行してください",
+    );
+  }
+  return new Stripe(key, { httpClient: Stripe.createFetchHttpClient() });
+}
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} が未設定です。scripts/stripe-provision.sh を実行してください`);
+  }
+  return value;
+}
+
+/**
+ * E2E / 検証用: Clerk userId に Stripe テストモードの trialing サブスクを付けて Pro にする。
+ * 支払い方法なしの trial（trialing → isPro）。既存が active/trialing なら何もしない。
+ * 実行例: npx convex run admin:ensureE2ePro '{"userId":"user_xxx","email":"…+clerk_test@…"}'
+ */
+type EnsureE2eProResult = {
+  ok: true;
+  alreadyPro: boolean;
+  status: string;
+  stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  currentPeriodEnd?: number;
+};
+
+export const ensureE2ePro = internalAction({
+  args: {
+    userId: v.string(),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, email }): Promise<EnsureE2eProResult> => {
+    if (!userId) {
+      throw new ConvexError("userId が空です");
+    }
+
+    const existing: {
+      status: string;
+      stripeCustomerId: string;
+      stripeSubscriptionId: string;
+    } | null = await ctx.runQuery(internal.billing.getForUser, { userId });
+    if (existing !== null && ACTIVE_STATUSES.includes(existing.status)) {
+      return {
+        ok: true,
+        alreadyPro: true,
+        status: existing.status,
+        stripeCustomerId: existing.stripeCustomerId,
+        stripeSubscriptionId: existing.stripeSubscriptionId,
+      };
+    }
+
+    const stripe = stripeClient();
+    const priceId = requireEnv("STRIPE_PRICE_ID");
+
+    let customerId: string | null = existing?.stripeCustomerId ?? null;
+    if (customerId === null) {
+      const customer = await stripe.customers.create({
+        ...(email ? { email } : {}),
+        metadata: { userId, purpose: "e2e" },
+      });
+      customerId = customer.id;
+    }
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customerId,
+      items: [{ price: priceId }],
+      trial_period_days: E2E_TRIAL_DAYS,
+      trial_settings: {
+        end_behavior: { missing_payment_method: "pause" },
+      },
+      metadata: { userId, purpose: "e2e" },
+    });
+
+    const currentPeriodEnd =
+      (subscription.items.data[0]?.current_period_end ?? subscription.trial_end ?? 0) * 1000;
+
+    await ctx.runMutation(internal.billing.upsertFromStripe, {
+      userId,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscription.id,
+      status: subscription.status,
+      currentPeriodEnd,
+    });
+
+    return {
+      ok: true,
+      alreadyPro: false,
+      status: subscription.status,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscription.id,
+      currentPeriodEnd,
+    };
+  },
+});
 
 /**
  * 運用用: from ユーザーの settings / rules / transactions の所有者を to ユーザーに付け替える。

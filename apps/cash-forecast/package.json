@@ -9,8 +9,9 @@
     "deploy": "vp run build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "e2e:clerk-user": "node scripts/ensure-clerk-e2e-user.mjs",
+    "e2e:clerk-pro": "node scripts/ensure-e2e-pro.mjs",
     "e2e:clerk-screenshot": "playwright test -c e2e/playwright.config.ts",
-    "e2e:clerk": "node scripts/ensure-clerk-e2e-user.mjs && playwright test -c e2e/playwright.config.ts"
+    "e2e:clerk": "node scripts/ensure-clerk-e2e-user.mjs && node scripts/ensure-e2e-pro.mjs && playwright test -c e2e/playwright.config.ts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.3",

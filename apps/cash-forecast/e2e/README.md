@@ -18,11 +18,18 @@ Google OAuth を自動化せず、`@clerk/testing` の Backend API サインイ�
 
 ```bash
 cd apps/cash-forecast
+# .env.local に CONVEX_DEPLOY_KEY が必要（ensure-e2e-pro が Convex 経由で Stripe trial を付ける）
 vp run e2e:clerk
 # または段階実行:
 vp run e2e:clerk-user
+vp run e2e:clerk-pro
 vp run e2e:clerk-screenshot
 ```
+
+`e2e:clerk-pro` は Convex の `admin:ensureE2ePro` を呼ぶ。デプロイメント上の
+`STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` でテストモードの Customer + trialing サブスクを作り、
+`subscriptions` を upsert する（Cloud Agent に `STRIPE_SECRET_KEY` を置かなくてもよい）。
+既に active/trialing なら冪等にスキップする。
 
 スクショ出力:
 
@@ -34,3 +41,6 @@ vp run e2e:clerk-screenshot
 1. Clerk Dashboard（development）→ Users → Create user
 2. Email を `cash-forecast-e2e+clerk_test@example.com` にする
 3. 公開の Sign-in options は Google のままでよい
+
+Pro を Dashboard だけで付ける場合（非推奨・非耐久）: Stripe Checkout を手動決済するか、
+Convex ダッシュボードから `admin:ensureE2ePro` を同じ引数で実行する。
