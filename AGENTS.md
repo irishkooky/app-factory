@@ -31,11 +31,15 @@
 | 目的 | コマンド |
 |---|---|
 | 依存関係インストール | `vp install` |
-| 開発サーバー起動 | `vp dev` |
+| 開発サーバー起動 | 各アプリのディレクトリで `vp run dev` |
 | ビルド検証 | 各アプリのディレクトリで `vp run build`（vite build + tsc） |
 | テスト | `vp test` |
 | 静的チェック | `vp check` |
 | 依存追加 | `vp add <pkg>`（開発依存は `vp add -D <pkg>`） |
+
+`vp dev` は Vite+ の組み込みコマンドで、このリポジトリの Vite 8 では
+`Expected @voidzero-dev/vite-plus-core` で失敗する。開発サーバーは `vp run dev`
+（`package.json` の `vite dev`）を使う。
 
 ## 4. 作業の入口
 
@@ -100,7 +104,7 @@ pstack の指示とこの節が食い違ったら、この節を優先する。
 ### Cloudflare Workers
 
 - Worker から同じゾーンの別の `*.workers.dev` への `fetch()` は `HTTP 404` とボディ `error code: 1042` で失敗する。
-  ローカルの `vp dev` では成功するので本番でしか見つからない。他のアプリは Service Bindings で呼ぶ。
+  ローカルの `vp run dev` では成功するので本番でしか見つからない。他のアプリは Service Bindings で呼ぶ。
   `wrangler.jsonc` の `services` に `{ "binding": "APP_XXX", "service": "<worker名>" }` を書き、
   `import { env } from 'cloudflare:workers'` して `env.APP_XXX.fetch(new Request(url))`。
   実装例は `apps/lab/src/server/liveness.ts` と `apps/lab/scripts/sync.mjs`
@@ -125,3 +129,11 @@ pstack の指示とこの節が食い違ったら、この節を優先する。
   `lsof -i :<port>` で PID を引いて `kill $PID`
 - 裏で起動したプロセスは PID を控える
 - プロセスの kill とデプロイなどの重要な操作を1つの複合コマンドに連結しない
+
+## Cursor Cloud specific instructions
+
+- Node.js 22。`vp` は `npm install -g vite-plus@1.4.0 --prefix "$HOME/.local"` で入れ、`/usr/local/bin/vp` へシンボリックリンクする。`node` が `/exec-daemon/node` だと npm の既定 prefix は書けない
+- 依存はリポジトリルートで `vp install`。再実行しても安全
+- 雛形の動作確認は `cd apps/hello && vp run dev` のあと `http://localhost:5173/`。ビルドは `vp run build`
+- 秘密情報が要らないテスト: `apps/cash-forecast` で `vp test`、`apps/jev-lab` で `vp run test`
+- `CLOUDFLARE_API_TOKEN` と `CLOUDFLARE_ACCOUNT_ID` が無いとデプロイはできない。ローカルの起動・ビルド・上記テストには不要
