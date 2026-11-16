@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Box, Button, Container, Group, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Box, Button, Group, Stack, Text, TextInput } from '@mantine/core'
 import { Footer } from '../footer'
 import { layoutSeal, sealFor } from '../domain'
 
@@ -19,10 +19,10 @@ function sealMarkup(chars: readonly string[]): string {
   const glyphs = mark.chars
     .map(
       (item) =>
-        `<text x="${item.x}" y="${item.y}" text-anchor="middle" dominant-baseline="central" font-size="${mark.fontSize}" fill="#fff7ef" font-family="serif">${xml(item.char)}</text>`,
+        `<text x="${item.x}" y="${item.y}" text-anchor="middle" dominant-baseline="central" font-size="${mark.fontSize}" fill="#fff8f2" font-family="serif">${xml(item.char)}</text>`,
     )
     .join('')
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="Name seal"><rect width="320" height="320" fill="#f4efe6"/><rect x="28" y="28" width="264" height="264" rx="18" fill="#c4272f"/><rect x="42" y="42" width="236" height="236" rx="8" fill="none" stroke="#f4efe6" stroke-width="3"/>${glyphs}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" width="100%" height="100%"><rect width="320" height="320" fill="#fff4ee"/><g transform="rotate(-2.5 160 160)"><rect x="36" y="40" width="248" height="248" rx="10" fill="#b81d32"/><rect x="28" y="32" width="248" height="248" rx="10" fill="#d7263d"/><rect x="46" y="50" width="212" height="212" fill="none" stroke="#fff4ee" stroke-width="3"/>${glyphs}</g></svg>`
 }
 
 async function sealPng(chars: readonly string[]): Promise<Blob> {
@@ -58,13 +58,19 @@ function saveBlob(blob: Blob, filename: string) {
 function HomeComponent() {
   const [raw, setRaw] = useState('Priya')
   const [shifts, setShifts] = useState<number[]>([])
+  const [press, setPress] = useState(0)
   const result = sealFor(raw, shifts)
-  const chars = result.ok ? result.seal.glyphs.map((glyph) => glyph.kanji) : []
+  const chars = result.ok ? result.seal.glyphs.map((glyph) => glyph.kanji) : ['印']
+
+  function stamp(next: string) {
+    setRaw(next)
+    setShifts([])
+    setPress((value) => value + 1)
+  }
 
   async function onDownload() {
     if (!result.ok) return
-    const png = await sealPng(chars)
-    saveBlob(png, `${result.seal.name}-hanko.png`)
+    saveBlob(await sealPng(chars), `${result.seal.name}-hanko.png`)
   }
 
   async function onShare() {
@@ -80,111 +86,90 @@ function HomeComponent() {
   }
 
   return (
-    <Box mih="100vh" bg="#f6f3ee">
-      <Container size="sm" px="md" py="lg">
-        <Stack gap="lg">
-          <Stack gap={4}>
-            <Text size="sm" c="dimmed">
-              A seal for the name you just said
-            </Text>
-            <Title order={1}>Kanji Name Maker</Title>
-            <Text>
-              Type a name in Latin letters. You get the katakana a Japanese ear hears, a playful kanji seal, and the meaning of each character. It is ateji, a game, not a legal name.
-            </Text>
-          </Stack>
+    <Box mih="100vh" bg="#fff4ee" c="#1a120f" px="md" py="lg">
+      <style>{`@keyframes press{0%{transform:scale(1.35) rotate(-10deg);opacity:0}70%{transform:scale(.96) rotate(-2deg);opacity:1}100%{transform:scale(1) rotate(-2.5deg)}}`}</style>
+      <Stack gap="md" maw={420} mx="auto">
+        <Text size="xs" tt="uppercase" fw={700} c="#b42318" style={{ letterSpacing: '0.16em' }}>
+          A seal, not a translation
+        </Text>
+        <Group justify="space-between" align="flex-end" wrap="nowrap">
+          <Text fz={40} fw={750} lh={0.95}>
+            Stamp
+            <br />
+            your name
+          </Text>
+          <Box key={press} w={168} h={168} style={{ animation: 'press .48s cubic-bezier(.2,1.4,.4,1)', flex: '0 0 auto' }} dangerouslySetInnerHTML={{ __html: sealMarkup(chars) }} />
+        </Group>
 
-          <TextInput
-            label="Your name"
-            size="lg"
-            value={raw}
-            onChange={(event) => {
-              setRaw(event.currentTarget.value)
-              setShifts([])
-            }}
-            placeholder="Priya"
-          />
+        <TextInput
+          aria-label="Your name"
+          size="xl"
+          radius="lg"
+          value={raw}
+          placeholder="Priya"
+          onChange={(event) => stamp(event.currentTarget.value)}
+          styles={{ input: { fontSize: 28, height: 64, border: '2px solid #1a120f', background: '#fff' } }}
+        />
 
-          <Group gap="xs">
-            {SAMPLES.map((sample) => (
-              <Button
-                key={sample}
-                variant="default"
-                size="sm"
-                onClick={() => {
-                  setRaw(sample)
-                  setShifts([])
-                }}
-              >
-                {sample}
+        <Group gap={8}>
+          {SAMPLES.map((sample) => (
+            <Button key={sample} radius="xl" size="md" variant={raw === sample ? 'filled' : 'outline'} color="dark" onClick={() => stamp(sample)}>
+              {sample}
+            </Button>
+          ))}
+        </Group>
+
+        {result.ok ? (
+          <>
+            <Text fz={28} fw={700} lh={1}>
+              {result.seal.reading}
+            </Text>
+            <Group gap={8} align="stretch">
+              {result.seal.glyphs.map((glyph, index) => (
+                <Button
+                  key={`${glyph.reading}-${index}`}
+                  variant="white"
+                  onClick={() => {
+                    const next = shifts.slice()
+                    next[index] = (next[index] ?? 0) + 1
+                    setShifts(next)
+                    setPress((value) => value + 1)
+                  }}
+                  aria-label={`Another kanji for ${glyph.reading}`}
+                  styles={{ root: { height: 'auto', padding: '10px 8px', border: '1px solid #ecdcd4', flex: 1 } }}
+                >
+                  <Stack gap={0} align="center">
+                    <Text fz={32} fw={700} lh={1} ff="serif">
+                      {glyph.kanji}
+                    </Text>
+                    <Text size="xs" c="#8a7368">
+                      {glyph.meaning}
+                    </Text>
+                  </Stack>
+                </Button>
+              ))}
+            </Group>
+            <Group grow>
+              <Button size="lg" color="red" onClick={() => void onDownload()}>
+                Save the seal
               </Button>
-            ))}
-          </Group>
+              <Button size="lg" variant="outline" color="dark" onClick={() => void onShare()}>
+                Share
+              </Button>
+            </Group>
+          </>
+        ) : (
+          <Text>Type a name in Latin letters.</Text>
+        )}
 
-          {result.ok ? (
-            <Stack gap="md">
-              <Stack gap={2}>
-                <Text size="xs" c="dimmed">
-                  Katakana
-                </Text>
-                <Title order={2}>{result.seal.reading}</Title>
-              </Stack>
-
-              <Group gap="xs" align="stretch">
-                {result.seal.glyphs.map((glyph, index) => (
-                  <Button
-                    key={`${glyph.reading}-${index}`}
-                    variant="default"
-                    onClick={() => {
-                      const next = shifts.slice()
-                      next[index] = (next[index] ?? 0) + 1
-                      setShifts(next)
-                    }}
-                    styles={{ root: { height: 'auto', paddingBlock: 12 } }}
-                    aria-label={`Another kanji for ${glyph.reading}`}
-                  >
-                    <Stack gap={0} align="center">
-                      <Text fz={28} fw={600} lh={1.1}>
-                        {glyph.kanji}
-                      </Text>
-                      <Text size="xs">{glyph.reading}</Text>
-                      <Text size="xs" c="dimmed">
-                        {glyph.meaning}
-                      </Text>
-                    </Stack>
-                  </Button>
-                ))}
-              </Group>
-              <Text size="sm" c="dimmed">
-                Tap a character for another positive kanji. The same name keeps the same seal until you do.
-              </Text>
-
-              <Box
-                maw={280}
-                mx="auto"
-                w="100%"
-                dangerouslySetInnerHTML={{ __html: sealMarkup(chars) }}
-              />
-
-              <Stack gap="xs">
-                <Button size="lg" fullWidth onClick={() => void onDownload()}>
-                  Download stamp
-                </Button>
-                <Button size="lg" fullWidth variant="default" onClick={() => void onShare()}>
-                  Share
-                </Button>
-              </Stack>
-            </Stack>
-          ) : (
-            <Text>
-              {result.reason === 'empty'
-                ? 'Type a name to see the seal.'
-                : 'Use Latin letters, the way the name is written in a passport.'}
-            </Text>
-          )}
-
-          <Footer current="kanji-name" />
-        </Stack>
-      </Container>
+        <details>
+          <summary style={{ cursor: 'pointer', color: '#8a7368' }}>This is playful ateji, not a legal name.</summary>
+          <Text size="sm" c="#6d5c52" mt={6}>
+            Tap a character for another positive kanji. The same spelling keeps the same seal until you do.
+          </Text>
+        </details>
+        <Footer current="kanji-name" />
+      </Stack>
     </Box>
   )
 }

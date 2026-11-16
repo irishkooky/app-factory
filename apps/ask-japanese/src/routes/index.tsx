@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Box, Button, Card, Container, Group, Stack, Text, TextInput, Title } from '@mantine/core'
+import { Box, Group, Stack, Text, TextInput, UnstyledButton } from '@mantine/core'
 import { Footer } from '../footer'
 import { filterAnswers, TOPICS, type TopicId } from '../domain'
 
@@ -9,81 +9,78 @@ export const Route = createFileRoute('/')({
 })
 
 function HomeComponent() {
-  const [topic, setTopic] = useState<TopicId | 'all'>('all')
+  const [topic, setTopic] = useState<TopicId | 'all'>('food')
   const [query, setQuery] = useState('')
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>('veg')
   const answers = filterAnswers(query, topic)
-  const shownId = answers.some((answer) => answer.id === openId) ? openId : (answers[0]?.id ?? null)
+  const shown = answers.find((answer) => answer.id === openId) ?? answers[0]
 
   return (
-    <Box mih="100vh" bg="#f6f3ee">
-      <Container size="sm" px="md" py="lg">
-        <Stack gap="lg">
-          <Stack gap={4}>
-            <Text size="sm" c="dimmed">
-              From a person who lives there
+    <Box mih="100vh" bg="#fff8f3" c="#1a120f" px="md" py="lg">
+      <Stack gap="sm" maw={420} mx="auto">
+        <Text size="xs" tt="uppercase" fw={700} c="#b42318" style={{ letterSpacing: '0.16em' }}>
+          A person in Tokyo
+        </Text>
+        <Text fz={36} fw={750} lh={0.95}>
+          Ask a Japanese.
+        </Text>
+        {shown ? (
+          <Box bg="#fff" bd="1.5px solid #1a120f" bdrs={22} p="md">
+            <Text fz={28} fw={750} lh={1.05}>
+              {shown.question}
             </Text>
-            <Title order={1}>Ask a Japanese</Title>
-            <Text>
-              Practical questions Indian travelers actually ask, answered the way Yoshihiro would answer them on the spot. These are fixed answers, not a guess from a model.
+            <Text mt={8} fw={600}>
+              {shown.answer.split('. ')[0]?.replace(/\.$/, '')}.
             </Text>
-          </Stack>
+            <Text fz={26} ff="serif" mt="sm" lh={1.25} c="#9d1c28">
+              {shown.say}
+            </Text>
+          </Box>
+        ) : (
+          <Text>Nothing matches. Try onsen or train.</Text>
+        )}
+        <Group gap={8}>
+          {TOPICS.map((item) => (
+            <UnstyledButton
+              key={item.id}
+              onClick={() => setTopic(item.id)}
+              px="sm"
+              py={8}
+              bdrs="xl"
+              bg={topic === item.id ? '#1a120f' : '#fff'}
+              c={topic === item.id ? '#fff' : '#1a120f'}
+              bd="1.5px solid #1a120f"
+              fw={700}
+            >
+              {item.label}
+            </UnstyledButton>
+          ))}
+        </Group>
+        <TextInput
+          aria-label="Search"
+          placeholder="tip, onsen, train"
+          radius="xl"
+          size="md"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+        />
 
-          <TextInput
-            label="Search"
-            size="lg"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder="tipping, onsen, trains"
-          />
-
-          <Group gap="xs">
-            <Button size="sm" variant={topic === 'all' ? 'filled' : 'default'} onClick={() => setTopic('all')}>
-              All
-            </Button>
-            {TOPICS.map((item) => (
-              <Button key={item.id} size="sm" variant={topic === item.id ? 'filled' : 'default'} onClick={() => setTopic(item.id)}>
-                {item.label}
-              </Button>
-            ))}
-          </Group>
-
-          {answers.length === 0 ? (
-            <Text>Nothing matches. Try onsen, train, or vegetarian.</Text>
-          ) : (
-            <Stack gap="sm">
-              {answers.map((answer) => {
-                const open = answer.id === shownId
-                return (
-                  <Card key={answer.id} withBorder padding="md" radius="md">
-                    <Stack gap="xs">
-                      <Text
-                        component="button"
-                        fw={600}
-                        ta="left"
-                        fz="lg"
-                        onClick={() => setOpenId(open ? null : answer.id)}
-                        aria-expanded={open}
-                        style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer' }}
-                      >
-                        {answer.question}
-                      </Text>
-                      {open ? (
-                        <Stack gap="xs">
-                          <Text>{answer.answer}</Text>
-                          <Text fw={600}>{answer.say}</Text>
-                        </Stack>
-                      ) : null}
-                    </Stack>
-                  </Card>
-                )
-              })}
-            </Stack>
-          )}
-
-          <Footer current="ask-japanese" />
-        </Stack>
-      </Container>
+        {answers.filter((answer) => answer.id !== shown?.id).slice(0, 4).map((answer) => (
+          <UnstyledButton
+            key={answer.id}
+            onClick={() => setOpenId(answer.id)}
+            bg="#f3ebe3"
+            bdrs="lg"
+            px="md"
+            py="sm"
+            fw={700}
+            ta="left"
+          >
+            {answer.question}
+          </UnstyledButton>
+        ))}
+        <Footer current="ask-japanese" />
+      </Stack>
     </Box>
   )
 }
