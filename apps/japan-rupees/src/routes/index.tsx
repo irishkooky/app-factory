@@ -13,126 +13,163 @@ const STYLES: { id: Style; label: string }[] = [
   { id: 'mid', label: 'Mid' },
   { id: 'comfort', label: 'Comfort' },
 ]
-const CITIES: CityId[] = ['tokyo', 'hakone', 'kyoto', 'nara', 'osaka', 'hiroshima', 'fukuoka']
-const BAR: Record<string, string> = {
-  flights: '#ff5a4e',
-  stay: '#d6f25a',
-  food: '#f2c14e',
-  local: '#7dcea0',
-  rail: '#8eb6ff',
-}
+const ORDER: CityId[] = ['tokyo', 'hakone', 'kyoto', 'nara', 'osaka', 'hiroshima', 'fukuoka']
 
 function rupees(value: number): string {
   return `₹${value.toLocaleString('en-IN')}`
-}
-
-function Pill({ on, children, onClick }: { on: boolean; children: string; onClick: () => void }) {
-  return (
-    <UnstyledButton
-      onClick={onClick}
-      aria-pressed={on}
-      px="sm"
-      py={8}
-      bdrs="xl"
-      bg={on ? '#d6f25a' : 'transparent'}
-      c={on ? '#10241c' : '#f6f3ea'}
-      bd={on ? '0' : '1.5px solid rgba(246,243,234,.45)'}
-      fw={700}
-    >
-      {children}
-    </UnstyledButton>
-  )
 }
 
 function HomeComponent() {
   const [days, setDays] = useState(7)
   const [style, setStyle] = useState<Style>('mid')
   const [cities, setCities] = useState<CityId[]>(['tokyo', 'kyoto', 'osaka'])
-  const [returnToTokyo, setReturnToTokyo] = useState(false)
-  const result = quoteTrip({ days, style, cities, returnToTokyo })
-  const max = result.ok ? Math.max(...result.quote.lines.map((line) => line.inr)) : 1
+  const [open, setOpen] = useState(false)
+  const result = quoteTrip({ days, style, cities, returnToTokyo: false })
+  const route = ORDER.filter((id) => cities.includes(id))
+  const spare = ORDER.filter((id) => !cities.includes(id))
 
   return (
-    <Box mih="100vh" bg="#10241c" c="#f6f3ea" px="md" py="lg">
-      <Stack gap="sm" maw={420} mx="auto">
-        <Text size="xs" fw={700} c="#d6f25a" style={{ letterSpacing: '0.16em' }}>
-          FROM BENGALURU
-        </Text>
+    <Box mih="100vh" bg="#10241c" px="md" py="sm" style={{ display: 'flex', flexDirection: 'column' }}>
+      <Text size="xs" c="#d6f25a" fw={700} style={{ letterSpacing: '0.18em' }}>
+        BOARDING PASS · BENGALURU
+      </Text>
+      <Box
+        mt="xs"
+        bg="#f7f1e4"
+        c="#1a140c"
+        bdrs={18}
+        px="md"
+        pt="md"
+        pb="sm"
+        pos="relative"
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', boxShadow: '0 16px 36px rgba(0,0,0,.28)' }}
+      >
         <Group justify="space-between" align="flex-end">
-          <Text fz={56} fw={750} lh={0.9}>
-            {result.ok ? rupees(result.quote.totalInr) : 'Pick a city'}
-          </Text>
-          <Stack gap={4}>
-            <UnstyledButton aria-label="More days" onClick={() => setDays((value) => Math.min(18, value + 1))} c="#d6f25a" fz={28} fw={700}>
-              +
-            </UnstyledButton>
-            <Text ta="center" fw={700}>{days}d</Text>
-            <UnstyledButton aria-label="Fewer days" onClick={() => setDays((value) => Math.max(3, value - 1))} c="#d6f25a" fz={28} fw={700}>
-              −
-            </UnstyledButton>
+          <Stack gap={0}>
+            <Text size="xs" c="#8a7368" fw={700} style={{ letterSpacing: '0.14em' }}>
+              FROM
+            </Text>
+            <Text fz={28} fw={750} lh={1}>
+              BLR
+            </Text>
+          </Stack>
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 13.2 22 4l-4.2 12.2-5.2-2.1L10 21l-2.1-6.2L2 13.2z" fill="#c4372f" />
+          </svg>
+          <Stack gap={0} align="flex-end">
+            <Text size="xs" c="#8a7368" fw={700} style={{ letterSpacing: '0.14em' }}>
+              TO
+            </Text>
+            <Text fz={28} fw={750} lh={1}>
+              JAPAN
+            </Text>
           </Stack>
         </Group>
-        <Text size="lg">{result.ok ? `${result.quote.nights} nights. One adult.` : 'Choose at least one city.'}</Text>
-
-        <Group gap={8}>
-          {STYLES.map((item) => (
-            <Pill key={item.id} on={style === item.id} onClick={() => setStyle(item.id)}>
-              {item.label}
-            </Pill>
-          ))}
-        </Group>
-        <Group gap={8}>
-          {CITIES.map((id) => (
-            <Pill
-              key={id}
-              on={cities.includes(id)}
-              onClick={() => setCities((current) => (current.includes(id) ? current.filter((city) => city !== id) : [...current, id]))}
+        <Text fz={46} fw={750} lh={1} mt="sm">
+          {result.ok ? rupees(result.quote.totalInr) : 'Add a city'}
+        </Text>
+        <Text size="sm" c="#5c5148">
+          {result.ok ? `One adult · ${days} days · ${result.quote.nights} nights · estimate` : 'Pick at least one city.'}
+        </Text>
+        <Stack gap={0} mt="md" style={{ flex: 1 }}>
+          {(result.ok ? result.quote.stays : route.map((id) => ({ id, label: CITY_LABEL[id], nights: 0, dayTrip: false }))).map((stay, index, list) => (
+            <UnstyledButton
+              key={stay.id}
+              onClick={() => setCities((current) => (current.length === 1 ? current : current.filter((city) => city !== stay.id)))}
+              style={{ flex: 1, display: 'flex' }}
             >
-              {CITY_LABEL[id]}
-            </Pill>
-          ))}
-          <Pill on={returnToTokyo} onClick={() => setReturnToTokyo((value) => !value)}>
-            Train back
-          </Pill>
-        </Group>
-
-        {result.ok && (
-          <Stack gap={8} mt={4}>
-            {result.quote.lines.map((line) => (
-              <Box key={line.id}>
-                <Group justify="space-between">
-                  <Text size="sm">{line.label}</Text>
-                  <Text size="sm" fw={700}>{rupees(line.inr)}</Text>
-                </Group>
-                <Box h={8} bg="#1e4634" bdrs={99} style={{ overflow: 'hidden' }}>
-                  <Box h="100%" w={`${Math.max(8, (line.inr / max) * 100)}%`} bg={BAR[line.id] ?? '#d6f25a'} />
+              <Group gap={12} wrap="nowrap" align="stretch" style={{ flex: 1 }}>
+                <Stack gap={0} align="center" w={16}>
+                  <Box w={10} h={10} bdrs={99} bg="#c4372f" mt={6} />
+                  {index < list.length - 1 && <Box w={2} bg="#e7d7c4" style={{ flex: 1 }} />}
+                </Stack>
+                <Box>
+                  <Text fw={750} fz={20} lh={1.1}>
+                    {stay.label}
+                  </Text>
+                  <Text size="sm" c="#8a7368">
+                    {stay.dayTrip ? 'Day trip' : `${stay.nights} ${stay.nights === 1 ? 'night' : 'nights'}`}
+                  </Text>
                 </Box>
-              </Box>
-            ))}
-            <Text size="sm" c="#d6f25a" fw={700}>
-              {result.quote.rail.passWins ? 'The rail pass is cheaper here.' : 'Buy the tickets, not the pass.'}
-            </Text>
-            <Text size="sm">
-              {result.quote.stays.map((stay) => (stay.dayTrip ? `${stay.label} by day` : `${stay.nights}n ${stay.label}`)).join(' → ')}
-            </Text>
-          </Stack>
+              </Group>
+            </UnstyledButton>
+          ))}
+        </Stack>
+        <Box my="xs" h={1} style={{ background: 'repeating-linear-gradient(90deg,#1a140c 0 7px,transparent 7px 13px)' }} />
+        <Box pos="absolute" left={-11} top="58%" w={22} h={22} bg="#10241c" bdrs={99} />
+        <Box pos="absolute" right={-11} top="58%" w={22} h={22} bg="#10241c" bdrs={99} />
+        <Group justify="space-between" wrap="nowrap">
+          {STYLES.map((item) => (
+            <UnstyledButton
+              key={item.id}
+              onClick={() => setStyle(item.id)}
+              px="sm"
+              py={6}
+              bdrs="xl"
+              bg={style === item.id ? '#1a140c' : 'transparent'}
+              c={style === item.id ? '#f7f1e4' : '#1a140c'}
+              bd="1px solid #1a140c"
+              fw={700}
+              style={{ flex: 1, textAlign: 'center' }}
+            >
+              {item.label}
+            </UnstyledButton>
+          ))}
+        </Group>
+        <Group justify="space-between" mt={8} wrap="nowrap">
+          <UnstyledButton onClick={() => setDays((value) => Math.max(3, value - 1))} aria-label="Fewer days" fw={700} px={8}>
+            −
+          </UnstyledButton>
+          <Text fw={750}>{days} days</Text>
+          <UnstyledButton onClick={() => setDays((value) => Math.min(18, value + 1))} aria-label="More days" fw={700} px={8}>
+            +
+          </UnstyledButton>
+        </Group>
+        <Text size="xs" c="#8a7368" mt={6}>
+          Add a stop
+        </Text>
+        <Group gap={12} mt={2}>
+          {spare.map((id) => (
+            <UnstyledButton key={id} onClick={() => setCities((current) => [...current, id])} fw={700} c="#1a140c">
+              + {CITY_LABEL[id]}
+            </UnstyledButton>
+          ))}
+        </Group>
+        {result.ok && (
+          <Text size="sm" mt={6} fw={600}>
+            {result.quote.rail.passWins ? 'Rail pass wins on this route.' : 'Point-to-point tickets are cheaper.'}
+          </Text>
         )}
-
-        <details>
-          <summary style={{ cursor: 'pointer', color: '#b7cbbf' }}>Estimate, vegetarian line, and the rate</summary>
-          {result.ok && (
-            <Stack gap={6} mt={8}>
-              <Text size="sm">{result.quote.veg[0]}</Text>
-              {result.quote.assumptions.map((line) => (
-                <Text key={line} size="xs" c="#b7cbbf">
-                  {line}
-                </Text>
-              ))}
-            </Stack>
-          )}
-        </details>
-        <Footer current="japan-rupees" light />
-      </Stack>
+        <Group gap={3} mt="sm" justify="center" aria-hidden="true">
+          {Array.from({ length: 28 }, (_, index) => (
+            <Box key={index} w={index % 4 === 0 ? 3 : 2} h={28} bg="#1a140c" />
+          ))}
+        </Group>
+      </Box>
+      <UnstyledButton mt={8} c="#b7cbbf" ta="left" onClick={() => setOpen((value) => !value)}>
+        {open ? 'Hide the breakdown' : 'The lines, the vegetarian phrase, the rate'}
+      </UnstyledButton>
+      {open && result.ok && (
+        <Stack gap={4} mt={6}>
+          {result.quote.lines.map((line) => (
+            <Group key={line.id} justify="space-between">
+              <Text size="sm" c="#f6f3ea">
+                {line.label}
+              </Text>
+              <Text size="sm" c="#f6f3ea" fw={700}>
+                {rupees(line.inr)}
+              </Text>
+            </Group>
+          ))}
+          <Text size="sm" c="#f6f3ea">
+            {result.quote.veg[0]}
+          </Text>
+          <Text size="xs" c="#b7cbbf">
+            {result.quote.assumptions[1]}
+          </Text>
+        </Stack>
+      )}
+      <Footer current="japan-rupees" light />
     </Box>
   )
 }

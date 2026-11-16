@@ -1,127 +1,142 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Anchor, Box, Group, SimpleGrid, Stack, Text } from '@mantine/core'
+import { Anchor, Box, Group, Stack, Text, UnstyledButton } from '@mantine/core'
 import { Footer } from '../footer'
-import { ANIME, type Anime } from '../domain'
+import { ANIME } from '../domain'
+import { PlaceScene } from '../scenes'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
 })
 
-const TONES: Record<string, string> = {
-  'your-name': '#12315c',
-  weathering: '#0e3b4c',
-  suzume: '#7d1d22',
-  'slam-dunk': '#14324a',
-  'demon-slayer': '#3d1a16',
+const SHORT: Record<string, string> = {
+  'your-name': 'Your Name',
+  weathering: 'Weathering',
+  suzume: 'Suzume',
+  'slam-dunk': 'Slam Dunk',
+  'demon-slayer': 'Demon Slayer',
 }
 
 function mapHref(query: string): string {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
-function Torii() {
+function pinFor(area: string): { x: number; y: number } {
+  if (area.includes('Kamakura') || area.includes('Shonan')) return { x: 46, y: 58 }
+  if (area.includes('Kobe')) return { x: 34, y: 66 }
+  if (area.includes('Hida') || area.includes('Gifu')) return { x: 40, y: 52 }
+  return { x: 46, y: 46 }
+}
+
+function JapanPin({ area }: { area: string }) {
+  const pin = pinFor(area)
   return (
-    <svg width="120" height="78" viewBox="0 0 120 78" aria-hidden="true">
-      <path d="M8 22h104M22 22v40M86 22v40" stroke="#e23b34" strokeWidth="8" fill="none" />
-      <path d="M14 10h92" stroke="#e23b34" strokeWidth="6" />
+    <svg width="52" height="68" viewBox="0 0 80 104" aria-hidden="true">
+      <ellipse cx="58" cy="14" rx="11" ry="8" fill="rgba(255,255,255,.92)" />
+      <path d="M54 22c-6 6-14 8-18 16-4 8-10 12-8 22 2 8 10 12 8 20-2 8-8 12-4 18 6 2 14-4 16-12 4-8 2-14 8-20 6-6 12-8 12-16 0-8-6-14-6-22 0-4-4-6-8-6z" fill="rgba(255,255,255,.92)" />
+      <ellipse cx="22" cy="86" rx="8" ry="9" fill="rgba(255,255,255,.92)" />
+      <circle cx={pin.x} cy={pin.y} r="4.5" fill="#e23b32" />
+      <circle cx={pin.x} cy={pin.y} r="8" fill="none" stroke="#e23b32" strokeWidth="1.6" />
     </svg>
   )
 }
 
-function FilmCard({ anime, active, onPick }: { anime: Anime; active: boolean; onPick: () => void }) {
-  return (
-    <Box
-      component="button"
-      onClick={onPick}
-      aria-pressed={active}
-      w="100%"
-      ta="left"
-      p="sm"
-      bdrs="lg"
-      bd={active ? '2px solid #f2c14e' : '0'}
-      bg={TONES[anime.id] ?? '#12315c'}
-      c="#f7f3ea"
-      style={{ cursor: 'pointer' }}
-    >
-      <Text size="xs" c="#f2c14e" fw={700} style={{ letterSpacing: '0.12em' }}>
-        {anime.year}
-      </Text>
-      <Text fz={18} fw={750} lh={1.1}>
-        {anime.title}
-      </Text>
-      <Text size="sm" c="rgba(247,243,234,.8)">
-        {anime.spots[0]?.name}
-      </Text>
-    </Box>
-  )
-}
-
 function HomeComponent() {
-  const [id, setId] = useState(ANIME[0]?.id ?? 'your-name')
+  const [filmId, setFilmId] = useState(ANIME[0]?.id ?? 'your-name')
+  const [spotIndex, setSpotIndex] = useState(0)
   const [open, setOpen] = useState(false)
-  const anime = ANIME.find((item) => item.id === id) ?? ANIME[0]
+  const anime = ANIME.find((item) => item.id === filmId) ?? ANIME[0]
   if (!anime) return null
+  const spot = anime.spots[Math.min(spotIndex, anime.spots.length - 1)] ?? anime.spots[0]
+  if (!spot) return null
 
   return (
-    <Box mih="100vh" bg="#f6f1e8" c="#14120f" px="md" py="lg">
-      <Stack gap="sm" maw={420} mx="auto">
-        <Text size="xs" tt="uppercase" fw={700} c="#b42318" style={{ letterSpacing: '0.16em' }}>
-          Real places only
-        </Text>
-        <Text fz={34} fw={750} lh={0.95}>
-          Where was it filmed?
-        </Text>
-
-        <Box bg={TONES[anime.id] ?? '#12315c'} c="#f7f3ea" bdrs={24} p="lg" pos="relative" style={{ overflow: 'hidden', minHeight: 210 }}>
-          <Box pos="absolute" right={12} bottom={8} style={{ opacity: 0.95 }}>
-            <Torii />
-          </Box>
-          <Text size="xs" c="#f2c14e" fw={700} style={{ letterSpacing: '0.14em' }}>
-            {anime.title.toUpperCase()}
-          </Text>
-          <Text fz={28} fw={750} lh={1.05} maw={230} mt={6}>
-            {anime.spots[0]?.name}
-          </Text>
-          <Text size="sm" mt={6} c="rgba(247,243,234,.82)">
-            {anime.spots[0]?.area}
+    <Box h="100vh" pos="relative" style={{ overflow: 'hidden' }} bg="#101820">
+      <Box pos="absolute" inset={0}>
+        <PlaceScene name={spot.name} />
+      </Box>
+      <Stack gap={0} pos="absolute" top={12} left={12}>
+        <JapanPin area={spot.area} />
+        <Box bg="rgba(255,255,255,.88)" px={6} py={2} bdrs="sm" mt={2}>
+          <Text size="xs" fw={700} c="#142033" style={{ letterSpacing: '0.08em' }}>
+            {spot.area.split(',')[0]?.toUpperCase()}
           </Text>
         </Box>
-
-        <SimpleGrid cols={2} spacing={8}>
-          {ANIME.filter((item) => item.id !== anime.id).map((item) => (
-            <FilmCard key={item.id} anime={item} active={false} onPick={() => { setId(item.id); setOpen(false) }} />
-          ))}
-        </SimpleGrid>
-
-        <Group gap={8}>
-          {anime.spots.map((spot, index) => (
-            <Anchor key={spot.name} href={mapHref(spot.mapsQuery)} target="_blank" rel="noreferrer" underline="never">
-              <Box bg="#fff" bdrs="xl" px="sm" py={8} bd="1.5px solid #1a120f">
-                <Text size="xs" c="#b42318" fw={700}>
-                  {index + 1}
-                </Text>
-                <Text size="sm" fw={700} c="#1a120f">
-                  {spot.name}
-                </Text>
-              </Box>
-            </Anchor>
-          ))}
-        </Group>
-        <details open={open} onToggle={(event) => setOpen((event.target as HTMLDetailsElement).open)}>
-          <summary style={{ cursor: 'pointer', color: '#8a7368' }}>Trains, manners, and why each stop counts</summary>
-          <Stack gap={6} mt={8}>
-            <Text size="sm">{anime.route}</Text>
-            {anime.spots.map((spot) => (
-              <Text key={spot.name} size="sm">
-                <b>{spot.name}.</b> {spot.why} {spot.access} {spot.manners}
-              </Text>
-            ))}
-            <Text size="sm">{anime.blurb}</Text>
-          </Stack>
-        </details>
-        <Footer current="anime-pilgrimage" />
       </Stack>
+      <Group gap={6} pos="absolute" top={16} right={14}>
+        {anime.spots.map((item, index) => (
+          <UnstyledButton
+            key={item.name}
+            aria-label={`Stop ${index + 1}, ${item.name}`}
+            onClick={() => setSpotIndex(index)}
+            w={10}
+            h={10}
+            bdrs={99}
+            bg={index === spotIndex ? '#f2c14e' : 'rgba(255,255,255,.75)'}
+          />
+        ))}
+      </Group>
+      <Box
+        pos="absolute"
+        left={0}
+        right={0}
+        bottom={0}
+        px="md"
+        pt={72}
+        pb="sm"
+        style={{ background: 'linear-gradient(transparent, rgba(8,12,18,.55) 18%, rgba(8,12,18,.92))' }}
+      >
+        <Text size="xs" c="#f2c14e" fw={700} style={{ letterSpacing: '0.16em' }}>
+          {anime.title.toUpperCase()}
+        </Text>
+        <Text fz={30} fw={750} lh={1.05} c="#fff">
+          {spot.name}
+        </Text>
+        <Text c="rgba(255,255,255,.82)" mb="xs">
+          {spot.area}
+        </Text>
+        <Anchor href={mapHref(spot.mapsQuery)} target="_blank" rel="noreferrer" fw={700} c="#f2c14e" underline="never">
+          Open this place in Maps
+        </Anchor>
+        <Group gap={10} mt="sm">
+          {ANIME.map((item) => {
+            const on = item.id === anime.id
+            return (
+              <UnstyledButton
+                key={item.id}
+                onClick={() => {
+                  setFilmId(item.id)
+                  setSpotIndex(0)
+                  setOpen(false)
+                }}
+                aria-pressed={on}
+                c={on ? '#f2c14e' : 'rgba(255,255,255,.78)'}
+                fw={700}
+                style={{ flex: '0 0 auto', borderBottom: on ? '2px solid #f2c14e' : '2px solid transparent', paddingBottom: 4 }}
+              >
+                {SHORT[item.id] ?? item.title}
+              </UnstyledButton>
+            )
+          })}
+        </Group>
+        <UnstyledButton mt={8} c="rgba(255,255,255,.72)" onClick={() => setOpen((value) => !value)}>
+          {open ? 'Hide the walk' : 'Train, manners, and the rest of the walk'}
+        </UnstyledButton>
+        {open && (
+          <Stack gap={4} mt={6}>
+            <Text size="sm" c="#fff">
+              {spot.why}
+            </Text>
+            <Text size="sm" c="rgba(255,255,255,.86)">
+              {spot.access}
+            </Text>
+            <Text size="sm" c="rgba(255,255,255,.86)">
+              {spot.manners}
+            </Text>
+          </Stack>
+        )}
+        <Footer current="anime-pilgrimage" light />
+      </Box>
     </Box>
   )
 }
