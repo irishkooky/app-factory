@@ -92,13 +92,13 @@ function HomeComponent() {
         <Text size="xs" tt="uppercase" fw={700} c="#b42318" style={{ letterSpacing: '0.16em' }}>
           A seal, not a translation
         </Text>
-        <Group justify="space-between" align="flex-end" wrap="nowrap">
-          <Text fz={40} fw={750} lh={0.95}>
+        <Group justify="space-between" align="flex-end" wrap="nowrap" gap={8}>
+          <Text fz={34} fw={750} lh={0.95} style={{ minWidth: 0 }}>
             Stamp
             <br />
             your name
           </Text>
-          <Box key={press} w={168} h={168} style={{ animation: 'press .48s cubic-bezier(.2,1.4,.4,1)', flex: '0 0 auto' }} dangerouslySetInnerHTML={{ __html: sealMarkup(chars) }} />
+          <Box key={press} w={132} h={132} style={{ animation: 'press .48s cubic-bezier(.2,1.4,.4,1)', flex: '0 0 132px' }} dangerouslySetInnerHTML={{ __html: sealMarkup(chars) }} />
         </Group>
 
         <TextInput
