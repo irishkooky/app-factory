@@ -178,4 +178,28 @@ export const META: Record<string, AppMeta> = {
     category: 'game',
     tags: ['AI', 'リアルタイム', 'Convex'],
   },
+  'kanji-name': {
+    title: '漢字ネームメーカー',
+    description: 'ラテン文字の名前を、カタカナと遊びの当て字、ダウンロードできるハンコにする。正しい氏名ではない。',
+    category: 'tool',
+    tags: ['日本', '名前', '英語'],
+  },
+  'anime-pilgrimage': {
+    title: 'アニメ聖地マップ',
+    description: '君の名は、天気の子、すずめ、スラムダンク、鬼滅の刃の、実在する場所と行き方だけを載せる。',
+    category: 'tool',
+    tags: ['日本', 'アニメ', '英語'],
+  },
+  'japan-rupees': {
+    title: '日本旅行をルピーで',
+    description: '日数と都市から、インドからの日本旅行の見積もりをルピーで出す。為替の日付と前提を表示する。',
+    category: 'tool',
+    tags: ['日本', '旅行', '英語'],
+  },
+  'ask-japanese': {
+    title: '日本人に聞いてみた',
+    description: 'チップ、温泉、電車、菜食、マナー。インドからの旅行者が聞くことに、東京の開発者が答える。',
+    category: 'tool',
+    tags: ['日本', '旅行', '英語'],
+  },
 }
