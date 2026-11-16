@@ -71,7 +71,30 @@ jobs:
             echo "::group::$app"
             log="$RUNNER_TEMP/$app.log"
             url=""
-            if (cd "apps/$app" && vp run build && vp exec wrangler versions upload --preview-alias "$alias" --message "PR #$PR_NUMBER") >"$log" 2>&1; then
+            if grep -q '"previews"' "apps/$app/wrangler.jsonc"; then
+              echo "previews ブロックがあるので wrangler preview で更新する"
+              if (cd "apps/$app" && vp run build && npx --yes wrangler@4.163.0 preview --name "$alias" --message "PR #$PR_NUMBER" --json) >"$log" 2>&1; then
+                url=$(node -e '
+                  const fs = require("fs")
+                  const text = fs.readFileSync(process.argv[1], "utf8")
+                  const starts = []
+                  for (let i = 0; i < text.length; i++) {
+                    if (text[i] === "{" && (i === 0 || text[i - 1] === "\n")) starts.push(i)
+                  }
+                  for (let i = starts.length - 1; i >= 0; i--) {
+                    try {
+                      const data = JSON.parse(text.slice(starts[i]))
+                      const found = data?.preview?.urls?.[0] || data?.deployment?.urls?.[0]
+                      if (found) {
+                        process.stdout.write(found)
+                        process.exit(0)
+                      }
+                    } catch {}
+                  }
+                  process.exit(1)
+                ' "$log") || url=""
+              fi
+            elif (cd "apps/$app" && vp run build && vp exec wrangler versions upload --preview-alias "$alias" --message "PR #$PR_NUMBER") >"$log" 2>&1; then
               url=$(grep -oE "https://$alias-[a-z0-9.-]+\\.workers\\.dev" "$log" | head -1)
             elif grep -q "does not yet exist" "$log"; then
               echo "Worker が未作成なので wrangler preview でプレビューだけ作る"
