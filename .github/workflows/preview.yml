@@ -1,5 +1,5 @@
-# PR で変更されたアプリをビルドし、本番に出さずに Worker のバージョンだけを上げて
-# プレビュー URL（https://pr-<番号>-<worker名>.ichigoooo.workers.dev）を PR にコメントする。
+# PR で変更されたアプリをビルドし、本番の wrangler deploy はせずにプレビュー URL を PR にコメントする。
+# 既存 Worker は versions upload。未作成の Worker は wrangler preview（4.163）で作る。
 # Convex を使うアプリ（convex/ を持つもの）はデプロイキーが要るので対象外。
 name: preview
 
@@ -69,11 +69,62 @@ jobs:
           status=0
           for app in ${{ steps.apps.outputs.list }}; do
             echo "::group::$app"
-            if (cd "apps/$app" && vp run build && vp exec wrangler versions upload --preview-alias "$alias" --message "PR #$PR_NUMBER" 2>&1 | tee "$RUNNER_TEMP/$app.log"); then
-              url=$(grep -oE "https://$alias-[a-z0-9.-]+\.workers\.dev" "$RUNNER_TEMP/$app.log" | head -1)
-              echo "| $app | ${url:-（URL を取得できませんでした）} |" >> "$RUNNER_TEMP/rows.md"
+            log="$RUNNER_TEMP/$app.log"
+            url=""
+            if grep -q '"previews"' "apps/$app/wrangler.jsonc"; then
+              echo "previews ブロックがあるので wrangler preview で更新する"
+              if (cd "apps/$app" && vp run build && npx --yes wrangler@4.163.0 preview --name "$alias" --message "PR #$PR_NUMBER" --json) >"$log" 2>&1; then
+                url=$(node -e '
+                  const fs = require("fs")
+                  const text = fs.readFileSync(process.argv[1], "utf8")
+                  const starts = []
+                  for (let i = 0; i < text.length; i++) {
+                    if (text[i] === "{" && (i === 0 || text[i - 1] === "\n")) starts.push(i)
+                  }
+                  for (let i = starts.length - 1; i >= 0; i--) {
+                    try {
+                      const data = JSON.parse(text.slice(starts[i]))
+                      const found = data?.preview?.urls?.[0] || data?.deployment?.urls?.[0]
+                      if (found) {
+                        process.stdout.write(found)
+                        process.exit(0)
+                      }
+                    } catch {}
+                  }
+                  process.exit(1)
+                ' "$log") || url=""
+              fi
+            elif (cd "apps/$app" && vp run build && vp exec wrangler versions upload --preview-alias "$alias" --message "PR #$PR_NUMBER") >"$log" 2>&1; then
+              url=$(grep -oE "https://$alias-[a-z0-9.-]+\\.workers\\.dev" "$log" | head -1)
+            elif grep -q "does not yet exist" "$log"; then
+              echo "Worker が未作成なので wrangler preview でプレビューだけ作る"
+              if (cd "apps/$app" && npx --yes wrangler@4.163.0 preview --name "$alias" --message "PR #$PR_NUMBER" --json) >"$log" 2>&1; then
+                url=$(node -e '
+                  const fs = require("fs")
+                  const text = fs.readFileSync(process.argv[1], "utf8")
+                  const starts = []
+                  for (let i = 0; i < text.length; i++) {
+                    if (text[i] === "{" && (i === 0 || text[i - 1] === "\n")) starts.push(i)
+                  }
+                  for (let i = starts.length - 1; i >= 0; i--) {
+                    try {
+                      const data = JSON.parse(text.slice(starts[i]))
+                      const found = data?.preview?.urls?.[0]
+                      if (found) {
+                        process.stdout.write(found)
+                        process.exit(0)
+                      }
+                    } catch {}
+                  }
+                  process.exit(1)
+                ' "$log") || url=""
+              fi
+            fi
+            cat "$log"
+            if [ -n "$url" ]; then
+              echo "| $app | $url |" >> "$RUNNER_TEMP/rows.md"
             else
-              echo "| $app | ビルドかアップロードに失敗しました |" >> "$RUNNER_TEMP/rows.md"
+              echo "| $app | プレビューの作成に失敗しました |" >> "$RUNNER_TEMP/rows.md"
               status=1
             fi
             echo "::endgroup::"
