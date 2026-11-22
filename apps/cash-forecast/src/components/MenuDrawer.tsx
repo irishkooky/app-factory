@@ -7,8 +7,8 @@ type MenuDrawerProps = {
   onReconcile: () => void
   onRules: () => void
   onThreshold: () => void
-  onMonthlySummary: () => void
   onPastMonths: () => void
+  onMonthlySummary: () => void
   onForecastCheck: () => void
   onPdfImport: () => void
 }
@@ -19,8 +19,8 @@ export function MenuDrawer({
   onReconcile,
   onRules,
   onThreshold,
-  onMonthlySummary,
   onPastMonths,
+  onMonthlySummary,
   onForecastCheck,
   onPdfImport,
 }: MenuDrawerProps) {
