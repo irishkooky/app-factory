@@ -94,7 +94,7 @@ test.describe('Clerk authenticated shell', () => {
       await expect(forecastTitle).toBeVisible({ timeout: 45_000 })
     }
 
-    // Pro plan (ensure-e2e-pro) unlocks chart + checkpoint panels.
+    // Pro plan (ensure-e2e-pro) unlocks chart + forecast-check panels.
     const proBadge = page.getByText('Pro', { exact: true })
     const freeBadge = page.getByText('Free', { exact: true })
     await expect
@@ -110,51 +110,35 @@ test.describe('Clerk authenticated shell', () => {
     const tmpForecast = path.join(artifactsDir, '_tmp-forecast.png')
     await page.screenshot({ path: tmpForecast, fullPage: true })
     saveShot('02-forecast-shell.png', tmpForecast)
-    saveShot('05-checkpoints-shell.png', tmpForecast)
+    await expect(page.getByText('予測チェックポイント')).toHaveCount(0)
 
-    // Open checkpoint detail when the summary card is unlocked.
-    const checkpointHeading = page.getByRole('heading', { name: '予測チェックポイント' }).or(
-      page.getByText('予測チェックポイント', { exact: true }),
-    )
-    const checkpointOpeners = page.getByRole('button', { name: /予測チェックポイント|詳細/ })
-    if ((await checkpointOpeners.count()) > 0) {
-      try {
-        await checkpointOpeners.first().click({ timeout: 5_000 })
-        await page.waitForTimeout(800)
-        // Empty state: start a series so the drawer shows observations/chart.
-        const startSeries = page.getByRole('button', { name: /今すぐシリーズを開始|新しいシリーズを手動開始/ })
-        if ((await startSeries.count()) > 0) {
-          await startSeries.first().click({ timeout: 5_000 })
-          await page.waitForTimeout(1_500)
-        }
-        const tmpCp = path.join(artifactsDir, '_tmp-checkpoints.png')
-        await page.screenshot({ path: tmpCp, fullPage: true })
-        saveShot('06-checkpoints-drawer.png', tmpCp)
-      } catch {
-        // Shell Pro shot is enough if drawer affordance differs.
-      }
-    }
-
-    // Best-effort: open app menu (billing / checkpoint entries live here).
+    // 予測の答え合わせ lives only in the menu.
     const menu = page.getByRole('button', { name: 'メニュー' })
-    if ((await menu.count()) > 0) {
-      try {
-        // Close checkpoint drawer if still open (Escape / close trigger).
-        await page.keyboard.press('Escape')
-        await page.waitForTimeout(400)
-        const closeTrigger = page.locator('[data-slot="close-trigger"], [aria-label="Close"], button[aria-label="閉じる"]')
-        if ((await closeTrigger.count()) > 0) {
-          await closeTrigger.first().click({ timeout: 2_000 }).catch(() => {})
-          await page.waitForTimeout(300)
-        }
-        await menu.click({ timeout: 5_000, force: true })
-        await page.waitForTimeout(600)
-        const tmpMenu = path.join(artifactsDir, '_tmp-menu.png')
-        await page.screenshot({ path: tmpMenu, fullPage: true })
-        saveShot('03-authenticated-menu.png', tmpMenu)
-      } catch {
-        // Menu affordance varies; shell shot is enough proof of auth.
-      }
+    await menu.click({ timeout: 5_000 })
+    const forecastCheckEntry = page.getByRole('button', { name: '予測の答え合わせ' })
+    await expect(forecastCheckEntry).toBeVisible()
+    await page.waitForTimeout(600)
+    const tmpMenu = path.join(artifactsDir, '_tmp-menu.png')
+    await page.screenshot({ path: tmpMenu, fullPage: true })
+    saveShot('03-authenticated-menu.png', tmpMenu)
+
+    await forecastCheckEntry.click()
+    await expect(page.getByRole('heading', { name: '予測の答え合わせ' })).toBeVisible()
+    await expect(
+      page.getByText(/^最初の記録は .+ です$/).or(page.getByText(/月末の残高$/)),
+    ).toBeVisible()
+    await page.waitForTimeout(500)
+    const tmpCheck = path.join(artifactsDir, '_tmp-forecast-check.png')
+    await page.screenshot({ path: tmpCheck, fullPage: true })
+    saveShot('05-forecast-check-drawer.png', tmpCheck)
+
+    const next = page.getByRole('button', { name: '次の日付' })
+    if ((await next.count()) > 0 && (await next.isEnabled())) {
+      await next.click()
+      await page.waitForTimeout(500)
+      const tmpNext = path.join(artifactsDir, '_tmp-forecast-check-next.png')
+      await page.screenshot({ path: tmpNext, fullPage: true })
+      saveShot('06-forecast-check-next.png', tmpNext)
     }
 
     // Record what we proved for the coordinator.
@@ -167,7 +151,7 @@ test.describe('Clerk authenticated shell', () => {
       plan: isPro ? 'pro' : 'free',
       bodyPreview: bodyText,
       notes: isPro
-        ? 'Pro plan unlocked; checkpoint shell/drawer screenshots attempted (05/06).'
+        ? 'Pro plan unlocked; 予測の答え合わせ drawer captured (05, plus 06 when a next date exists).'
         : 'Signed-in shell captured but Free plan — run e2e:clerk-pro before screenshots.',
     }
     const { writeFileSync } = await import('node:fs')

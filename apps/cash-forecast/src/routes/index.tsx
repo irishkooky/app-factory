@@ -20,8 +20,7 @@ import { HistoryEditDrawer } from '../components/HistoryEditDrawer'
 import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
-import { CheckpointSummaryCard } from '../components/CheckpointSummaryCard'
-import { CheckpointDrawer } from '../components/CheckpointDrawer'
+import { ForecastCheckDrawer } from '../components/ForecastCheckDrawer'
 import { BalanceChart } from '../components/BalanceChart'
 import { MenuDrawer } from '../components/MenuDrawer'
 import { PdfImportDrawer } from '../components/PdfImportDrawer'
@@ -117,8 +116,6 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const transactions = useQuery(api.transactions.listAfter, { after: settings.anchorDate })
   const rules = useQuery(api.rules.list)
   const historyTxs = useQuery(api.transactions.listHistory)
-  const checkpointSeries = useQuery(api.checkpoints.listForUser)
-  const ensureCheckpoints = useMutation(api.checkpoints.ensure)
 
   const [txDrawerOpen, setTxDrawerOpen] = useState(false)
   const [txDrawerTarget, setTxDrawerTarget] = useState<ForecastRow | null>(null)
@@ -129,15 +126,9 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [rulesPreset, setRulesPreset] = useState<RulePreset | null>(null)
   const [thresholdOpen, setThresholdOpen] = useState(false)
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
-  const [checkpointOpen, setCheckpointOpen] = useState(false)
+  const [forecastCheckOpen, setForecastCheckOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [pdfImportOpen, setPdfImportOpen] = useState(false)
-
-  useEffect(() => {
-    void ensureCheckpoints({ today }).catch(() => {
-      // 補完失敗は画面を止めない（次回起動・cron で再試行）
-    })
-  }, [ensureCheckpoints, today])
 
   const existingImportKeys = useMemo(() => {
     const keys = new Set<string>()
@@ -245,11 +236,6 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         <BalanceChart points={balancePoints} threshold={settings.threshold} today={today} />
       </ProGate>
 
-      <CheckpointSummaryCard
-        series={checkpointSeries}
-        onOpenDetail={() => setCheckpointOpen(true)}
-      />
-
       <ForecastList
         rows={forecast}
         today={today}
@@ -320,10 +306,10 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         threshold={settings.threshold}
       />
 
-      <CheckpointDrawer
-        opened={checkpointOpen}
-        onClose={() => setCheckpointOpen(false)}
-        series={checkpointSeries}
+      <ForecastCheckDrawer
+        opened={forecastCheckOpen}
+        onClose={() => setForecastCheckOpen(false)}
+        today={today}
       />
 
       <ThresholdDrawer
@@ -339,7 +325,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onRules={() => { setMenuOpen(false); setRulesPreset(null); setRulesOpen(true) }}
         onThreshold={() => { setMenuOpen(false); setThresholdOpen(true) }}
         onMonthlySummary={() => { setMenuOpen(false); setMonthlySummaryOpen(true) }}
-        onCheckpoints={() => { setMenuOpen(false); setCheckpointOpen(true) }}
+        onForecastCheck={() => { setMenuOpen(false); setForecastCheckOpen(true) }}
         onPdfImport={() => { setMenuOpen(false); setPdfImportOpen(true) }}
       />
 

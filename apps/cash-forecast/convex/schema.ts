@@ -58,35 +58,16 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_customer", ["stripeCustomerId"]),
 
-  // 予測チェックポイント: 固定ターゲット日に向けた予測の四半期スナップショット。
-  forecastSeries: defineTable({
+  // 予測の答え合わせ: 四半期末ごとに1件。その日の残高と、1〜4四半期先の四半期末の予測残高。
+  forecastSnapshots: defineTable({
     userId: v.string(),
-    startedAt: v.string(), // "YYYY-MM-DD"
-    targetDate: v.string(), // startedAt のちょうど1年後
-    status: v.union(v.literal("in_progress"), v.literal("reached")),
-    source: v.union(v.literal("quarter"), v.literal("manual")),
-  })
-    .index("by_user", ["userId"])
-    .index("by_user_status", ["userId", "status"])
-    .index("by_user_started", ["userId", "startedAt"]),
-
-  forecastObservations: defineTable({
-    userId: v.string(),
-    seriesId: v.id("forecastSeries"),
-    slot: v.union(
-      v.literal("m0"),
-      v.literal("m3"),
-      v.literal("m6"),
-      v.literal("m9"),
-      v.literal("actual"),
+    takenOn: v.string(), // 四半期末 "YYYY-MM-DD"（JST）
+    balance: v.number(), // takenOn 時点の残高（メイン画面の「今日時点の残高」と同じ計算）
+    predictions: v.array(
+      v.object({
+        date: v.string(), // 予測先の四半期末
+        balance: v.number(),
+      }),
     ),
-    dueDate: v.string(),
-    observedAt: v.string(),
-    predictedBalanceAtTarget: v.number(),
-    balanceToday: v.number(),
-    kind: v.union(v.literal("forecast"), v.literal("actual")),
-  })
-    .index("by_series_slot", ["seriesId", "slot"])
-    .index("by_series", ["seriesId"])
-    .index("by_user", ["userId"]),
+  }).index("by_user_taken", ["userId", "takenOn"]),
 });

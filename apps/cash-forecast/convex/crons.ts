@@ -3,11 +3,11 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-// 毎日 15:17 UTC ≒ JST 翌0:17。四半期開始日と観測日の取りこぼしを cron 側で拾う。
+// 毎日 14:50 UTC = JST 23:50。JST の日付が四半期末の日だけ、その日の入力を反映した残高と予測を記録する。
 crons.daily(
-  "forecast checkpoints",
-  { hourUTC: 15, minuteUTC: 17 },
-  internal.checkpoints.runDaily,
+  "forecast snapshots",
+  { hourUTC: 14, minuteUTC: 50 },
+  internal.forecastSnapshots.recordQuarterEnd,
 );
 
 export default crons;
