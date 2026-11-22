@@ -20,6 +20,7 @@ import { HistoryEditDrawer } from '../components/HistoryEditDrawer'
 import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
+import { PastMonthsDrawer } from '../components/PastMonthsDrawer'
 import { ForecastCheckDrawer } from '../components/ForecastCheckDrawer'
 import { BalanceChart } from '../components/BalanceChart'
 import { MenuDrawer } from '../components/MenuDrawer'
@@ -126,6 +127,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [rulesPreset, setRulesPreset] = useState<RulePreset | null>(null)
   const [thresholdOpen, setThresholdOpen] = useState(false)
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
+  const [pastMonthsOpen, setPastMonthsOpen] = useState(false)
   const [forecastCheckOpen, setForecastCheckOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [pdfImportOpen, setPdfImportOpen] = useState(false)
@@ -245,11 +247,6 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
           setTxDrawerTarget(row)
           setTxDrawerOpen(true)
         }}
-        historyRows={historyRows}
-        onHistoryRowClick={(row) => {
-          setHistoryDrawerTarget(row)
-          setHistoryDrawerOpen(true)
-        }}
         onTodayClick={() => setReconcileOpen(true)}
       />
 
@@ -306,6 +303,18 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         threshold={settings.threshold}
       />
 
+      <PastMonthsDrawer
+        opened={pastMonthsOpen}
+        onClose={() => setPastMonthsOpen(false)}
+        historyRows={historyRows}
+        today={today}
+        onHistoryRowClick={(row) => {
+          setPastMonthsOpen(false)
+          setHistoryDrawerTarget(row)
+          setHistoryDrawerOpen(true)
+        }}
+      />
+
       <ForecastCheckDrawer
         opened={forecastCheckOpen}
         onClose={() => setForecastCheckOpen(false)}
@@ -324,6 +333,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onReconcile={() => { setMenuOpen(false); setReconcileOpen(true) }}
         onRules={() => { setMenuOpen(false); setRulesPreset(null); setRulesOpen(true) }}
         onThreshold={() => { setMenuOpen(false); setThresholdOpen(true) }}
+        onPastMonths={() => { setMenuOpen(false); setPastMonthsOpen(true) }}
         onMonthlySummary={() => { setMenuOpen(false); setMonthlySummaryOpen(true) }}
         onForecastCheck={() => { setMenuOpen(false); setForecastCheckOpen(true) }}
         onPdfImport={() => { setMenuOpen(false); setPdfImportOpen(true) }}
