@@ -8,6 +8,7 @@ type MenuDrawerProps = {
   onRules: () => void
   onThreshold: () => void
   onMonthlySummary: () => void
+  onPastMonths: () => void
   onForecastCheck: () => void
   onPdfImport: () => void
 }
@@ -19,6 +20,7 @@ export function MenuDrawer({
   onRules,
   onThreshold,
   onMonthlySummary,
+  onPastMonths,
   onForecastCheck,
   onPdfImport,
 }: MenuDrawerProps) {
@@ -36,6 +38,7 @@ export function MenuDrawer({
               <Button variant="secondary" onPress={onRules}>ルール管理</Button>
               <Button variant="secondary" onPress={onPdfImport}>PDFから取り込む</Button>
               <Button variant="secondary" onPress={onThreshold}>しきい値</Button>
+              <Button variant="secondary" onPress={onPastMonths}>過去の月</Button>
               <Button variant="secondary" onPress={onMonthlySummary}>月次サマリー</Button>
               <Button variant="secondary" onPress={onForecastCheck}>予測の答え合わせ</Button>
               <Separator className="my-1" />

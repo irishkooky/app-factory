@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Chip, Separator } from '@heroui/react'
-import { IconChevronRight } from '@tabler/icons-react'
 import type { ForecastRow } from '../lib/forecast'
 import type { HistoryRow } from '../lib/history'
-import { buildForecastListItems, type CurrentPosition, type PastGroupItem } from '../lib/forecastList'
-import { formatDateShort, formatMonthLabel, monthOf } from '../lib/date'
+import { buildForecastListItems, type CurrentPosition } from '../lib/forecastList'
+import { formatDateShort, formatMonthLabel } from '../lib/date'
 import { formatYen } from '../lib/money'
 import { KindYen, NetYen, kindTone, netTone } from './Amount'
 import { summarizeByMonth, type MonthSummary } from '../lib/summary'
@@ -15,8 +14,6 @@ type ForecastListProps = {
   anchorDate: string
   anchorBalance: number
   onRowClick: (row: ForecastRow) => void
-  historyRows?: HistoryRow[]
-  onHistoryRowClick?: (row: HistoryRow) => void
   onTodayClick?: () => void
 }
 
@@ -26,8 +23,6 @@ export function ForecastList({
   anchorDate,
   anchorBalance,
   onRowClick,
-  historyRows,
-  onHistoryRowClick,
   onTodayClick,
 }: ForecastListProps) {
   const items = buildForecastListItems({ rows, today, anchorDate, anchorBalance })
@@ -36,7 +31,7 @@ export function ForecastList({
     [rows],
   )
 
-  if (rows.length === 0 && (historyRows?.length ?? 0) === 0) {
+  if (rows.length === 0) {
     return (
       <p className="py-8 text-center text-muted">
         毎月の予定や取引を登録すると、ここに12ヶ月分の予測が並びます。
@@ -46,9 +41,6 @@ export function ForecastList({
 
   return (
     <div className="flex flex-col">
-      {historyRows && historyRows.length > 0 && (
-        <HistorySection rows={historyRows} onRowClick={onHistoryRowClick} />
-      )}
       {items.map((item) => {
         if (item.type === 'month') {
           const summary = monthSummaries.get(item.month)
@@ -61,9 +53,6 @@ export function ForecastList({
         }
         if (item.type === 'today') {
           return <TodayMarker key={item.key} today={item.today} position={item.position} onClick={onTodayClick} />
-        }
-        if (item.type === 'past') {
-          return <PastSection key={item.key} group={item} today={today} onRowClick={onRowClick} />
         }
         return (
           <ForecastListRow
@@ -79,81 +68,9 @@ export function ForecastList({
   )
 }
 
-// 実績（過去の確定済み入出金）を月ごとの折りたたみセクションで表示する。デフォルトは全月折りたたみ。
-function HistorySection({
-  rows,
-  onRowClick,
-}: {
-  rows: HistoryRow[]
-  onRowClick?: (row: HistoryRow) => void
-}) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-
-  const monthGroups = useMemo(() => {
-    const rowsByMonth = new Map<string, HistoryRow[]>()
-    for (const row of rows) {
-      const month = monthOf(row.date)
-      const monthRows = rowsByMonth.get(month)
-      if (monthRows) monthRows.push(row)
-      else rowsByMonth.set(month, [row])
-    }
-    return summarizeByMonth(rows).map((summary) => ({ summary, rows: rowsByMonth.get(summary.month) ?? [] }))
-  }, [rows])
-
-  const toggle = (month: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(month)) {
-        next.delete(month)
-      } else {
-        next.add(month)
-      }
-      return next
-    })
-  }
-
+export function HistoryListRow({ row, onClick }: { row: HistoryRow; onClick: () => void }) {
   return (
-    <div className="flex flex-col">
-      {monthGroups.map(({ summary, rows: monthRows }) => {
-        const { month } = summary
-        const isOpen = expanded.has(month)
-        return (
-          <div key={month} className="flex flex-col">
-            <button
-              type="button"
-              onClick={() => toggle(month)}
-              className="flex items-center gap-1.5 rounded-md px-1 py-1.5 text-left"
-            >
-              <IconChevronRight
-                size={14}
-                className={`shrink-0 text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`}
-              />
-              <span className="text-sm font-medium">{formatMonthLabel(month)}</span>
-              <span className="text-sm text-muted">実績 {monthRows.length}件</span>
-              <NetLabel net={summary.net} />
-            </button>
-            {isOpen && (
-              <div className="flex flex-col">
-                {monthRows.map((row) => (
-                  <HistoryListRow key={row.txId} row={row} onClick={onRowClick ? () => onRowClick(row) : undefined} />
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function HistoryListRow({ row, onClick }: { row: HistoryRow; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!onClick}
-      className="rounded-md px-3 py-2 text-left opacity-70"
-    >
+    <button type="button" onClick={onClick} className="rounded-md border-l-2 border-transparent px-3 py-2 text-left">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
           <span className="w-10 shrink-0 text-sm text-muted">{formatDateShort(row.date)}</span>
@@ -225,50 +142,7 @@ function TodayMarker({
   )
 }
 
-// 「今日より前」の予測行の折りたたみ。既定は閉。現在残高は今日マーカーが示すので、
-// 畳んでも情報は失われない。要確認の件数だけはヘッダーに出して操作待ちを見えるままにする。
-function PastSection({
-  group,
-  today,
-  onRowClick,
-}: {
-  group: PastGroupItem
-  today: string
-  onRowClick: (row: ForecastRow) => void
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="flex flex-col">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 rounded-md px-1 py-1.5 text-left"
-      >
-        <IconChevronRight
-          size={14}
-          className={`shrink-0 text-muted transition-transform ${open ? 'rotate-90' : ''}`}
-        />
-        <span className="text-sm font-medium">今日より前</span>
-        <span className="text-sm text-muted">{group.rows.length}件</span>
-        <NetLabel net={group.net} />
-        {group.reviewCount > 0 && (
-          <Chip size="sm" variant="soft" color="warning" className="shrink-0">
-            要確認 {group.reviewCount}件
-          </Chip>
-        )}
-      </button>
-      {open && (
-        <div className="flex flex-col">
-          {group.rows.map((row) => (
-            <ForecastListRow key={row.key} row={row} isToday={false} today={today} onClick={() => onRowClick(row)} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ForecastListRow({
+export function ForecastListRow({
   row,
   isToday,
   today,

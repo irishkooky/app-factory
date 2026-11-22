@@ -20,6 +20,7 @@ import { HistoryEditDrawer } from '../components/HistoryEditDrawer'
 import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
+import { PastMonthsDrawer, type PastMonthsNav } from '../components/PastMonthsDrawer'
 import { ForecastCheckDrawer } from '../components/ForecastCheckDrawer'
 import { BalanceChart } from '../components/BalanceChart'
 import { MenuDrawer } from '../components/MenuDrawer'
@@ -126,6 +127,8 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
   const [rulesPreset, setRulesPreset] = useState<RulePreset | null>(null)
   const [thresholdOpen, setThresholdOpen] = useState(false)
   const [monthlySummaryOpen, setMonthlySummaryOpen] = useState(false)
+  const [pastMonthsOpen, setPastMonthsOpen] = useState(false)
+  const [pastMonthsNav, setPastMonthsNav] = useState<PastMonthsNav>({ screen: 'list' })
   const [forecastCheckOpen, setForecastCheckOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [pdfImportOpen, setPdfImportOpen] = useState(false)
@@ -199,6 +202,12 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
 
   // 「残高を合わせる」対象: 基準日より後・今日以下の予定・確定・手入力行（=まだ実績化されていない過去分）
   const pendingRows = forecast.filter((row) => settings.anchorDate < row.date && row.date <= today)
+  const pastRows = forecast.filter((row) => row.date < today)
+
+  const openTxDrawer = (row: ForecastRow) => {
+    setTxDrawerTarget(row)
+    setTxDrawerOpen(true)
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -241,15 +250,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         today={today}
         anchorDate={settings.anchorDate}
         anchorBalance={settings.anchorBalance}
-        onRowClick={(row) => {
-          setTxDrawerTarget(row)
-          setTxDrawerOpen(true)
-        }}
-        historyRows={historyRows}
-        onHistoryRowClick={(row) => {
-          setHistoryDrawerTarget(row)
-          setHistoryDrawerOpen(true)
-        }}
+        onRowClick={openTxDrawer}
         onTodayClick={() => setReconcileOpen(true)}
       />
 
@@ -306,6 +307,21 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         threshold={settings.threshold}
       />
 
+      <PastMonthsDrawer
+        opened={pastMonthsOpen}
+        onClose={() => setPastMonthsOpen(false)}
+        nav={pastMonthsNav}
+        onNavChange={setPastMonthsNav}
+        historyRows={historyRows}
+        pastRows={pastRows}
+        today={today}
+        onHistoryRowClick={(row) => {
+          setHistoryDrawerTarget(row)
+          setHistoryDrawerOpen(true)
+        }}
+        onForecastRowClick={openTxDrawer}
+      />
+
       <ForecastCheckDrawer
         opened={forecastCheckOpen}
         onClose={() => setForecastCheckOpen(false)}
@@ -325,6 +341,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onRules={() => { setMenuOpen(false); setRulesPreset(null); setRulesOpen(true) }}
         onThreshold={() => { setMenuOpen(false); setThresholdOpen(true) }}
         onMonthlySummary={() => { setMenuOpen(false); setMonthlySummaryOpen(true) }}
+        onPastMonths={() => { setMenuOpen(false); setPastMonthsNav({ screen: 'list' }); setPastMonthsOpen(true) }}
         onForecastCheck={() => { setMenuOpen(false); setForecastCheckOpen(true) }}
         onPdfImport={() => { setMenuOpen(false); setPdfImportOpen(true) }}
       />
