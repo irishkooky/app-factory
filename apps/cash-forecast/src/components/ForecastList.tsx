@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Chip, Separator } from '@heroui/react'
+import { IconCheck } from '@tabler/icons-react'
 import type { ForecastRow } from '../lib/forecast'
 import type { HistoryRow } from '../lib/history'
 import { buildForecastListItems, type CurrentPosition } from '../lib/forecastList'
@@ -68,11 +69,21 @@ export function ForecastList({
   )
 }
 
+// 確定は件数が少ないので、印は確定側だけに付ける。印の無い行も同じ幅を空けて日付の縦位置を揃える。
+function ConfirmedSlot({ confirmed }: { confirmed: boolean }) {
+  return (
+    <span className="flex h-5 w-3.5 shrink-0 items-center">
+      {confirmed && <IconCheck size={14} stroke={3} className="text-blue-600" role="img" aria-label="確定" />}
+    </span>
+  )
+}
+
 export function HistoryListRow({ row, onClick }: { row: HistoryRow; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="rounded-md border-l-2 border-transparent px-3 py-2 text-left">
+    <button type="button" onClick={onClick} className="rounded-md border-l-2 border-transparent py-2 pr-3 pl-1.5 text-left">
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
+          <ConfirmedSlot confirmed />
           <span className="w-10 shrink-0 text-sm text-muted">{formatDateShort(row.date)}</span>
           <div className="flex min-w-0 flex-col gap-0">
             <div className="flex items-center gap-1.5">
@@ -163,10 +174,11 @@ export function ForecastListRow({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md border-l-2 px-3 py-2 text-left ${isToday ? 'border-accent' : 'border-transparent'} ${bg}`}
+      className={`rounded-md border-l-2 py-2 pr-3 pl-1.5 text-left ${isToday ? 'border-accent' : 'border-transparent'} ${bg}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-start gap-2">
+          <ConfirmedSlot confirmed={!row.isVirtual} />
           <span className={`w-10 shrink-0 text-sm ${isToday ? 'font-semibold text-accent' : 'text-muted'}`}>
             {formatDateShort(row.date)}
           </span>
@@ -176,7 +188,7 @@ export function ForecastListRow({
                 {row.name}
                 {row.periodLabel ?? ''}
               </span>
-              {/* チップは「金額が見込みかどうか」の1軸のみ。無印＝確定（実額）。
+              {/* 確定は左の青チェックで示す。予定は大半の行に付くので背景なしの淡い文字に留め、
                   期限を過ぎてまだ見込みの行だけ要確認として操作待ちを示す。 */}
               {row.isVirtual &&
                 (row.date < today ? (
@@ -184,7 +196,7 @@ export function ForecastListRow({
                     要確認
                   </Chip>
                 ) : (
-                  <Chip size="sm" variant="soft" className="shrink-0">
+                  <Chip size="sm" variant="tertiary" className="shrink-0 font-normal text-muted">
                     予定
                   </Chip>
                 ))}
