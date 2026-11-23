@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "@heroui/styles";
 
+/* Playwright ハーネスは Vite root が e2e/ のため、明示しないと src のクラスが CSS に載らない */
+@source "./**/*.{ts,tsx}";
+@source "../e2e/**/*.{ts,tsx}";
+
 /* dark: バリアントは @heroui/styles が .dark / [data-theme="dark"] 連動で定義済みのため、
    ここで @custom-variant を再定義しない（上書きすると .dark クラス・擬似要素対応が落ちる） */
 
@@ -37,5 +41,30 @@
 @layer components {
   .drawer__dialog--bottom {
     @apply mx-auto sm:max-w-md;
+  }
+
+  .reparent-candidate-grid {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .reparent-candidate-card {
+    @apply box-border flex w-full min-w-0 flex-col gap-1.5 rounded-xl border border-border bg-surface p-3 text-left shadow-sm outline-none transition-[border-color,background-color,box-shadow];
+    min-height: 6.5rem;
+  }
+
+  .reparent-candidate-card:hover:not(:disabled) {
+    @apply border-accent/50 bg-surface-secondary;
+  }
+
+  .reparent-candidate-card--selected {
+    border-width: 2px;
+    @apply border-accent bg-accent/20 shadow-md ring-2 ring-accent/50;
+  }
+
+  .reparent-candidate-card__check {
+    @apply flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground;
   }
 }

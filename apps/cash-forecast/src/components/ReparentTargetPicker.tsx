@@ -67,25 +67,19 @@ function CandidateCard({
       disabled={isPending}
       onClick={onSelect}
       data-candidate-key={candidateKey(c)}
-      className={`relative flex min-h-[6.25rem] w-full flex-col gap-2 rounded-xl border p-2.5 text-left shadow-sm transition-[border-color,background-color,box-shadow] outline-none ${
-        isSelected
-          ? 'border-accent bg-accent/10 ring-2 ring-accent/35'
-          : 'border-border bg-surface hover:border-accent/40 hover:bg-surface-secondary'
-      }`}
+      className={`reparent-candidate-card relative ${isSelected ? 'reparent-candidate-card--selected' : ''}`}
+      aria-pressed={isSelected}
     >
-      <div className="flex items-start justify-between gap-1">
-        <span className="line-clamp-2 min-w-0 flex-1 text-xs font-medium leading-snug text-foreground">
+      <div className="flex items-start justify-between gap-1.5">
+        <span className="line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-snug text-foreground">
           {title}
         </span>
         {isSelected ? (
-          <span
-            className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground"
-            aria-hidden
-          >
-            <IconCheck size={14} stroke={2.5} />
+          <span className="reparent-candidate-card__check" aria-hidden>
+            <IconCheck size={16} stroke={2.5} />
           </span>
         ) : (
-          <span className="size-5 shrink-0" aria-hidden />
+          <span className="size-6 shrink-0" aria-hidden />
         )}
       </div>
       <span className="text-[11px] tabular-nums text-muted">{formatDateShort(c.date)}</span>
@@ -168,7 +162,7 @@ export function ReparentTargetPicker({
     (activeTab === 'recurring-virtual' && virtualGroups.every((g) => g.visibleItems.length === 0)) ||
     (activeTab === 'recurring-confirmed' && confirmedGroups.every((g) => g.visibleItems.length === 0))
 
-  const cardGridClass = 'grid grid-cols-2 gap-2.5'
+  const cardGridClass = 'reparent-candidate-grid'
 
   return (
     <div className="flex flex-col gap-4" data-reparent-picker>
@@ -223,7 +217,7 @@ export function ReparentTargetPicker({
         {tabEmpty ? (
           <p className="py-6 text-center text-sm text-muted">該当する取引がありません</p>
         ) : activeTab === 'oneoff' ? (
-          <div className={cardGridClass}>
+          <div className={cardGridClass} data-testid="reparent-candidate-grid">
             {oneoffList.map((c) => (
               <CandidateCard
                 key={candidateKey(c)}
@@ -241,7 +235,7 @@ export function ReparentTargetPicker({
                 <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">
                   {group.ruleName}
                 </h3>
-                <div className={cardGridClass}>
+                <div className={cardGridClass} data-testid="reparent-candidate-grid">
                   {group.visibleItems.map((c) => (
                     <CandidateCard
                       key={candidateKey(c)}

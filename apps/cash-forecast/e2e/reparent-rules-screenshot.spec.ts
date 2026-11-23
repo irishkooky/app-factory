@@ -15,7 +15,13 @@ const shots: { view: string; file: string; note: string; extra?: (page: import('
     file: '01-picker-tab-oneoff-selected.png',
     note: 'Pro oneoff selected',
     extra: async (page) => {
-      await expect(page.locator('[data-reparent-picker] button.border-accent')).toHaveCount(1)
+      await expect(page.locator('.reparent-candidate-card--selected')).toHaveCount(1)
+      const accentBorder = await page.locator('.reparent-candidate-card--selected').evaluate((el) => {
+        const s = getComputedStyle(el)
+        return { borderWidth: parseFloat(s.borderTopWidth), bg: s.backgroundColor }
+      })
+      expect(accentBorder.borderWidth).toBeGreaterThanOrEqual(2)
+      expect(accentBorder.bg).not.toBe('rgba(0, 0, 0, 0)')
     },
   },
   { view: 'picker-tab-virtual-collapsed', file: '02-picker-tab-virtual-collapsed.png', note: 'Pro virtual collapsed' },
@@ -50,6 +56,41 @@ const shots: { view: string; file: string; note: string; extra?: (page: import('
   },
 ]
 
+const PICKER_GRID_VIEWS = new Set([
+  'picker-tab-oneoff',
+  'picker-tab-oneoff-selected',
+  'picker-tab-virtual-collapsed',
+  'picker-tab-virtual-expanded',
+  'picker-tab-confirmed',
+  'picker-free',
+  'picker-search',
+])
+
+async function expectPickerGridLayout(page: import('@playwright/test').Page) {
+  const grid = page.locator('[data-reparent-picker] [data-testid="reparent-candidate-grid"]').first()
+  await expect(grid).toBeVisible()
+  const metrics = await grid.evaluate((el) => {
+    const gridStyle = getComputedStyle(el)
+    const card = el.querySelector<HTMLElement>('.reparent-candidate-card')
+    if (!card) return null
+    const cardStyle = getComputedStyle(card)
+    return {
+      gridTemplateColumns: gridStyle.gridTemplateColumns,
+      cardPaddingTop: parseFloat(cardStyle.paddingTop),
+      cardBorderWidth: parseFloat(cardStyle.borderTopWidth),
+      cardWidth: card.offsetWidth,
+      gridWidth: el.clientWidth,
+    }
+  })
+  expect(metrics).not.toBeNull()
+  const columns = metrics!.gridTemplateColumns.trim()
+  const colParts = columns.split(/\s+/).filter((p) => p.length > 0)
+  expect(colParts.length).toBeGreaterThanOrEqual(2)
+  expect(metrics!.cardPaddingTop).toBeGreaterThanOrEqual(11)
+  expect(metrics!.cardBorderWidth).toBeGreaterThanOrEqual(1)
+  expect(metrics!.cardWidth).toBeGreaterThan(metrics!.gridWidth * 0.38)
+}
+
 function save(pagePath: string, fileName: string) {
   mkdirSync(artifactsDir, { recursive: true })
   mkdirSync(storeDir, { recursive: true })
@@ -75,6 +116,11 @@ test.describe('reparent rules UI harness (#123/#124)', () => {
         await expect(page.getByTestId('harness-meta')).toContainText('基準日 2026-03-15')
       }
 
+      if (PICKER_GRID_VIEWS.has(shot.view)) {
+        if (shot.view === 'picker-tab-oneoff-selected') await page.waitForTimeout(200)
+        await expectPickerGridLayout(page)
+      }
+
       if (shot.view === 'picker-tab-oneoff' || shot.view === 'picker-search') {
         await expect(page.locator('[data-reparent-picker]').getByText('4月の支出')).toHaveCount(0)
       }
@@ -93,10 +139,6 @@ test.describe('reparent rules UI harness (#123/#124)', () => {
         const group = page.locator('[data-rule-group]').first()
         await expect(group.locator('button[data-candidate-key]').first()).toContainText('2026年')
         await expect(group.locator('button[data-candidate-key]').first()).not.toContainText('（2026年')
-      }
-
-      if (shot.view === 'picker-tab-oneoff-selected') {
-        await page.waitForTimeout(200)
       }
 
       if (shot.view === 'picker-tab-virtual-expanded') {
