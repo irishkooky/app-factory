@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>reparent-rules harness</title>
+    <script>
+      ;(function () {
+        var m = window.matchMedia('(prefers-color-scheme: dark)')
+        var f = function () {
+          document.documentElement.setAttribute('data-theme', m.matches ? 'dark' : 'light')
+        }
+        f()
+        m.addEventListener('change', f)
+      })()
+    </script>
+  </head>
+  <body class="bg-background text-foreground">
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
