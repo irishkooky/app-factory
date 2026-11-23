@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReparentCandidate } from "./reparentCandidates";
 import {
+  cardPrimaryLabel,
   candidateMatchesQuery,
   dayDistanceFromSource,
   groupRecurringCandidates,
@@ -85,6 +86,24 @@ describe("groupRecurringCandidates", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]!.visibleItems).toHaveLength(1);
     expect(groups[0]!.hiddenCount).toBe(0);
+  });
+});
+
+describe("cardPrimaryLabel", () => {
+  it("定期は月ラベルのみ、単発は取引名", () => {
+    expect(
+      cardPrimaryLabel(virtual(ruleA, "2026-05", "2026-05-25", "家賃")),
+    ).toBe("2026年5月");
+    const oneoff: ReparentCandidate = {
+      targetKind: "transaction",
+      section: "oneoff",
+      txId: "t1" as Id<"transactions">,
+      name: "食料品",
+      date: "2026-05-01",
+      kind: "expense",
+      amount: 12_000,
+    };
+    expect(cardPrimaryLabel(oneoff)).toBe("食料品");
   });
 });
 

@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Button, Input, Label, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
+import { IconCheck } from '@tabler/icons-react'
 import type { Id } from '../../convex/_generated/dataModel'
 import { formatDateShort } from '../lib/date'
 import { formatYen, type Kind } from '../lib/money'
 import type { ReparentCandidate, ReparentRuleMonthTarget, ReparentSection } from '../lib/reparentCandidates'
 import {
+  cardPrimaryLabel,
   candidateKey,
-  displayTitle,
   oneoffCandidatesForTab,
   recurringCandidatesForTab,
   REPARENT_PICKER_SECTIONS,
@@ -59,24 +60,38 @@ function CandidateCard({
   isPending?: boolean
   onSelect: () => void
 }) {
-  const title = displayTitle(c)
+  const title = cardPrimaryLabel(c)
   return (
     <button
       type="button"
       disabled={isPending}
       onClick={onSelect}
       data-candidate-key={candidateKey(c)}
-      className={`flex min-h-[5.5rem] w-full flex-col justify-between gap-2 rounded-2xl border-2 p-3 text-left transition-colors ${
+      className={`relative flex min-h-[6.25rem] w-full flex-col gap-2 rounded-xl border p-2.5 text-left shadow-sm transition-[border-color,background-color,box-shadow] outline-none ${
         isSelected
-          ? 'border-accent bg-accent/10 shadow-sm ring-2 ring-accent/40'
-          : 'border-default-200 bg-surface-secondary hover:border-default-300 hover:bg-surface-tertiary'
+          ? 'border-accent bg-accent/10 ring-2 ring-accent/35'
+          : 'border-border bg-surface hover:border-accent/40 hover:bg-surface-secondary'
       }`}
     >
-      <span className="line-clamp-2 text-sm font-semibold leading-snug">{title}</span>
-      <div className="flex flex-col gap-0.5">
-        <span className="text-lg font-bold tabular-nums">{formatYen(c.amount)}</span>
-        <span className="text-sm tabular-nums text-muted">{formatDateShort(c.date)}</span>
+      <div className="flex items-start justify-between gap-1">
+        <span className="line-clamp-2 min-w-0 flex-1 text-xs font-medium leading-snug text-foreground">
+          {title}
+        </span>
+        {isSelected ? (
+          <span
+            className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground"
+            aria-hidden
+          >
+            <IconCheck size={14} stroke={2.5} />
+          </span>
+        ) : (
+          <span className="size-5 shrink-0" aria-hidden />
+        )}
       </div>
+      <span className="text-[11px] tabular-nums text-muted">{formatDateShort(c.date)}</span>
+      <span className="mt-auto text-base font-bold tabular-nums leading-none text-foreground">
+        {formatYen(c.amount)}
+      </span>
     </button>
   )
 }
@@ -153,6 +168,8 @@ export function ReparentTargetPicker({
     (activeTab === 'recurring-virtual' && virtualGroups.every((g) => g.visibleItems.length === 0)) ||
     (activeTab === 'recurring-confirmed' && confirmedGroups.every((g) => g.visibleItems.length === 0))
 
+  const cardGridClass = 'grid grid-cols-2 gap-2.5'
+
   return (
     <div className="flex flex-col gap-4" data-reparent-picker>
       <div className="flex flex-col gap-1">
@@ -189,26 +206,24 @@ export function ReparentTargetPicker({
           isDisabled={isPending}
           className="w-full"
         >
-          {tabs.map((tab, i) => (
-            <span key={tab.id} className="contents">
-              {i > 0 ? <ToggleButtonGroup.Separator /> : null}
-              <ToggleButton
-                id={tab.id}
-                data-testid={`reparent-tab-${tab.id}`}
-                className="flex-1 text-sm"
-              >
-                {tab.title}
-              </ToggleButton>
-            </span>
+          {tabs.map((tab) => (
+            <ToggleButton
+              key={tab.id}
+              id={tab.id}
+              data-testid={`reparent-tab-${tab.id}`}
+              className="min-w-0 flex-1 text-xs sm:text-sm"
+            >
+              {tab.title}
+            </ToggleButton>
           ))}
         </ToggleButtonGroup>
       )}
 
-      <div className="max-h-[min(24rem,55vh)] overflow-y-auto">
+      <div className="max-h-[min(24rem,55vh)] overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
         {tabEmpty ? (
           <p className="py-6 text-center text-sm text-muted">該当する取引がありません</p>
         ) : activeTab === 'oneoff' ? (
-          <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+          <div className={cardGridClass}>
             {oneoffList.map((c) => (
               <CandidateCard
                 key={candidateKey(c)}
@@ -223,8 +238,10 @@ export function ReparentTargetPicker({
           <div className="flex flex-col gap-4">
             {(activeTab === 'recurring-virtual' ? virtualGroups : confirmedGroups).map((group) => (
               <section key={group.ruleId} className="flex flex-col gap-2" data-rule-group={group.ruleId}>
-                <h3 className="px-1 text-sm font-semibold text-foreground">{group.ruleName}</h3>
-                <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+                <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">
+                  {group.ruleName}
+                </h3>
+                <div className={cardGridClass}>
                   {group.visibleItems.map((c) => (
                     <CandidateCard
                       key={candidateKey(c)}

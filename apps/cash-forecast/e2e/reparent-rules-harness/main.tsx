@@ -23,6 +23,7 @@ import type { ForecastRow } from '../../src/lib/forecast'
 type View =
   | 'picker-free'
   | 'picker-tab-oneoff'
+  | 'picker-tab-oneoff-selected'
   | 'picker-tab-virtual-collapsed'
   | 'picker-tab-virtual-expanded'
   | 'picker-tab-confirmed'
@@ -35,6 +36,7 @@ type View =
 const PICKER_VIEWS: View[] = [
   'picker-free',
   'picker-tab-oneoff',
+  'picker-tab-oneoff-selected',
   'picker-tab-virtual-collapsed',
   'picker-tab-virtual-expanded',
   'picker-tab-confirmed',
@@ -215,6 +217,14 @@ function App() {
       </HarnessShell>
     )
   }
+  if (view === 'picker-tab-oneoff-selected') {
+    return (
+      <HarnessShell view={view}>
+        <PickerHarness view={view} showRecurringSections initialTab="oneoff" />
+        <SelectFirstOneoffBootstrap />
+      </HarnessShell>
+    )
+  }
   if (view === 'picker-tab-virtual-collapsed') {
     return (
       <HarnessShell view={view}>
@@ -333,13 +343,25 @@ function DateWarningBootstrap() {
   useEffect(() => {
     const run = () => {
       document.querySelector<HTMLElement>('[data-testid="reparent-tab-recurring-virtual"]')?.click()
-      const buttons = Array.from(document.querySelectorAll('button[data-candidate-key]'))
-      const target =
-        buttons.find((b) => b.textContent?.includes('家賃') && b.textContent.includes('2026年4月')) ??
-        buttons.find((b) => b.textContent?.includes('家賃') && b.textContent.includes('2026年5月'))
-      target?.click()
+      const pick = () => {
+        const card = document.querySelector<HTMLButtonElement>(
+          '[data-reparent-picker] [data-rule-group] button[data-candidate-key]',
+        )
+        card?.click()
+      }
+      setTimeout(pick, 180)
     }
-    const t = setTimeout(run, 120)
+    const t = setTimeout(run, 100)
+    return () => clearTimeout(t)
+  }, [])
+  return null
+}
+
+function SelectFirstOneoffBootstrap() {
+  useEffect(() => {
+    const t = setTimeout(() => {
+      document.querySelector<HTMLButtonElement>('[data-reparent-picker] button[data-candidate-key]')?.click()
+    }, 120)
     return () => clearTimeout(t)
   }, [])
   return null

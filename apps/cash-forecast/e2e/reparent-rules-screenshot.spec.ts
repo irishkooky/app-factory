@@ -10,6 +10,14 @@ const harnessBase = 'http://localhost:5199'
 
 const shots: { view: string; file: string; note: string; extra?: (page: import('@playwright/test').Page) => Promise<void> }[] = [
   { view: 'picker-tab-oneoff', file: '01-picker-tab-oneoff.png', note: 'Pro tab oneoff' },
+  {
+    view: 'picker-tab-oneoff-selected',
+    file: '01-picker-tab-oneoff-selected.png',
+    note: 'Pro oneoff selected',
+    extra: async (page) => {
+      await expect(page.locator('[data-reparent-picker] button.border-accent')).toHaveCount(1)
+    },
+  },
   { view: 'picker-tab-virtual-collapsed', file: '02-picker-tab-virtual-collapsed.png', note: 'Pro virtual collapsed' },
   { view: 'picker-tab-virtual-expanded', file: '03-picker-tab-virtual-expanded.png', note: 'Pro virtual expanded' },
   { view: 'picker-tab-confirmed', file: '04-picker-tab-confirmed.png', note: 'Pro confirmed' },
@@ -22,6 +30,12 @@ const shots: { view: string; file: string; note: string; extra?: (page: import('
     file: '09-date-warning.png',
     note: 'Date warning',
     extra: async (page) => {
+      await page.getByTestId('reparent-tab-recurring-virtual').click()
+      await page
+        .locator('[data-rule-group]', { hasText: '家賃' })
+        .locator('button[data-candidate-key]', { hasText: '4/25' })
+        .first()
+        .click()
       await expect(page.getByText(/ルール発生日と違う/)).toBeVisible({ timeout: 10_000 })
     },
   },
@@ -52,7 +66,7 @@ test.describe('reparent rules UI harness (#123/#124)', () => {
       await page.goto(`${harnessBase}/?view=${shot.view}`)
       await page.waitForLoadState('networkidle')
       await expect(page.locator(`[data-view="${shot.view}"]`)).toBeVisible({ timeout: 15_000 })
-      if (shot.view === 'picker-tab-virtual-expanded' || shot.view === 'date-warning') {
+      if (shot.view === 'picker-tab-virtual-expanded') {
         await page.waitForTimeout(400)
       }
 
@@ -76,6 +90,13 @@ test.describe('reparent rules UI harness (#123/#124)', () => {
       if (shot.view === 'picker-tab-virtual-collapsed') {
         await expect(page.locator('[data-reparent-picker]').getByRole('button', { name: /もっと見る/ }).first()).toBeVisible()
         expect(await page.locator('[data-reparent-picker]').getByRole('button', { name: /もっと見る/ }).count()).toBeGreaterThanOrEqual(1)
+        const group = page.locator('[data-rule-group]').first()
+        await expect(group.locator('button[data-candidate-key]').first()).toContainText('2026年')
+        await expect(group.locator('button[data-candidate-key]').first()).not.toContainText('（2026年')
+      }
+
+      if (shot.view === 'picker-tab-oneoff-selected') {
+        await page.waitForTimeout(200)
       }
 
       if (shot.view === 'picker-tab-virtual-expanded') {

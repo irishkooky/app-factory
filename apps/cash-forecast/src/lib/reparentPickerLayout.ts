@@ -20,6 +20,17 @@ export function displayTitle(c: ReparentCandidate): string {
   return c.name;
 }
 
+/** カード内の主ラベル（定期はルール名見出しの下なので月のみ） */
+export function cardPrimaryLabel(c: ReparentCandidate): string {
+  if (
+    (c.section === "recurring-virtual" || c.section === "recurring-confirmed") &&
+    c.ruleMonth !== undefined
+  ) {
+    return formatMonthLabel(c.ruleMonth);
+  }
+  return c.name;
+}
+
 export function candidateKey(c: ReparentCandidate): string {
   if (c.targetKind === "transaction") return `tx:${c.txId}`;
   return `rule:${c.ruleId}:${c.ruleMonth}`;
