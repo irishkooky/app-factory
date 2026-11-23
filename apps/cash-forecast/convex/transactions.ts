@@ -2,6 +2,8 @@ import { query, mutation } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { assertAmount, assertDateString, assertMonthString, assertName, assertOptionalName } from "./validate";
 import { requirePro } from "./billing";
+import { addMonthsToDateClamped, todayJST } from "../src/lib/date";
+import { computeReparent } from "../src/lib/reparentBreakdown";
 
 const amountBreakdownArg = v.optional(
   v.array(
@@ -226,5 +228,113 @@ export const remove = mutation({
       throw new ConvexError("権限がありません");
     }
     await ctx.db.delete(id);
+  },
+});
+
+/**
+ * 内訳1行を別取引へ原子的に移動する。
+ * スキーマ変更なし。制約違反は ConvexError。成功時は Undo 用の逆 patch 情報を返す。
+ */
+export const reparentBreakdownLine = mutation({
+  args: {
+    sourceId: v.id("transactions"),
+    targetId: v.id("transactions"),
+    index: v.number(),
+    expectedAmount: v.number(),
+    expectedLabel: v.optional(v.string()),
+  },
+  handler: async (ctx, { sourceId, targetId, index, expectedAmount, expectedLabel }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("ログインが必要です");
+    }
+
+    const source = await ctx.db.get(sourceId);
+    const target = await ctx.db.get(targetId);
+    if (!source || source.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+    if (!target || target.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    if (!settings) {
+      throw new ConvexError("先に残高の初期設定を行ってください");
+    }
+
+    assertAmount(expectedAmount);
+    if (!Number.isInteger(index) || index < 0) {
+      throw new ConvexError("内訳の行が見つかりません");
+    }
+
+    const horizonEnd = addMonthsToDateClamped(todayJST(), 12);
+    const result = computeReparent({
+      source: {
+        id: source._id,
+        kind: source.kind,
+        amount: source.amount,
+        amountBreakdown: source.amountBreakdown,
+        date: source.date,
+        addon: source.addon,
+        actual: source.actual,
+        importBatchId: source.importBatchId,
+      },
+      target: {
+        id: target._id,
+        kind: target.kind,
+        amount: target.amount,
+        amountBreakdown: target.amountBreakdown,
+        date: target.date,
+        addon: target.addon,
+        actual: target.actual,
+        importBatchId: target.importBatchId,
+      },
+      index,
+      expectedAmount,
+      expectedLabel,
+      anchorDate: settings.anchorDate,
+      horizonEnd,
+    });
+
+    if ("error" in result) {
+      throw new ConvexError(result.error);
+    }
+
+    // 両親とも amount === 内訳合計（正規化後）。空クリアは [] で明示。
+    await ctx.db.patch(sourceId, {
+      amount: result.source.amount,
+      amountBreakdown:
+        result.source.amountBreakdown !== undefined && result.source.amountBreakdown.length > 0
+          ? result.source.amountBreakdown
+          : [],
+    });
+    await ctx.db.patch(targetId, {
+      amount: result.target.amount,
+      amountBreakdown:
+        result.target.amountBreakdown !== undefined && result.target.amountBreakdown.length > 0
+          ? result.target.amountBreakdown
+          : [],
+    });
+
+    return {
+      sourceId,
+      targetId,
+      sourceAmount: result.source.amount,
+      targetAmount: result.target.amount,
+      dateChanged: result.dateChanged,
+      sourceDate: source.date,
+      targetDate: target.date,
+      undo: {
+        sourceId: targetId,
+        targetId: sourceId,
+        index: result.undo.index,
+        expectedAmount: result.undo.expectedAmount,
+        expectedLabel: result.undo.expectedLabel,
+      },
+    };
   },
 });

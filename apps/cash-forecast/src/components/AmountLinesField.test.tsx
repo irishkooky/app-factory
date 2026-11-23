@@ -15,9 +15,11 @@ afterEach(cleanup)
 function Harness({
   initial,
   initialLines,
+  onMoveLine,
 }: {
   initial?: number
   initialLines?: AmountLine[]
+  onMoveLine?: (line: AmountLine) => void
 }) {
   const [lines, setLines] = useState<AmountLine[]>(
     () => initialLines ?? initAmountLines(initial),
@@ -25,7 +27,12 @@ function Harness({
   const total = sumAmountLines(lines)
   return (
     <>
-      <AmountLinesField lines={lines} onChange={setLines} kind="expense" />
+      <AmountLinesField
+        lines={lines}
+        onChange={setLines}
+        kind="expense"
+        onMoveLine={onMoveLine}
+      />
       <span data-testid="total">{total === undefined ? 'none' : String(total)}</span>
       <span data-testid="line-count">{lines.length}</span>
       <span data-testid="labels">{lines.map((l) => l.label).join('|')}</span>
@@ -101,5 +108,37 @@ describe('AmountLinesField', () => {
     expect(screen.getByText('予定納税')).toBeTruthy()
     expect(screen.getByText('-¥80,000')).toBeTruthy()
     expect(screen.getAllByRole('button', { name: /^編集/ })).toHaveLength(2)
+  })
+
+  it('永続内訳が2行以上かつ onMoveLine があるときだけ移動ボタンを出す', () => {
+    const moved: string[] = []
+    render(
+      <Harness
+        initialLines={initAmountLinesFromTx({
+          amount: 80000,
+          amountBreakdown: [
+            { amount: 50000, label: '住民税' },
+            { amount: 30000, label: '予定納税' },
+          ],
+        })}
+        onMoveLine={(line) => {
+          moved.push(line.label)
+        }}
+      />,
+    )
+    expect(screen.getAllByRole('button', { name: /^別の取引へ移動|^移動/ })).toHaveLength(2)
+  })
+
+  it('永続内訳が1行のときは移動ボタンを出さない', () => {
+    render(
+      <Harness
+        initialLines={initAmountLinesFromTx({
+          amount: 50000,
+          amountBreakdown: [{ amount: 50000, label: '住民税' }],
+        })}
+        onMoveLine={() => {}}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /^別の取引へ移動|^移動/ })).toBeNull()
   })
 })
