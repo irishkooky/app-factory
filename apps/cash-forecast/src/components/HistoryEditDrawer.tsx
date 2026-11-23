@@ -15,6 +15,7 @@ import { api } from '../../convex/_generated/api'
 import type { HistoryRow } from '../lib/history'
 import type { Kind } from '../lib/money'
 import { notifyDeleted, notifyError, notifyMoved, notifySaved } from '../lib/notify'
+import { usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
 import {
   initAmountLinesFromTx,
@@ -24,6 +25,7 @@ import {
 } from '../lib/amountLines'
 import { AmountLinesField } from './AmountLinesField'
 import { ReparentTargetPicker, type ReparentCandidate } from './ReparentTargetPicker'
+import { filterReparentMoveCandidates } from '../lib/reparentCandidates'
 import type { Id } from '../../convex/_generated/dataModel'
 
 type HistoryEditDrawerProps = {
@@ -95,9 +97,12 @@ function HistoryEditForm({
   const [kind, setKind] = useState<Kind>(target.kind)
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
 
-  const kindCandidates = reparentCandidates.filter(
-    (c) => c.kind === kind && c.txId !== target.txId,
-  )
+  const { plan } = usePlan()
+
+  const kindCandidates = filterReparentMoveCandidates(reparentCandidates, {
+    kind,
+    sourceTxId: target.txId,
+  }).filter((c) => c.targetKind === 'transaction')
 
   const runUndo = async (undo: {
     sourceId: Id<'transactions'>
@@ -165,6 +170,7 @@ function HistoryEditForm({
         lineAmount={movingLine.value ?? 0}
         kind={kind}
         isPending={submitting}
+        showRecurringSections={plan === 'pro'}
         onSelect={(id) => {
           void handleReparent(id)
         }}

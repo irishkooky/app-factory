@@ -28,6 +28,7 @@ import {
 import { AmountLinesField } from './AmountLinesField'
 import { MoneyField } from './MoneyField'
 import { ReparentTargetPicker, type ReparentCandidate } from './ReparentTargetPicker'
+import { filterReparentMoveCandidates } from '../lib/reparentCandidates'
 import type { Id } from '../../convex/_generated/dataModel'
 
 type TransactionDrawerProps = {
@@ -163,7 +164,9 @@ function RuleMonthDetail({
       <div className="flex flex-col gap-1.5">
         <div className="flex justify-between">
           <span className="text-sm text-muted">ベース（ルール平均）</span>
-          <span className="text-sm tabular-nums">{formatYen(baseAmount)}</span>
+          <span className={`text-sm tabular-nums ${kindTone(target.kind)}`}>
+            <KindYen kind={target.kind} amount={baseAmount} />
+          </span>
         </div>
 
         {(target.addons ?? []).map((addon) => (
@@ -460,9 +463,11 @@ function TransactionForm({
   const isRuleBacked = isEdit && target?.ruleId !== undefined
   const absorbedAddons = isRuleBacked ? target?.addons ?? [] : []
 
-  const kindCandidates = reparentCandidates.filter(
-    (c) => c.kind === kind && c.txId !== target?.txId,
-  )
+  const { plan } = usePlan()
+  const kindCandidates = filterReparentMoveCandidates(reparentCandidates, {
+    kind,
+    sourceTxId: target?.txId,
+  })
 
   const runUndo = async (undo: {
     sourceId: Id<'transactions'>
@@ -530,6 +535,7 @@ function TransactionForm({
         lineAmount={movingLine.value ?? 0}
         kind={kind}
         isPending={submitting}
+        showRecurringSections={plan === 'pro'}
         onSelect={(id) => {
           void handleReparent(id)
         }}
