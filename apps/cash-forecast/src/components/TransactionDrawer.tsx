@@ -460,9 +460,12 @@ function TransactionForm({
   const isRuleBacked = isEdit && target?.ruleId !== undefined
   const absorbedAddons = isRuleBacked ? target?.addons ?? [] : []
 
-  const kindCandidates = reparentCandidates.filter(
-    (c) => c.kind === kind && c.txId !== target?.txId,
-  )
+  const { plan } = usePlan()
+  const kindCandidates = reparentCandidates.filter((c) => {
+    if (c.kind !== kind) return false
+    if (c.targetKind === 'transaction' && c.txId === target?.txId) return false
+    return true
+  })
 
   const runUndo = async (undo: {
     sourceId: Id<'transactions'>
@@ -530,6 +533,7 @@ function TransactionForm({
         lineAmount={movingLine.value ?? 0}
         kind={kind}
         isPending={submitting}
+        showRecurringSections={plan === 'pro'}
         onSelect={(id) => {
           void handleReparent(id)
         }}
