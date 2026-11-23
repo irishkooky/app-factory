@@ -49,6 +49,16 @@ test.describe('reparent rules UI harness (#123/#124)', () => {
         await expect(page.getByText('単発の取引')).toBeVisible()
         await expect(page.getByText('定期（未確定の月）')).toBeVisible()
         await expect(page.getByText('定期（確定済み）')).toBeVisible()
+        await expect(page.getByTestId('harness-meta')).toContainText('基準日 2026-03-15')
+      }
+
+      if (shot.view === 'after-move') {
+        await expect(page.getByTestId('source-header')).toContainText('¥54,000')
+        await expect(page.getByTestId('source-header')).toContainText('¥50,000')
+        await expect(page.getByTestId('target-header')).toContainText('¥130,000')
+        await expect(page.getByTestId('target-header')).toContainText('¥134,000')
+        await expect(page.getByTestId('addon-line')).toContainText('繰越分')
+        await expect(page.getByTestId('rule-month-after')).toContainText('-¥134,000')
       }
 
       const tmp = path.join(artifactsDir, `_tmp-${shot.file}`)
