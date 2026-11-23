@@ -16,6 +16,11 @@ type AmountLinesFieldProps = {
   kind: Kind
   error?: string
   isDisabled?: boolean
+  /**
+   * 永続済み内訳が2行以上のとき、行の「別の取引へ移動」から呼ばれる。
+   * 新規追加行（serverIndex 無し）には出さない。
+   */
+  onMoveLine?: (line: AmountLine) => void
 }
 
 /**
@@ -23,12 +28,21 @@ type AmountLinesFieldProps = {
  * 項目を足すと、上乗せの詳細ビュー（RuleMonthDetail）と同じく
  * 「大きな合計 → 項目ごとの行（編集・削除）→ 追加ボタン」の並びになり、項目は1行ずつ開いて編集する。
  */
-export function AmountLinesField({ lines, onChange, kind, error, isDisabled }: AmountLinesFieldProps) {
+export function AmountLinesField({
+  lines,
+  onChange,
+  kind,
+  error,
+  isDisabled,
+  onMoveLine,
+}: AmountLinesFieldProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const total = sumAmountLines(lines)
   // ラベル付きの1行も内訳として見せる（保存済みの項目名を隠さない）。
   // 編集中は、項目名を消しても入力欄が単一表示に切り替わらないようにする
   const itemized = lines.length > 1 || (lines[0]?.label ?? '') !== '' || editingId !== null
+  const persistedCount = lines.filter((line) => line.serverIndex !== undefined).length
+  const canOfferMove = onMoveLine !== undefined && persistedCount >= 2
 
   const setLineValue = (id: string, value: number | undefined) => {
     onChange(lines.map((line) => (line.id === id ? { ...line, value } : line)))
@@ -106,7 +120,17 @@ export function AmountLinesField({ lines, onChange, kind, error, isDisabled }: A
                   isDisabled={isDisabled}
                   showFormattedPreview={false}
                 />
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
+                  {canOfferMove && line.serverIndex !== undefined && (
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      isDisabled={isDisabled}
+                      onPress={() => onMoveLine(line)}
+                    >
+                      別の取引へ移動
+                    </Button>
+                  )}
                   {lines.length > 1 && (
                     <Button variant="tertiary" size="sm" isDisabled={isDisabled} onPress={() => removeLine(line.id)}>
                       削除
@@ -137,6 +161,17 @@ export function AmountLinesField({ lines, onChange, kind, error, isDisabled }: A
                 >
                   編集
                 </Button>
+                {canOfferMove && line.serverIndex !== undefined && (
+                  <Button
+                    variant="tertiary"
+                    size="sm"
+                    isDisabled={isDisabled}
+                    aria-label={`別の取引へ移動${n}`}
+                    onPress={() => onMoveLine(line)}
+                  >
+                    移動
+                  </Button>
+                )}
                 {lines.length > 1 && (
                   <Button
                     variant="tertiary"

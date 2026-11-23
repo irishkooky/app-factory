@@ -16,7 +16,7 @@ import type { AddonInfo, ForecastRow } from '../lib/forecast'
 import { addDays, formatDateShort, formatMonthLabel } from '../lib/date'
 import { formatYen, type Kind } from '../lib/money'
 import { KindYen, kindTone } from './Amount'
-import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
+import { notifyDeleted, notifyError, notifyMoved, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
 import {
@@ -27,6 +27,8 @@ import {
 } from '../lib/amountLines'
 import { AmountLinesField } from './AmountLinesField'
 import { MoneyField } from './MoneyField'
+import { ReparentTargetPicker, type ReparentCandidate } from './ReparentTargetPicker'
+import type { Id } from '../../convex/_generated/dataModel'
 
 type TransactionDrawerProps = {
   opened: boolean
@@ -34,6 +36,8 @@ type TransactionDrawerProps = {
   anchorDate: string
   today: string
   target: ForecastRow | null
+  /** 同じ kind・予定側の移動先候補（仮想・addon・import 除外済み） */
+  reparentCandidates?: ReparentCandidate[]
 }
 
 function titleFor(target: ForecastRow | null): string {
@@ -45,7 +49,14 @@ function titleFor(target: ForecastRow | null): string {
   return '取引を編集'
 }
 
-export function TransactionDrawer({ opened, onClose, anchorDate, today, target }: TransactionDrawerProps) {
+export function TransactionDrawer({
+  opened,
+  onClose,
+  anchorDate,
+  today,
+  target,
+  reparentCandidates = [],
+}: TransactionDrawerProps) {
   return (
     <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
       <Drawer.Content placement="bottom">
@@ -65,6 +76,7 @@ export function TransactionDrawer({ opened, onClose, anchorDate, today, target }
                   today={today}
                   target={target}
                   onClose={onClose}
+                  reparentCandidates={reparentCandidates}
                 />
               ))}
           </Drawer.Body>
@@ -415,15 +427,18 @@ function TransactionForm({
   today,
   target,
   onClose,
+  reparentCandidates,
 }: {
   anchorDate: string
   today: string
   target: ForecastRow | null
   onClose: () => void
+  reparentCandidates: ReparentCandidate[]
 }) {
   const createTx = useMutation(api.transactions.create)
   const updateTx = useMutation(api.transactions.update)
   const removeTx = useMutation(api.transactions.remove)
+  const reparentLine = useMutation(api.transactions.reparentBreakdownLine)
   const confirm = useConfirm()
 
   const minDate = addDays(anchorDate, 1)
@@ -431,6 +446,7 @@ function TransactionForm({
 
   const [submitting, setSubmitting] = useState(false)
   const [deletingAddonId, setDeletingAddonId] = useState<string | null>(null)
+  const [movingLine, setMovingLine] = useState<AmountLine | null>(null)
 
   const [date, setDate] = useState(initialDate)
   const [name, setName] = useState(target?.rawName ?? target?.name ?? '')
@@ -443,6 +459,84 @@ function TransactionForm({
   const isEdit = target !== null && !target.isVirtual
   const isRuleBacked = isEdit && target?.ruleId !== undefined
   const absorbedAddons = isRuleBacked ? target?.addons ?? [] : []
+
+  const kindCandidates = reparentCandidates.filter(
+    (c) => c.kind === kind && c.txId !== target?.txId,
+  )
+
+  const runUndo = async (undo: {
+    sourceId: Id<'transactions'>
+    targetId: Id<'transactions'>
+    index: number
+    expectedAmount: number
+    expectedLabel?: string
+  }) => {
+    try {
+      await reparentLine({
+        sourceId: undo.sourceId,
+        targetId: undo.targetId,
+        index: undo.index,
+        expectedAmount: undo.expectedAmount,
+        expectedLabel: undo.expectedLabel,
+      })
+      notifySaved('元に戻しました')
+    } catch (err) {
+      notifyError(err, '元に戻せませんでした')
+    }
+  }
+
+  const handleReparent = async (targetId: Id<'transactions'>) => {
+    if (!target?.txId || movingLine?.serverIndex === undefined) return
+    const breakdown = target.amountBreakdown
+    if (breakdown === undefined || breakdown.length < 2) return
+    const serverEntry = breakdown[movingLine.serverIndex]
+    if (serverEntry === undefined) {
+      notifyError(new Error('内訳の行が見つかりません'), '移動に失敗しました')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const result = await reparentLine({
+        sourceId: target.txId,
+        targetId,
+        index: movingLine.serverIndex,
+        expectedAmount: serverEntry.amount,
+        expectedLabel: serverEntry.label,
+      })
+      const label =
+        movingLine.label !== '' ? movingLine.label : `項目${movingLine.serverIndex + 1}`
+      notifyMoved(`${label}を移動しました`, {
+        description: result.dateChanged
+          ? '途中の残高・最低残高が変わっている場合があります（最終残高は同じ）。'
+          : undefined,
+        onUndo: () => {
+          void runUndo(result.undo)
+        },
+      })
+      onClose()
+    } catch (err) {
+      notifyError(err, '移動に失敗しました')
+      setSubmitting(false)
+    }
+  }
+
+  if (movingLine !== null && isEdit) {
+    return (
+      <ReparentTargetPicker
+        candidates={kindCandidates}
+        sourceDate={target?.date ?? date}
+        lineLabel={movingLine.label !== '' ? movingLine.label : `項目${(movingLine.serverIndex ?? 0) + 1}`}
+        lineAmount={movingLine.value ?? 0}
+        kind={kind}
+        isPending={submitting}
+        onSelect={(id) => {
+          void handleReparent(id)
+        }}
+        onCancel={() => setMovingLine(null)}
+      />
+    )
+  }
 
   const handleNameChange = (v: string) => {
     setName(v)
@@ -582,6 +676,7 @@ function TransactionForm({
         kind={kind}
         error={errors.amount}
         isDisabled={submitting}
+        onMoveLine={isEdit ? (line) => setMovingLine(line) : undefined}
       />
 
       <ToggleButtonGroup

@@ -14,7 +14,7 @@ import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { HistoryRow } from '../lib/history'
 import type { Kind } from '../lib/money'
-import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
+import { notifyDeleted, notifyError, notifyMoved, notifySaved } from '../lib/notify'
 import { useConfirm } from './ConfirmDialog'
 import {
   initAmountLinesFromTx,
@@ -23,17 +23,27 @@ import {
   type AmountLine,
 } from '../lib/amountLines'
 import { AmountLinesField } from './AmountLinesField'
+import { ReparentTargetPicker, type ReparentCandidate } from './ReparentTargetPicker'
+import type { Id } from '../../convex/_generated/dataModel'
 
 type HistoryEditDrawerProps = {
   opened: boolean
   onClose: () => void
   anchorDate: string
   target: HistoryRow | null
+  /** 同じ kind・履歴側の移動先候補（addon・import 除外済み） */
+  reparentCandidates?: ReparentCandidate[]
 }
 
 // 実績（過去に確定した入出金）の編集専用Drawer。
 // forecast の予定行とは排他（実績は過去の記録なので、ルール確定・上乗せの概念が無い）。
-export function HistoryEditDrawer({ opened, onClose, anchorDate, target }: HistoryEditDrawerProps) {
+export function HistoryEditDrawer({
+  opened,
+  onClose,
+  anchorDate,
+  target,
+  reparentCandidates = [],
+}: HistoryEditDrawerProps) {
   return (
     <Drawer.Backdrop isOpen={opened} onOpenChange={(open) => { if (!open) onClose() }}>
       <Drawer.Content placement="bottom">
@@ -44,7 +54,13 @@ export function HistoryEditDrawer({ opened, onClose, anchorDate, target }: Histo
           </Drawer.Header>
           <Drawer.Body>
             {opened && target && (
-              <HistoryEditForm key={target.txId} anchorDate={anchorDate} target={target} onClose={onClose} />
+              <HistoryEditForm
+                key={target.txId}
+                anchorDate={anchorDate}
+                target={target}
+                onClose={onClose}
+                reparentCandidates={reparentCandidates}
+              />
             )}
           </Drawer.Body>
         </Drawer.Dialog>
@@ -57,16 +73,20 @@ function HistoryEditForm({
   anchorDate,
   target,
   onClose,
+  reparentCandidates,
 }: {
   anchorDate: string
   target: HistoryRow
   onClose: () => void
+  reparentCandidates: ReparentCandidate[]
 }) {
   const updateTx = useMutation(api.transactions.update)
   const removeTx = useMutation(api.transactions.remove)
+  const reparentLine = useMutation(api.transactions.reparentBreakdownLine)
   const confirm = useConfirm()
 
   const [submitting, setSubmitting] = useState(false)
+  const [movingLine, setMovingLine] = useState<AmountLine | null>(null)
   const [date, setDate] = useState(target.date)
   const [name, setName] = useState(target.rawName ?? target.name)
   const [lines, setLines] = useState<AmountLine[]>(() =>
@@ -74,6 +94,84 @@ function HistoryEditForm({
   )
   const [kind, setKind] = useState<Kind>(target.kind)
   const [errors, setErrors] = useState<{ name?: string; amount?: string }>({})
+
+  const kindCandidates = reparentCandidates.filter(
+    (c) => c.kind === kind && c.txId !== target.txId,
+  )
+
+  const runUndo = async (undo: {
+    sourceId: Id<'transactions'>
+    targetId: Id<'transactions'>
+    index: number
+    expectedAmount: number
+    expectedLabel?: string
+  }) => {
+    try {
+      await reparentLine({
+        sourceId: undo.sourceId,
+        targetId: undo.targetId,
+        index: undo.index,
+        expectedAmount: undo.expectedAmount,
+        expectedLabel: undo.expectedLabel,
+      })
+      notifySaved('元に戻しました')
+    } catch (err) {
+      notifyError(err, '元に戻せませんでした')
+    }
+  }
+
+  const handleReparent = async (targetId: Id<'transactions'>) => {
+    if (movingLine?.serverIndex === undefined || target.isAddon) return
+    const breakdown = target.amountBreakdown
+    if (breakdown === undefined || breakdown.length < 2) return
+    const serverEntry = breakdown[movingLine.serverIndex]
+    if (serverEntry === undefined) {
+      notifyError(new Error('内訳の行が見つかりません'), '移動に失敗しました')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const result = await reparentLine({
+        sourceId: target.txId,
+        targetId,
+        index: movingLine.serverIndex,
+        expectedAmount: serverEntry.amount,
+        expectedLabel: serverEntry.label,
+      })
+      const label =
+        movingLine.label !== '' ? movingLine.label : `項目${movingLine.serverIndex + 1}`
+      notifyMoved(`${label}を移動しました`, {
+        description: result.dateChanged
+          ? '途中の残高・最低残高が変わっている場合があります（最終残高は同じ）。'
+          : undefined,
+        onUndo: () => {
+          void runUndo(result.undo)
+        },
+      })
+      onClose()
+    } catch (err) {
+      notifyError(err, '移動に失敗しました')
+      setSubmitting(false)
+    }
+  }
+
+  if (movingLine !== null && !target.isAddon) {
+    return (
+      <ReparentTargetPicker
+        candidates={kindCandidates}
+        sourceDate={target.date}
+        lineLabel={movingLine.label !== '' ? movingLine.label : `項目${(movingLine.serverIndex ?? 0) + 1}`}
+        lineAmount={movingLine.value ?? 0}
+        kind={kind}
+        isPending={submitting}
+        onSelect={(id) => {
+          void handleReparent(id)
+        }}
+        onCancel={() => setMovingLine(null)}
+      />
+    )
+  }
 
   const handleNameChange = (v: string) => {
     setName(v)
@@ -163,6 +261,7 @@ function HistoryEditForm({
         kind={kind}
         error={errors.amount}
         isDisabled={submitting}
+        onMoveLine={target.isAddon ? undefined : (line) => setMovingLine(line)}
       />
 
       <ToggleButtonGroup

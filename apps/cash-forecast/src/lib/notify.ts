@@ -16,6 +16,29 @@ export function notifyDeleted(message = '削除しました') {
   notifyQueue.add({ title: message, variant: 'success' })
 }
 
+/** 内訳移動の直後トースト。actionProps で Undo（逆 patch）を載せる。 */
+export function notifyMoved(
+  message: string,
+  options: {
+    description?: string
+    onUndo: () => void
+    timeout?: number
+  },
+) {
+  notifyQueue.add(
+    {
+      title: message,
+      description: options.description,
+      variant: 'success',
+      actionProps: {
+        children: '元に戻す',
+        onPress: options.onUndo,
+      },
+    },
+    { timeout: options.timeout ?? 8000 },
+  )
+}
+
 // ConvexError の場合は .data（このアプリでは日本語メッセージ）を優先して表示する。
 // 本番デプロイメントは通常の Error のメッセージをクライアントに渡さず "Server Error" に
 // 置き換えるため、意味のあるメッセージを見せたい箇所はサーバー側で ConvexError を使う想定。

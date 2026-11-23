@@ -3,6 +3,11 @@ export type AmountLine = {
   value: number | undefined
   /** Optional memo for this line. Empty string means none. */
   label: string
+  /**
+   * 永続化された amountBreakdown 上の index。
+   * hydrate 時だけ付き、新規追加行は undefined（移動不可）。
+   */
+  serverIndex?: number
 }
 
 /** Persisted breakdown entry. Omit `label` when empty. */
@@ -14,13 +19,22 @@ export type AmountBreakdownEntry = {
 let lineSeq = 0
 
 /** Stable unique id for a form row (DOM key + remove target). */
-export function createAmountLine(value?: number, label = ''): AmountLine {
+export function createAmountLine(
+  value?: number,
+  label = '',
+  serverIndex?: number,
+): AmountLine {
   lineSeq += 1
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `amount-line-${lineSeq}`
-  return { id, value, label }
+  return {
+    id,
+    value,
+    label,
+    ...(serverIndex !== undefined ? { serverIndex } : {}),
+  }
 }
 
 /** Edit/create seed: always exactly one row. */
@@ -38,7 +52,9 @@ export function initAmountLinesFromTx(tx: {
 }): AmountLine[] {
   const breakdown = tx.amountBreakdown
   if (breakdown !== undefined && breakdown.length > 0) {
-    return breakdown.map((entry) => createAmountLine(entry.amount, entry.label ?? ''))
+    return breakdown.map((entry, index) =>
+      createAmountLine(entry.amount, entry.label ?? '', index),
+    )
   }
   return initAmountLines(tx.amount)
 }

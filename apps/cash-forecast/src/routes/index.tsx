@@ -17,6 +17,7 @@ import { OnboardingView } from '../components/OnboardingView'
 import { ForecastList } from '../components/ForecastList'
 import { TransactionDrawer } from '../components/TransactionDrawer'
 import { HistoryEditDrawer } from '../components/HistoryEditDrawer'
+import type { ReparentCandidate } from '../components/ReparentTargetPicker'
 import { ReconcileDrawer } from '../components/ReconcileDrawer'
 import { RulesDrawer } from '../components/RulesDrawer'
 import { MonthlySummaryDrawer } from '../components/MonthlySummaryDrawer'
@@ -161,6 +162,39 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
     return buildHistoryRows({ anchorBalance: settings.anchorBalance, txs: historyTxs })
   }, [historyTxs, settings.anchorBalance])
 
+  // 内訳移動先: 一覧から開ける実取引のみ（仮想・addon・import 除外）。kind はフォーム側で絞る。
+  const forecastReparentCandidates = useMemo((): ReparentCandidate[] => {
+    if (transactions === undefined) return []
+    return transactions
+      .filter(
+        (tx) =>
+          tx.addon !== true &&
+          tx.importBatchId === undefined &&
+          tx.date > settings.anchorDate &&
+          tx.date <= horizonEnd,
+      )
+      .map((tx) => ({
+        txId: tx._id,
+        name: tx.name,
+        date: tx.date,
+        kind: tx.kind,
+        amount: tx.amount,
+      }))
+  }, [transactions, settings.anchorDate, horizonEnd])
+
+  const historyReparentCandidates = useMemo((): ReparentCandidate[] => {
+    if (historyTxs === undefined) return []
+    return historyTxs
+      .filter((tx) => tx.addon !== true && tx.importBatchId === undefined)
+      .map((tx) => ({
+        txId: tx._id,
+        name: tx.name,
+        date: tx.date,
+        kind: tx.kind,
+        amount: tx.amount,
+      }))
+  }, [historyTxs])
+
   const balancePoints = useMemo(() => {
     if (forecast === undefined) return undefined
     return buildBalanceSeries({
@@ -269,6 +303,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         anchorDate={settings.anchorDate}
         today={today}
         target={liveDrawerTarget}
+        reparentCandidates={forecastReparentCandidates}
       />
 
       <HistoryEditDrawer
@@ -276,6 +311,7 @@ function ForecastView({ settings }: { settings: Doc<'settings'> }) {
         onClose={() => setHistoryDrawerOpen(false)}
         anchorDate={settings.anchorDate}
         target={liveHistoryDrawerTarget}
+        reparentCandidates={historyReparentCandidates}
       />
 
       <ReconcileDrawer
