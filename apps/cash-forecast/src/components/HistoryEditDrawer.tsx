@@ -25,6 +25,7 @@ import {
 } from '../lib/amountLines'
 import { AmountLinesField } from './AmountLinesField'
 import { ReparentTargetPicker, type ReparentCandidate } from './ReparentTargetPicker'
+import { filterReparentMoveCandidates } from '../lib/reparentCandidates'
 import type { Id } from '../../convex/_generated/dataModel'
 
 type HistoryEditDrawerProps = {
@@ -98,11 +99,10 @@ function HistoryEditForm({
 
   const { plan } = usePlan()
 
-  const kindCandidates = reparentCandidates.filter((c) => {
-    if (c.kind !== kind) return false
-    if (c.targetKind === 'transaction' && c.txId === target.txId) return false
-    return c.targetKind === 'transaction'
-  })
+  const kindCandidates = filterReparentMoveCandidates(reparentCandidates, {
+    kind,
+    sourceTxId: target.txId,
+  }).filter((c) => c.targetKind === 'transaction')
 
   const runUndo = async (undo: {
     sourceId: Id<'transactions'>

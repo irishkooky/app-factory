@@ -9,6 +9,8 @@ import { formatDateShort, formatMonthLabel } from '../../src/lib/date'
 import { initAmountLinesFromTx } from '../../src/lib/amountLines'
 import { formatYen } from '../../src/lib/money'
 import { notifyMoved, notifyQueue } from '../../src/lib/notify'
+import { filterReparentMoveCandidates } from '../../src/lib/reparentCandidates'
+import type { ReparentSection } from '../../src/lib/reparentCandidates'
 import {
   buildReparentRulesHarnessScenario,
   HARNESS_ANCHOR_DATE,
@@ -19,26 +21,32 @@ import {
 import type { ForecastRow } from '../../src/lib/forecast'
 
 type View =
-  | 'picker-pro'
   | 'picker-free'
+  | 'picker-tab-oneoff'
+  | 'picker-tab-virtual-collapsed'
+  | 'picker-tab-virtual-expanded'
+  | 'picker-tab-confirmed'
+  | 'picker-search'
   | 'before-move'
   | 'after-move'
   | 'date-warning'
   | 'undo-toast'
 
+const PICKER_VIEWS: View[] = [
+  'picker-free',
+  'picker-tab-oneoff',
+  'picker-tab-virtual-collapsed',
+  'picker-tab-virtual-expanded',
+  'picker-tab-confirmed',
+  'picker-search',
+  'date-warning',
+]
+
 function viewFromLocation(): View {
   const v = new URLSearchParams(window.location.search).get('view')
-  if (
-    v === 'picker-pro' ||
-    v === 'picker-free' ||
-    v === 'before-move' ||
-    v === 'after-move' ||
-    v === 'date-warning' ||
-    v === 'undo-toast'
-  ) {
-    return v
-  }
-  return 'picker-pro'
+  const all: View[] = [...PICKER_VIEWS, 'before-move', 'after-move', 'undo-toast']
+  if (v !== null && all.includes(v as View)) return v as View
+  return 'picker-tab-oneoff'
 }
 
 function HarnessShell({ view, children }: { view: View; children: ReactNode }) {
@@ -104,7 +112,9 @@ function RuleMonthPreview({ row, amountBefore }: { row: ForecastRow; amountBefor
       <div className="flex flex-col gap-1.5">
         <div className="flex justify-between">
           <span className="text-sm text-muted">ベース（ルール平均）</span>
-          <span className="text-sm tabular-nums">{formatYen(baseAmount)}</span>
+          <span className={`text-sm tabular-nums ${kindTone(row.kind)}`}>
+            <KindYen kind={row.kind} amount={baseAmount} />
+          </span>
         </div>
         {(row.addons ?? []).map((addon) => (
           <div
@@ -123,10 +133,61 @@ function RuleMonthPreview({ row, amountBefore }: { row: ForecastRow; amountBefor
   )
 }
 
+function PickerHarness({
+  view,
+  showRecurringSections,
+  initialTab,
+  initialQuery,
+}: {
+  view: View
+  showRecurringSections: boolean
+  initialTab?: ReparentSection
+  initialQuery?: string
+}) {
+  const scenario = useMemo(() => buildReparentRulesHarnessScenario(), [])
+  const sourceBefore = scenario.transactionsBefore[0]!
+
+  const candidates = useMemo(
+    () =>
+      filterReparentMoveCandidates(
+        scenario.candidatesBefore.filter((c) => c.kind === 'expense'),
+        { kind: 'expense', sourceTxId: sourceBefore._id },
+      ),
+    [scenario],
+  )
+
+  return (
+    <>
+      <SourceTxnHeader
+        name={sourceBefore.name}
+        date={sourceBefore.date}
+        amountBefore={sourceBefore.amount}
+      />
+      <h1 className="mb-3 text-base font-semibold">別の取引へ移動</h1>
+      <div data-initial-tab={initialTab ?? 'oneoff'} data-initial-query={initialQuery ?? ''}>
+        <ReparentTargetPicker
+          key={view}
+          candidates={candidates}
+          sourceDate={sourceBefore.date}
+          lineLabel={HARNESS_MOVED_LABEL}
+          lineAmount={HARNESS_MOVED_AMOUNT}
+          kind="expense"
+          showRecurringSections={showRecurringSections}
+          defaultTab={initialTab}
+          initialQuery={initialQuery}
+          onSelect={() => {}}
+          onSelectRuleMonth={() => {}}
+          onCancel={() => {}}
+        />
+      </div>
+      {view === 'date-warning' ? <DateWarningBootstrap /> : null}
+    </>
+  )
+}
+
 function App() {
   const view = useMemo(() => viewFromLocation(), [])
   const scenario = useMemo(() => buildReparentRulesHarnessScenario(), [])
-  const expenseCandidates = scenario.candidatesBefore.filter((c) => c.kind === 'expense')
 
   const sourceBefore = scenario.transactionsBefore[0]!
   const sourceAfter = scenario.transactionsAfter[0]!
@@ -140,27 +201,62 @@ function App() {
     })
   }, [view])
 
-  if (view === 'picker-pro' || view === 'picker-free' || view === 'date-warning') {
+  if (view === 'picker-free') {
     return (
       <HarnessShell view={view}>
-        <SourceTxnHeader
-          name={sourceBefore.name}
-          date={sourceBefore.date}
-          amountBefore={sourceBefore.amount}
+        <PickerHarness view={view} showRecurringSections={false} initialTab="oneoff" />
+      </HarnessShell>
+    )
+  }
+  if (view === 'picker-tab-oneoff') {
+    return (
+      <HarnessShell view={view}>
+        <PickerHarness view={view} showRecurringSections initialTab="oneoff" />
+      </HarnessShell>
+    )
+  }
+  if (view === 'picker-tab-virtual-collapsed') {
+    return (
+      <HarnessShell view={view}>
+        <PickerHarness view={view} showRecurringSections initialTab="recurring-virtual" />
+      </HarnessShell>
+    )
+  }
+  if (view === 'picker-tab-virtual-expanded') {
+    return (
+      <HarnessShell view={view}>
+        <PickerHarness view={view} showRecurringSections initialTab="recurring-virtual" />
+        <ExpandRentBootstrap />
+      </HarnessShell>
+    )
+  }
+  if (view === 'picker-tab-confirmed') {
+    return (
+      <HarnessShell view={view}>
+        <PickerHarness view={view} showRecurringSections initialTab="recurring-confirmed" />
+      </HarnessShell>
+    )
+  }
+  if (view === 'picker-search') {
+    return (
+      <HarnessShell view={view}>
+        <PickerHarness
+          view={view}
+          showRecurringSections
+          initialTab="oneoff"
+          initialQuery="食料"
         />
-        <h1 className="mb-3 text-base font-semibold">別の取引へ移動</h1>
-        <ReparentTargetPicker
-          candidates={expenseCandidates}
-          sourceDate={sourceBefore.date}
-          lineLabel={HARNESS_MOVED_LABEL}
-          lineAmount={HARNESS_MOVED_AMOUNT}
-          kind="expense"
-          showRecurringSections={view !== 'picker-free'}
-          onSelect={() => {}}
-          onSelectRuleMonth={() => {}}
-          onCancel={() => {}}
+      </HarnessShell>
+    )
+  }
+  if (view === 'date-warning') {
+    return (
+      <HarnessShell view={view}>
+        <PickerHarness
+          view={view}
+          showRecurringSections
+          initialTab="recurring-virtual"
         />
-        {view === 'date-warning' ? <DateWarningBootstrap /> : null}
       </HarnessShell>
     )
   }
@@ -235,9 +331,36 @@ function App() {
 
 function DateWarningBootstrap() {
   useEffect(() => {
-    const buttons = Array.from(document.querySelectorAll('button'))
-    const target = buttons.find((b) => b.textContent?.includes('2026年11月') && b.textContent.includes('家賃'))
-    target?.click()
+    const run = () => {
+      document.querySelector<HTMLElement>('[data-testid="reparent-tab-recurring-virtual"]')?.click()
+      const buttons = Array.from(document.querySelectorAll('button[data-candidate-key]'))
+      const target =
+        buttons.find((b) => b.textContent?.includes('家賃') && b.textContent.includes('2026年4月')) ??
+        buttons.find((b) => b.textContent?.includes('家賃') && b.textContent.includes('2026年5月'))
+      target?.click()
+    }
+    const t = setTimeout(run, 120)
+    return () => clearTimeout(t)
+  }, [])
+  return null
+}
+
+function ExpandRentBootstrap() {
+  useEffect(() => {
+    const run = () => {
+      document.querySelector<HTMLElement>('[data-testid="reparent-tab-recurring-virtual"]')?.click()
+      const expandAll = () => {
+        const more = Array.from(document.querySelectorAll('button')).filter((b) =>
+          b.textContent?.includes('もっと見る'),
+        )
+        if (more.length === 0) return
+        for (const btn of more) btn.click()
+        setTimeout(expandAll, 80)
+      }
+      setTimeout(expandAll, 80)
+    }
+    const t = setTimeout(run, 80)
+    return () => clearTimeout(t)
   }, [])
   return null
 }

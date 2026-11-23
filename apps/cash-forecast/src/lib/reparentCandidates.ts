@@ -12,6 +12,7 @@ export type ReparentCandidateBase = {
   amount: number;
   /** 定期取引のルール名（表示用） */
   ruleName?: string;
+  ruleId?: Id<"rules">;
   /** yyyy-mm */
   ruleMonth?: string;
 };
@@ -74,6 +75,7 @@ export function buildForecastReparentCandidates(input: {
       date: tx.date,
       kind: tx.kind,
       amount: tx.amount,
+      ruleId: tx.ruleId,
       ruleName: rule?.name ?? tx.name,
       ruleMonth: tx.ruleMonth,
     });
@@ -94,6 +96,20 @@ export function buildForecastReparentCandidates(input: {
     }));
 
   return [...oneoff, ...virtual, ...confirmed];
+}
+
+/** ピッカー用: 同じ kind・移動元の実取引を候補から除外 */
+export function filterReparentMoveCandidates(
+  candidates: ReparentCandidate[],
+  params: { kind: Kind; sourceTxId?: Id<"transactions"> },
+): ReparentCandidate[] {
+  return candidates.filter((c) => {
+    if (c.kind !== params.kind) return false
+    if (c.targetKind === "transaction" && params.sourceTxId !== undefined && c.txId === params.sourceTxId) {
+      return false
+    }
+    return true
+  })
 }
 
 export function buildHistoryReparentCandidates(transactions: Doc<"transactions">[]): ReparentCandidate[] {

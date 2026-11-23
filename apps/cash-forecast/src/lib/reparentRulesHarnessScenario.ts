@@ -7,7 +7,10 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 import { clampedDateInMonth } from "./date";
 import { buildForecast, type ForecastRow } from "./forecast";
 import { buildForecastReparentCandidates, type ReparentCandidate } from "./reparentCandidates";
-import { computeReparentToRuleAddon } from "./reparentToRuleAddon";
+import {
+  computeReparentToRuleAddon,
+  type ReparentToRuleAddonOk,
+} from "./reparentToRuleAddon";
 
 export const HARNESS_ANCHOR_DATE = "2026-03-15";
 export const HARNESS_HORIZON_END = "2027-03-15";
@@ -18,7 +21,8 @@ export const HARNESS_MOVED_AMOUNT = 4_000;
 export const HARNESS_MOVED_LABEL = "繰越分";
 
 const userId = "harness-user";
-const ruleRentId = "rule_rent" as Id<"rules">;
+export const HARNESS_RULE_RENT_ID = "rule_rent" as Id<"rules">;
+const ruleRentId = HARNESS_RULE_RENT_ID;
 const ruleCardId = "rule_card" as Id<"rules">;
 const txManualId = "tx_manual" as Id<"transactions">;
 
@@ -96,7 +100,7 @@ export type ReparentRulesHarnessScenario = {
   rules: Doc<"rules">[];
   transactionsBefore: Doc<"transactions">[];
   transactionsAfter: Doc<"transactions">[];
-  reparent: ReturnType<typeof computeReparentToRuleAddon>;
+  reparent: ReparentToRuleAddonOk;
   forecastBefore: ForecastRow[];
   forecastAfter: ForecastRow[];
   virtualRentBefore: ForecastRow | undefined;

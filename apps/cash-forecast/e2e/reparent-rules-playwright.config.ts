@@ -12,7 +12,10 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 60_000,
   use: {
-    ...devices['Pixel 7'],
+    viewport: { width: 375, height: 812 },
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
     baseURL: 'http://localhost:5199',
   },
   webServer: {

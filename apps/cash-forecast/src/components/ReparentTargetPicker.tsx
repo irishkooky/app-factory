@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Button, Input, Label, TextField } from '@heroui/react'
+import { Button, Input, Label, TextField, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import type { Id } from '../../convex/_generated/dataModel'
-import { formatDateShort, formatMonthLabel } from '../lib/date'
+import { formatDateShort } from '../lib/date'
 import { formatYen, type Kind } from '../lib/money'
 import type { ReparentCandidate, ReparentRuleMonthTarget, ReparentSection } from '../lib/reparentCandidates'
+import {
+  candidateKey,
+  displayTitle,
+  oneoffCandidatesForTab,
+  recurringCandidatesForTab,
+  REPARENT_PICKER_SECTIONS,
+} from '../lib/reparentPickerLayout'
 
 export type { ReparentCandidate } from '../lib/reparentCandidates'
 
@@ -18,18 +25,14 @@ type ReparentTargetPickerProps = {
   lineAmount: number
   kind: Kind
   isPending?: boolean
-  /** false のとき定期セクション（未確定・確定済み）を出さない */
+  /** false のとき定期タブを出さない（単発のみ） */
   showRecurringSections?: boolean
+  defaultTab?: ReparentSection
+  initialQuery?: string
   onSelect: (targetId: Id<'transactions'>) => void
   onSelectRuleMonth?: (target: ReparentRuleMonthTarget) => void
   onCancel: () => void
 }
-
-const SECTION_META: { id: ReparentSection; title: string; proOnly?: boolean }[] = [
-  { id: 'oneoff', title: '単発の取引' },
-  { id: 'recurring-virtual', title: '定期（未確定の月）', proOnly: true },
-  { id: 'recurring-confirmed', title: '定期（確定済み）', proOnly: true },
-]
 
 function selectionKey(sel: Selection | null): string | null {
   if (sel === null) return null
@@ -37,19 +40,45 @@ function selectionKey(sel: Selection | null): string | null {
   return `rule:${sel.ruleId}:${sel.ruleMonth}`
 }
 
-function candidateKey(c: ReparentCandidate): string {
-  if (c.targetKind === 'transaction') return `tx:${c.txId}`
-  return `rule:${c.ruleId}:${c.ruleMonth}`
+function selectFromCandidate(c: ReparentCandidate, setSelection: (s: Selection) => void) {
+  if (c.targetKind === 'transaction') {
+    setSelection({ kind: 'transaction', txId: c.txId })
+  } else {
+    setSelection({ kind: 'rule-month', ruleId: c.ruleId, ruleMonth: c.ruleMonth })
+  }
 }
 
-function displayTitle(c: ReparentCandidate): string {
-  if (c.section === 'recurring-confirmed' && c.ruleName !== undefined && c.ruleMonth !== undefined) {
-    return `${c.ruleName}（${formatMonthLabel(c.ruleMonth)}）`
-  }
-  if (c.section === 'recurring-virtual' && c.ruleMonth !== undefined) {
-    return `${c.ruleName ?? c.name}（${formatMonthLabel(c.ruleMonth)}）`
-  }
-  return c.name
+function CandidateCard({
+  c,
+  isSelected,
+  isPending,
+  onSelect,
+}: {
+  c: ReparentCandidate
+  isSelected: boolean
+  isPending?: boolean
+  onSelect: () => void
+}) {
+  const title = displayTitle(c)
+  return (
+    <button
+      type="button"
+      disabled={isPending}
+      onClick={onSelect}
+      data-candidate-key={candidateKey(c)}
+      className={`flex min-h-[5.5rem] w-full flex-col justify-between gap-2 rounded-2xl border-2 p-3 text-left transition-colors ${
+        isSelected
+          ? 'border-accent bg-accent/10 shadow-sm ring-2 ring-accent/40'
+          : 'border-default-200 bg-surface-secondary hover:border-default-300 hover:bg-surface-tertiary'
+      }`}
+    >
+      <span className="line-clamp-2 text-sm font-semibold leading-snug">{title}</span>
+      <div className="flex flex-col gap-0.5">
+        <span className="text-lg font-bold tabular-nums">{formatYen(c.amount)}</span>
+        <span className="text-sm tabular-nums text-muted">{formatDateShort(c.date)}</span>
+      </div>
+    </button>
+  )
 }
 
 /**
@@ -64,52 +93,38 @@ export function ReparentTargetPicker({
   kind: _kind,
   isPending,
   showRecurringSections = true,
+  defaultTab = 'oneoff',
+  initialQuery = '',
   onSelect,
   onSelectRuleMonth,
   onCancel,
 }: ReparentTargetPickerProps) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const [selection, setSelection] = useState<Selection | null>(null)
+  const [activeTab, setActiveTab] = useState<ReparentSection>(defaultTab)
+  const [expandedRules, setExpandedRules] = useState<Set<string>>(() => new Set())
 
-  const visibleSections = useMemo(() => {
-    if (showRecurringSections) return SECTION_META
-    return SECTION_META.filter((s) => !s.proOnly)
+  const tabs = useMemo(() => {
+    if (showRecurringSections) return REPARENT_PICKER_SECTIONS
+    return REPARENT_PICKER_SECTIONS.filter((t) => !t.proOnly)
   }, [showRecurringSections])
 
-  const filteredBySection = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const match = (c: ReparentCandidate) => {
-      if (q === '') return true
-      const title = displayTitle(c).toLowerCase()
-      return (
-        title.includes(q) ||
-        c.name.toLowerCase().includes(q) ||
-        c.date.includes(q) ||
-        formatDateShort(c.date).includes(q) ||
-        (c.ruleMonth !== undefined && formatMonthLabel(c.ruleMonth).includes(q))
-      )
-    }
+  const oneoffList = useMemo(
+    () => oneoffCandidatesForTab(candidates, sourceDate, query),
+    [candidates, sourceDate, query],
+  )
 
-    const sortList = (list: ReparentCandidate[]) =>
-      [...list].sort((a, b) => {
-        if (a.date !== b.date) return a.date < b.date ? -1 : 1
-        return displayTitle(a).localeCompare(displayTitle(b), 'ja')
-      })
+  const virtualGroups = useMemo(
+    () =>
+      recurringCandidatesForTab(candidates, 'recurring-virtual', sourceDate, query, expandedRules),
+    [candidates, sourceDate, query, expandedRules],
+  )
 
-    const buckets = new Map<ReparentSection, ReparentCandidate[]>()
-    for (const meta of visibleSections) {
-      buckets.set(meta.id, [])
-    }
-    for (const c of candidates) {
-      if (!buckets.has(c.section)) continue
-      if (!match(c)) continue
-      buckets.get(c.section)!.push(c)
-    }
-    for (const [key, list] of buckets) {
-      buckets.set(key, sortList(list))
-    }
-    return buckets
-  }, [candidates, query, visibleSections])
+  const confirmedGroups = useMemo(
+    () =>
+      recurringCandidatesForTab(candidates, 'recurring-confirmed', sourceDate, query, expandedRules),
+    [candidates, sourceDate, query, expandedRules],
+  )
 
   const selectedCandidate = useMemo(() => {
     if (selection === null) return undefined
@@ -133,13 +148,13 @@ export function ReparentTargetPicker({
     (selection.kind === 'transaction' ||
       (selection.kind === 'rule-month' && onSelectRuleMonth !== undefined))
 
-  const totalVisible = visibleSections.reduce(
-    (n, meta) => n + (filteredBySection.get(meta.id)?.length ?? 0),
-    0,
-  )
+  const tabEmpty =
+    (activeTab === 'oneoff' && oneoffList.length === 0) ||
+    (activeTab === 'recurring-virtual' && virtualGroups.every((g) => g.visibleItems.length === 0)) ||
+    (activeTab === 'recurring-confirmed' && confirmedGroups.every((g) => g.visibleItems.length === 0))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4" data-reparent-picker>
       <div className="flex flex-col gap-1">
         <p className="text-sm text-muted">移動する項目</p>
         <p className="text-sm font-medium">
@@ -157,53 +172,88 @@ export function ReparentTargetPicker({
         />
       </TextField>
 
-      <div className="flex max-h-72 flex-col gap-3 overflow-y-auto">
-        {totalVisible === 0 ? (
-          <p className="py-4 text-center text-sm text-muted">該当する取引がありません</p>
+      {tabs.length > 1 && (
+        <ToggleButtonGroup
+          selectionMode="single"
+          selectedKeys={new Set([activeTab])}
+          onSelectionChange={(keys) => {
+            const value = Array.from(keys)[0]
+            if (
+              value === 'oneoff' ||
+              value === 'recurring-virtual' ||
+              value === 'recurring-confirmed'
+            ) {
+              setActiveTab(value)
+            }
+          }}
+          isDisabled={isPending}
+          className="w-full"
+        >
+          {tabs.map((tab, i) => (
+            <span key={tab.id} className="contents">
+              {i > 0 ? <ToggleButtonGroup.Separator /> : null}
+              <ToggleButton
+                id={tab.id}
+                data-testid={`reparent-tab-${tab.id}`}
+                className="flex-1 text-sm"
+              >
+                {tab.title}
+              </ToggleButton>
+            </span>
+          ))}
+        </ToggleButtonGroup>
+      )}
+
+      <div className="max-h-[min(24rem,55vh)] overflow-y-auto">
+        {tabEmpty ? (
+          <p className="py-6 text-center text-sm text-muted">該当する取引がありません</p>
+        ) : activeTab === 'oneoff' ? (
+          <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+            {oneoffList.map((c) => (
+              <CandidateCard
+                key={candidateKey(c)}
+                c={c}
+                isSelected={selectionKey(selection) === candidateKey(c)}
+                isPending={isPending}
+                onSelect={() => selectFromCandidate(c, setSelection)}
+              />
+            ))}
+          </div>
         ) : (
-          visibleSections.map((meta) => {
-            const list = filteredBySection.get(meta.id) ?? []
-            if (list.length === 0) return null
-            return (
-              <section key={meta.id} className="flex flex-col gap-1">
-                <h3 className="px-1 text-xs font-semibold tracking-wide text-muted uppercase">
-                  {meta.title}
-                </h3>
-                {list.map((c) => {
-                  const key = candidateKey(c)
-                  const isSelected = selectionKey(selection) === key
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      disabled={isPending}
-                      onClick={() => {
-                        if (c.targetKind === 'transaction') {
-                          setSelection({ kind: 'transaction', txId: c.txId })
-                        } else {
-                          setSelection({
-                            kind: 'rule-month',
-                            ruleId: c.ruleId,
-                            ruleMonth: c.ruleMonth,
-                          })
-                        }
-                      }}
-                      className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
-                        isSelected
-                          ? 'bg-accent/15 ring-1 ring-accent'
-                          : 'bg-surface-secondary hover:bg-surface-tertiary'
-                      }`}
-                    >
-                      <span className="min-w-0 truncate font-medium">{displayTitle(c)}</span>
-                      <span className="shrink-0 tabular-nums text-muted">
-                        {formatDateShort(c.date)} · {formatYen(c.amount)}
-                      </span>
-                    </button>
-                  )
-                })}
+          <div className="flex flex-col gap-4">
+            {(activeTab === 'recurring-virtual' ? virtualGroups : confirmedGroups).map((group) => (
+              <section key={group.ruleId} className="flex flex-col gap-2" data-rule-group={group.ruleId}>
+                <h3 className="px-1 text-sm font-semibold text-foreground">{group.ruleName}</h3>
+                <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
+                  {group.visibleItems.map((c) => (
+                    <CandidateCard
+                      key={candidateKey(c)}
+                      c={c}
+                      isSelected={selectionKey(selection) === candidateKey(c)}
+                      isPending={isPending}
+                      onSelect={() => selectFromCandidate(c, setSelection)}
+                    />
+                  ))}
+                </div>
+                {group.hiddenCount > 0 ? (
+                  <Button
+                    variant="tertiary"
+                    size="sm"
+                    className="self-start"
+                    onPress={() =>
+                      setExpandedRules((prev) => {
+                        const next = new Set(prev)
+                        next.add(group.ruleId)
+                        return next
+                      })
+                    }
+                  >
+                    もっと見る（あと{group.hiddenCount}件）
+                  </Button>
+                ) : null}
               </section>
-            )
-          })
+            ))}
+          </div>
         )}
       </div>
 
