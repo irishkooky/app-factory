@@ -28,7 +28,7 @@ import {
 import { AmountLinesField } from './AmountLinesField'
 import { MoneyField } from './MoneyField'
 import { ReparentTargetPicker, type ReparentCandidate } from './ReparentTargetPicker'
-import { filterReparentMoveCandidates } from '../lib/reparentCandidates'
+import { filterReparentMoveCandidates, type ReparentRuleMonthTarget } from '../lib/reparentCandidates'
 import type { Id } from '../../convex/_generated/dataModel'
 
 type TransactionDrawerProps = {
@@ -442,6 +442,8 @@ function TransactionForm({
   const updateTx = useMutation(api.transactions.update)
   const removeTx = useMutation(api.transactions.remove)
   const reparentLine = useMutation(api.transactions.reparentBreakdownLine)
+  const reparentToRuleAddon = useMutation(api.transactions.reparentBreakdownLineToRuleAddon)
+  const undoReparentToRuleAddon = useMutation(api.transactions.undoReparentBreakdownLineToRuleAddon)
   const confirm = useConfirm()
 
   const minDate = addDays(anchorDate, 1)
@@ -468,6 +470,21 @@ function TransactionForm({
     kind,
     sourceTxId: target?.txId,
   })
+
+  const runUndoRuleAddon = async (undo: {
+    sourceId: Id<'transactions'>
+    addonId: Id<'transactions'>
+    sourceIndex: number
+    expectedAmount: number
+    expectedLabel?: string
+  }) => {
+    try {
+      await undoReparentToRuleAddon(undo)
+      notifySaved('元に戻しました')
+    } catch (err) {
+      notifyError(err, '元に戻せませんでした')
+    }
+  }
 
   const runUndo = async (undo: {
     sourceId: Id<'transactions'>
@@ -526,6 +543,44 @@ function TransactionForm({
     }
   }
 
+  const handleReparentRuleMonth = async (ruleTarget: ReparentRuleMonthTarget) => {
+    if (!target?.txId || movingLine?.serverIndex === undefined) return
+    const breakdown = target.amountBreakdown
+    if (breakdown === undefined || breakdown.length < 2) return
+    const serverEntry = breakdown[movingLine.serverIndex]
+    if (serverEntry === undefined) {
+      notifyError(new Error('内訳の行が見つかりません'), '移動に失敗しました')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const result = await reparentToRuleAddon({
+        sourceId: target.txId,
+        ruleId: ruleTarget.ruleId,
+        ruleMonth: ruleTarget.ruleMonth,
+        expectedRuleDate: ruleTarget.date,
+        index: movingLine.serverIndex,
+        expectedAmount: serverEntry.amount,
+        expectedLabel: serverEntry.label,
+      })
+      const label =
+        movingLine.label !== '' ? movingLine.label : `項目${movingLine.serverIndex + 1}`
+      notifyMoved(`${label}を定期へ移動しました`, {
+        description: result.dateChanged
+          ? 'ルール発生日と違うため、それまでの途中残高・最低残高が変わっている場合があります（最終残高は同じことが多いです）。'
+          : undefined,
+        onUndo: () => {
+          void runUndoRuleAddon(result.undo)
+        },
+      })
+      onClose()
+    } catch (err) {
+      notifyError(err, '移動に失敗しました')
+      setSubmitting(false)
+    }
+  }
+
   if (movingLine !== null && isEdit) {
     return (
       <ReparentTargetPicker
@@ -538,6 +593,9 @@ function TransactionForm({
         showRecurringSections={plan === 'pro'}
         onSelect={(id) => {
           void handleReparent(id)
+        }}
+        onSelectRuleMonth={(ruleTarget) => {
+          void handleReparentRuleMonth(ruleTarget)
         }}
         onCancel={() => setMovingLine(null)}
       />
