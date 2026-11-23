@@ -2,8 +2,12 @@ import { query, mutation } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { assertAmount, assertDateString, assertMonthString, assertName, assertOptionalName } from "./validate";
 import { requirePro } from "./billing";
-import { addMonthsToDateClamped, todayJST } from "../src/lib/date";
+import { addMonthsToDateClamped, clampedDateInMonth, todayJST } from "../src/lib/date";
 import { computeReparent } from "../src/lib/reparentBreakdown";
+import {
+  computeReparentToRuleAddon,
+  computeUndoReparentToRuleAddon,
+} from "../src/lib/reparentToRuleAddon";
 
 const amountBreakdownArg = v.optional(
   v.array(
@@ -336,5 +340,195 @@ export const reparentBreakdownLine = mutation({
         expectedLabel: result.undo.expectedLabel,
       },
     };
+  },
+});
+
+/**
+ * 内訳1行を未確定ルール月へ addon として原子的に移動する。
+ */
+export const reparentBreakdownLineToRuleAddon = mutation({
+  args: {
+    sourceId: v.id("transactions"),
+    ruleId: v.id("rules"),
+    ruleMonth: v.string(),
+    expectedRuleDate: v.string(),
+    index: v.number(),
+    expectedAmount: v.number(),
+    expectedLabel: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("ログインが必要です");
+    }
+    await requirePro(ctx, identity.subject);
+
+    const { sourceId, ruleId, ruleMonth, expectedRuleDate, index, expectedAmount, expectedLabel } =
+      args;
+
+    const source = await ctx.db.get(sourceId);
+    if (!source || source.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+
+    const rule = await ctx.db.get(ruleId);
+    if (!rule || rule.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+
+    assertAmount(expectedAmount);
+    if (!Number.isInteger(index) || index < 0) {
+      throw new ConvexError("内訳の行が見つかりません");
+    }
+    assertMonthString(ruleMonth);
+    assertDateString(expectedRuleDate, "日付");
+
+    const ruleDate = clampedDateInMonth(ruleMonth, rule.dayOfMonth);
+    if (ruleDate !== expectedRuleDate) {
+      throw new ConvexError("移動先のルール月が変わっています。画面を開き直してください");
+    }
+
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    if (!settings) {
+      throw new ConvexError("先に残高の初期設定を行ってください");
+    }
+
+    const existingRows = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_rule", (q) =>
+        q.eq("userId", identity.subject).eq("ruleId", ruleId).eq("ruleMonth", ruleMonth),
+      )
+      .collect();
+    const targetMonthHasOverride = existingRows.some((row) => row.addon !== true);
+
+    const horizonEnd = addMonthsToDateClamped(todayJST(), 12);
+    const result = computeReparentToRuleAddon({
+      source: {
+        id: source._id,
+        kind: source.kind,
+        amount: source.amount,
+        amountBreakdown: source.amountBreakdown,
+        date: source.date,
+        addon: source.addon,
+        actual: source.actual,
+        importBatchId: source.importBatchId,
+      },
+      target: { ruleId: rule._id, ruleMonth, date: ruleDate },
+      index,
+      expectedAmount,
+      expectedLabel,
+      anchorDate: settings.anchorDate,
+      horizonEnd,
+      targetMonthHasOverride,
+    });
+
+    if ("error" in result) {
+      throw new ConvexError(result.error);
+    }
+
+    await ctx.db.patch(sourceId, {
+      amount: result.source.amount,
+      amountBreakdown:
+        result.source.amountBreakdown !== undefined && result.source.amountBreakdown.length > 0
+          ? result.source.amountBreakdown
+          : [],
+    });
+
+    const addonId = await ctx.db.insert("transactions", {
+      userId: identity.subject,
+      date: result.addon.date,
+      name: assertOptionalName(result.addon.name),
+      kind: result.addon.kind,
+      amount: result.addon.amount,
+      ruleId: ruleId,
+      ruleMonth,
+      addon: true,
+    });
+
+    return {
+      sourceId,
+      addonId,
+      dateChanged: result.dateChanged,
+      sourceDate: source.date,
+      targetDate: ruleDate,
+      undo: {
+        sourceId,
+        addonId,
+        sourceIndex: result.undo.sourceIndex,
+        expectedAmount: result.undo.expectedAmount,
+        expectedLabel: result.undo.expectedLabel,
+      },
+    };
+  },
+});
+
+/** reparentBreakdownLineToRuleAddon の Undo（addon 削除 + 内訳行を戻す） */
+export const undoReparentBreakdownLineToRuleAddon = mutation({
+  args: {
+    sourceId: v.id("transactions"),
+    addonId: v.id("transactions"),
+    sourceIndex: v.number(),
+    expectedAmount: v.number(),
+    expectedLabel: v.optional(v.string()),
+  },
+  handler: async (ctx, { sourceId, addonId, sourceIndex, expectedAmount, expectedLabel }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("ログインが必要です");
+    }
+
+    const source = await ctx.db.get(sourceId);
+    const addon = await ctx.db.get(addonId);
+    if (!source || source.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+    if (!addon || addon.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+    if (addon.addon !== true) {
+      throw new ConvexError("取り消し対象が見つかりません");
+    }
+    if (addon.amount !== expectedAmount) {
+      throw new ConvexError("移動した内容が変わっています。画面を開き直してください");
+    }
+    const addonLabel = addon.name?.trim() ?? "";
+    const expected = expectedLabel?.trim() ?? "";
+    if (expected.length > 0) {
+      if (addonLabel !== expected) {
+        throw new ConvexError("移動した内容が変わっています。画面を開き直してください");
+      }
+    }
+
+    const line =
+      expectedLabel !== undefined && expectedLabel !== ""
+        ? { amount: expectedAmount, label: expectedLabel }
+        : { amount: expectedAmount };
+
+    const restored = computeUndoReparentToRuleAddon({
+      source: {
+        id: source._id,
+        kind: source.kind,
+        amount: source.amount,
+        amountBreakdown: source.amountBreakdown,
+        date: source.date,
+        addon: source.addon,
+        actual: source.actual,
+        importBatchId: source.importBatchId,
+      },
+      index: sourceIndex,
+      line,
+    });
+
+    await ctx.db.delete(addonId);
+    await ctx.db.patch(sourceId, {
+      amount: restored.amount,
+      amountBreakdown:
+        restored.amountBreakdown !== undefined && restored.amountBreakdown.length > 0
+          ? restored.amountBreakdown
+          : [],
+    });
   },
 });
