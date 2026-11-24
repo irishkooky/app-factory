@@ -59,7 +59,11 @@ function HarnessShell({ view, children }: { view: View; children: ReactNode }) {
         computeReparentToRuleAddon 由来
       </p>
       <Toast.Provider placement="top" queue={notifyQueue} />
-      <Surface variant="secondary" className="rounded-2xl p-4 shadow-sm">
+      <Surface
+        variant="secondary"
+        className="fixed inset-x-0 bottom-0 z-10 mx-auto flex max-h-[85vh] min-h-[min(70vh,32rem)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl px-4 pt-4 pb-0 shadow-lg"
+        data-testid="harness-sheet"
+      >
         {children}
       </Surface>
     </div>
@@ -159,14 +163,18 @@ function PickerHarness({
   )
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <SourceTxnHeader
         name={sourceBefore.name}
         date={sourceBefore.date}
         amountBefore={sourceBefore.amount}
       />
-      <h1 className="mb-3 text-base font-semibold">別の取引へ移動</h1>
-      <div data-initial-tab={initialTab ?? 'oneoff'} data-initial-query={initialQuery ?? ''}>
+      <h1 className="text-base font-semibold">別の取引へ移動</h1>
+      <div
+        className="flex min-h-0 flex-1 flex-col"
+        data-initial-tab={initialTab ?? 'oneoff'}
+        data-initial-query={initialQuery ?? ''}
+      >
         <ReparentTargetPicker
           key={view}
           candidates={candidates}
@@ -183,7 +191,7 @@ function PickerHarness({
         />
       </div>
       {view === 'date-warning' ? <DateWarningBootstrap /> : null}
-    </>
+    </div>
   )
 }
 

@@ -6,7 +6,7 @@ const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 export default defineConfig({
   testDir: path.dirname(fileURLToPath(import.meta.url)),
-  testMatch: /reparent-rules-screenshot\.spec\.ts/,
+  testMatch: /reparent-(rules|ux)-screenshot\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
