@@ -55,6 +55,25 @@ test.describe('reparent UX sticky footer (#PR1)', () => {
     save(tmp, '01-picker-unselected-footer.png')
   })
 
+  test('post-move toast without undo', async ({ page }) => {
+    await page.goto(`${harnessBase}/?view=post-move-toast`)
+    await expect(page.getByText('繰越分を定期へ移動しました')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('button', { name: '元に戻す' })).toHaveCount(0)
+    const tmp = path.join(artifactsDir, '_tmp-post-move-toast.png')
+    mkdirSync(artifactsDir, { recursive: true })
+    await page.screenshot({ path: tmp, fullPage: false })
+    save(tmp, '03-post-move-toast.png')
+  })
+
+  test('addon line detail actions', async ({ page }) => {
+    await page.goto(`${harnessBase}/?view=addon-line-detail`)
+    await expect(page.getByTestId('addon-line-detail')).toBeVisible({ timeout: 15_000 })
+    const tmp = path.join(artifactsDir, '_tmp-addon-detail.png')
+    mkdirSync(artifactsDir, { recursive: true })
+    await page.screenshot({ path: tmp, fullPage: false })
+    save(tmp, '04-addon-line-detail.png')
+  })
+
   test('scrolled + selected → summary and 移動する visible', async ({ page }) => {
     await page.goto(`${harnessBase}/?view=picker-tab-oneoff-selected`)
     await expect(page.locator('[data-reparent-picker]')).toBeVisible({ timeout: 15_000 })

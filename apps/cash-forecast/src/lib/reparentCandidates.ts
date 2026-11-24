@@ -101,11 +101,23 @@ export function buildForecastReparentCandidates(input: {
 /** ピッカー用: 同じ kind・移動元の実取引を候補から除外 */
 export function filterReparentMoveCandidates(
   candidates: ReparentCandidate[],
-  params: { kind: Kind; sourceTxId?: Id<"transactions"> },
+  params: {
+    kind: Kind
+    sourceTxId?: Id<"transactions">
+    sourceAddonRuleMonth?: { ruleId: Id<"rules">; ruleMonth: string }
+  },
 ): ReparentCandidate[] {
   return candidates.filter((c) => {
     if (c.kind !== params.kind) return false
     if (c.targetKind === "transaction" && params.sourceTxId !== undefined && c.txId === params.sourceTxId) {
+      return false
+    }
+    if (
+      c.targetKind === "rule-month" &&
+      params.sourceAddonRuleMonth !== undefined &&
+      c.ruleId === params.sourceAddonRuleMonth.ruleId &&
+      c.ruleMonth === params.sourceAddonRuleMonth.ruleMonth
+    ) {
       return false
     }
     return true

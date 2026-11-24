@@ -3,12 +3,19 @@ import type { AmountBreakdownEntry } from "./amountLines";
 import { addMonths, clampedDateInMonth, monthOf, usagePeriodLabel } from "./date";
 import { signedAmount, type Kind } from "./money";
 
+export type AddonReparentOrigin = {
+  sourceId: Id<"transactions">;
+  sourceIndex: number;
+};
+
 export type AddonInfo = {
   txId: Id<"transactions">;
   name: string; // 表示用（未入力なら "上乗せ"）
   rawName: string; // 保存されている生の名前（編集フォームの初期値用。未入力なら ""）
   kind: Kind;
   amount: number;
+  /** 内訳行から移動してできた上乗せのみ */
+  reparentOrigin?: AddonReparentOrigin;
 };
 
 /** 上乗せの表示名。名前が未入力（空文字）のときは既定ラベルを返す。 */
@@ -83,6 +90,14 @@ function addonInfos(txs: Tx[]): AddonInfo[] | undefined {
     rawName: tx.name,
     kind: tx.kind,
     amount: tx.amount,
+    ...(tx.reparentOriginSourceId !== undefined && tx.reparentOriginSourceIndex !== undefined
+      ? {
+          reparentOrigin: {
+            sourceId: tx.reparentOriginSourceId,
+            sourceIndex: tx.reparentOriginSourceIndex,
+          },
+        }
+      : {}),
   }));
 }
 

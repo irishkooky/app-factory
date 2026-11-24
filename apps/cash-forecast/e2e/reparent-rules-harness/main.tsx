@@ -4,11 +4,13 @@ import { Button, Surface, Toast } from '@heroui/react'
 import '../../src/styles.css'
 import { AmountLinesField } from '../../src/components/AmountLinesField'
 import { ReparentTargetPicker } from '../../src/components/ReparentTargetPicker'
+import { AddonLineDetail } from '../../src/components/TransactionDrawer'
 import { KindYen, kindTone } from '../../src/components/Amount'
 import { formatDateShort, formatMonthLabel } from '../../src/lib/date'
 import { initAmountLinesFromTx } from '../../src/lib/amountLines'
 import { formatYen } from '../../src/lib/money'
-import { notifyMoved, notifyQueue } from '../../src/lib/notify'
+import { notifyQueue, notifySaved } from '../../src/lib/notify'
+import { computeReparentToRuleAddon, computeUndoReparentToRuleAddon } from '../../src/lib/reparentToRuleAddon'
 import { filterReparentMoveCandidates } from '../../src/lib/reparentCandidates'
 import type { ReparentSection } from '../../src/lib/reparentCandidates'
 import {
@@ -17,6 +19,8 @@ import {
   HARNESS_MOVED_AMOUNT,
   HARNESS_MOVED_LABEL,
   HARNESS_SOURCE_DATE,
+  HARNESS_TARGET_RULE_MONTH,
+  HARNESS_HORIZON_END,
 } from '../../src/lib/reparentRulesHarnessScenario'
 import type { ForecastRow } from '../../src/lib/forecast'
 
@@ -32,6 +36,9 @@ type View =
   | 'after-move'
   | 'date-warning'
   | 'undo-toast'
+  | 'post-move-toast'
+  | 'addon-line-detail'
+  | 'after-undo'
 
 const PICKER_VIEWS: View[] = [
   'picker-free',
@@ -46,7 +53,15 @@ const PICKER_VIEWS: View[] = [
 
 function viewFromLocation(): View {
   const v = new URLSearchParams(window.location.search).get('view')
-  const all: View[] = [...PICKER_VIEWS, 'before-move', 'after-move', 'undo-toast']
+  const all: View[] = [
+    ...PICKER_VIEWS,
+    'before-move',
+    'after-move',
+    'undo-toast',
+    'post-move-toast',
+    'addon-line-detail',
+    'after-undo',
+  ]
   if (v !== null && all.includes(v as View)) return v as View
   return 'picker-tab-oneoff'
 }
@@ -203,12 +218,12 @@ function App() {
   const sourceAfter = scenario.transactionsAfter[0]!
 
   useEffect(() => {
-    if (view !== 'undo-toast') return
-    notifyMoved(`${HARNESS_MOVED_LABEL}を定期へ移動しました`, {
-      description:
-        'ルール発生日と違うため、それまでの途中残高・最低残高が変わっている場合があります（最終残高は同じことが多いです）。',
-      onUndo: () => {},
-    })
+    if (view === 'post-move-toast') {
+      notifySaved(`${HARNESS_MOVED_LABEL}を定期へ移動しました`)
+    }
+    if (view === 'undo-toast') {
+      notifySaved(`${HARNESS_MOVED_LABEL}を定期へ移動しました`)
+    }
   }, [view])
 
   if (view === 'picker-free') {
@@ -333,13 +348,114 @@ function App() {
     )
   }
 
-  if (view === 'undo-toast') {
+  if (view === 'undo-toast' || view === 'post-move-toast') {
     return (
       <HarnessShell view={view}>
-        <p className="text-sm text-muted">移動完了直後のトースト（Harness で notifyMoved を発火）</p>
+        <p className="text-sm text-muted">移動完了直後のトースト（保存のみ・Undo なし）</p>
         <Button className="mt-4" variant="tertiary" onPress={() => {}}>
           ドロワーは閉じた想定
         </Button>
+      </HarnessShell>
+    )
+  }
+
+  if (view === 'addon-line-detail') {
+    const virtualAfter = scenario.virtualRentAfter
+    const addon = virtualAfter?.addons?.[0]
+    if (!addon || addon.reparentOrigin === undefined) {
+      return (
+        <HarnessShell view={view}>
+          <p className="text-sm text-danger">addon 行がありません</p>
+        </HarnessShell>
+      )
+    }
+    return (
+      <HarnessShell view={view}>
+        <h1 className="mb-3 text-base font-semibold">上乗せを開く</h1>
+        <AddonLineDetail
+          addon={addon}
+          canReparent
+          isPending={false}
+          onBack={() => {}}
+          onEdit={() => {}}
+          onDelete={() => {}}
+          onUndo={() => {}}
+          onMove={() => {}}
+        />
+      </HarnessShell>
+    )
+  }
+
+  if (view === 'after-undo') {
+    const sourceBefore = scenario.transactionsBefore[0]!
+    const reparent = computeReparentToRuleAddon({
+      source: {
+        id: sourceBefore._id,
+        kind: sourceBefore.kind,
+        amount: sourceBefore.amount,
+        amountBreakdown: sourceBefore.amountBreakdown,
+        date: sourceBefore.date,
+        addon: sourceBefore.addon,
+        actual: sourceBefore.actual,
+        importBatchId: sourceBefore.importBatchId,
+      },
+      target: {
+        ruleId: String(scenario.rules[0]!._id),
+        ruleMonth: HARNESS_TARGET_RULE_MONTH,
+        date: scenario.virtualRentBefore!.date,
+      },
+      index: 1,
+      expectedAmount: HARNESS_MOVED_AMOUNT,
+      expectedLabel: HARNESS_MOVED_LABEL,
+      anchorDate: HARNESS_ANCHOR_DATE,
+      horizonEnd: HARNESS_HORIZON_END,
+      targetMonthHasOverride: false,
+    })
+    if ('error' in reparent) {
+      return (
+        <HarnessShell view={view}>
+          <p className="text-sm text-danger">{reparent.error}</p>
+        </HarnessShell>
+      )
+    }
+    const sourceAfterMove: typeof sourceBefore = {
+      ...sourceBefore,
+      amount: reparent.source.amount,
+      amountBreakdown:
+        reparent.source.amountBreakdown !== undefined && reparent.source.amountBreakdown.length > 0
+          ? reparent.source.amountBreakdown
+          : undefined,
+    }
+    const restored = computeUndoReparentToRuleAddon({
+      source: {
+        id: sourceAfterMove._id,
+        kind: sourceAfterMove.kind,
+        amount: sourceAfterMove.amount,
+        amountBreakdown: sourceAfterMove.amountBreakdown,
+        date: sourceAfterMove.date,
+        addon: sourceAfterMove.addon,
+        actual: sourceAfterMove.actual,
+        importBatchId: sourceAfterMove.importBatchId,
+      },
+      index: reparent.undo.sourceIndex,
+      line: reparent.moved,
+    })
+    const sourceUndone = {
+      ...sourceAfterMove,
+      amount: restored.amount,
+      amountBreakdown: restored.amountBreakdown,
+    }
+    return (
+      <HarnessShell view={view}>
+        <div className="flex flex-col gap-3" data-testid="after-undo-amounts">
+          <p className="text-sm">
+            ソース合計: <span className="tabular-nums font-medium">{formatYen(sourceUndone.amount)}</span>
+          </p>
+          <p className="text-sm text-muted">
+            内訳2行目:{' '}
+            <span className="tabular-nums">{formatYen(sourceUndone.amountBreakdown?.[1]?.amount ?? 0)}</span>
+          </p>
+        </div>
       </HarnessShell>
     )
   }

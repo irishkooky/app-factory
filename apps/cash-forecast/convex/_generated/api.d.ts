@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as billing from "../billing.js";
 import type * as crons from "../crons.js";
+import type * as e2eReparentUx from "../e2eReparentUx.js";
 import type * as forecastSnapshots from "../forecastSnapshots.js";
 import type * as http from "../http.js";
 import type * as imports from "../imports.js";
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   billing: typeof billing;
   crons: typeof crons;
+  e2eReparentUx: typeof e2eReparentUx;
   forecastSnapshots: typeof forecastSnapshots;
   http: typeof http;
   imports: typeof imports;

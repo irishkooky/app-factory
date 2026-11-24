@@ -8,6 +8,11 @@ import {
   computeReparentToRuleAddon,
   computeUndoReparentToRuleAddon,
 } from "../src/lib/reparentToRuleAddon";
+import {
+  addonLabelMatches,
+  computeReparentAddonToRuleMonth,
+  computeReparentAddonToTransaction,
+} from "../src/lib/reparentAddon";
 
 const amountBreakdownArg = v.optional(
   v.array(
@@ -446,6 +451,8 @@ export const reparentBreakdownLineToRuleAddon = mutation({
       ruleId: ruleId,
       ruleMonth,
       addon: true,
+      reparentOriginSourceId: sourceId,
+      reparentOriginSourceIndex: result.undo.sourceIndex,
     });
 
     return {
@@ -530,5 +537,179 @@ export const undoReparentBreakdownLineToRuleAddon = mutation({
           ? restored.amountBreakdown
           : [],
     });
+  },
+});
+
+/** addon 行を別の実取引の内訳へ移動（addon 削除 + ターゲットに行追加） */
+export const reparentAddonToTransaction = mutation({
+  args: {
+    addonId: v.id("transactions"),
+    targetId: v.id("transactions"),
+    expectedAmount: v.number(),
+    expectedLabel: v.optional(v.string()),
+  },
+  handler: async (ctx, { addonId, targetId, expectedAmount, expectedLabel }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("ログインが必要です");
+    }
+    await requirePro(ctx, identity.subject);
+
+    const addon = await ctx.db.get(addonId);
+    const target = await ctx.db.get(targetId);
+    if (!addon || addon.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+    if (!target || target.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+    if (!addonLabelMatches(addon.name, expectedLabel)) {
+      throw new ConvexError("移動した内容が変わっています。画面を開き直してください");
+    }
+
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    if (!settings) {
+      throw new ConvexError("先に残高の初期設定を行ってください");
+    }
+
+    const horizonEnd = addMonthsToDateClamped(todayJST(), 12);
+    const result = computeReparentAddonToTransaction({
+      addon: {
+        id: addon._id,
+        kind: addon.kind,
+        amount: addon.amount,
+        amountBreakdown: addon.amountBreakdown,
+        date: addon.date,
+        addon: addon.addon,
+        actual: addon.actual,
+        importBatchId: addon.importBatchId,
+      },
+      target: {
+        id: target._id,
+        kind: target.kind,
+        amount: target.amount,
+        amountBreakdown: target.amountBreakdown,
+        date: target.date,
+        addon: target.addon,
+        actual: target.actual,
+        importBatchId: target.importBatchId,
+      },
+      expectedAmount,
+      expectedLabel,
+      anchorDate: settings.anchorDate,
+      horizonEnd,
+    });
+
+    if ("error" in result) {
+      throw new ConvexError(result.error);
+    }
+
+    await ctx.db.delete(addonId);
+    await ctx.db.patch(targetId, {
+      amount: result.target.amount,
+      amountBreakdown:
+        result.target.amountBreakdown !== undefined && result.target.amountBreakdown.length > 0
+          ? result.target.amountBreakdown
+          : [],
+    });
+
+    return { dateChanged: result.dateChanged };
+  },
+});
+
+/** addon 行を別の未確定ルール月へ移動 */
+export const reparentAddonToRuleMonth = mutation({
+  args: {
+    addonId: v.id("transactions"),
+    ruleId: v.id("rules"),
+    ruleMonth: v.string(),
+    expectedRuleDate: v.string(),
+    expectedAmount: v.number(),
+    expectedLabel: v.optional(v.string()),
+  },
+  handler: async (ctx, { addonId, ruleId, ruleMonth, expectedRuleDate, expectedAmount, expectedLabel }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("ログインが必要です");
+    }
+    await requirePro(ctx, identity.subject);
+
+    const addon = await ctx.db.get(addonId);
+    if (!addon || addon.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+    if (addon.ruleId === undefined || addon.ruleMonth === undefined) {
+      throw new ConvexError("上乗せ行だけ移動できます");
+    }
+    if (!addonLabelMatches(addon.name, expectedLabel)) {
+      throw new ConvexError("移動した内容が変わっています。画面を開き直してください");
+    }
+
+    const rule = await ctx.db.get(ruleId);
+    if (!rule || rule.userId !== identity.subject) {
+      throw new ConvexError("権限がありません");
+    }
+
+    assertAmount(expectedAmount);
+    assertMonthString(ruleMonth);
+    assertDateString(expectedRuleDate, "日付");
+
+    const ruleDate = clampedDateInMonth(ruleMonth, rule.dayOfMonth);
+    if (ruleDate !== expectedRuleDate) {
+      throw new ConvexError("移動先のルール月が変わっています。画面を開き直してください");
+    }
+
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .unique();
+    if (!settings) {
+      throw new ConvexError("先に残高の初期設定を行ってください");
+    }
+
+    const existingRows = await ctx.db
+      .query("transactions")
+      .withIndex("by_user_rule", (q) =>
+        q.eq("userId", identity.subject).eq("ruleId", ruleId).eq("ruleMonth", ruleMonth),
+      )
+      .collect();
+    const targetMonthHasOverride = existingRows.some((row) => row.addon !== true);
+
+    const horizonEnd = addMonthsToDateClamped(todayJST(), 12);
+    const result = computeReparentAddonToRuleMonth({
+      addon: {
+        id: addon._id,
+        kind: addon.kind,
+        amount: addon.amount,
+        amountBreakdown: addon.amountBreakdown,
+        date: addon.date,
+        addon: addon.addon,
+        actual: addon.actual,
+        importBatchId: addon.importBatchId,
+        ruleId: String(addon.ruleId),
+        ruleMonth: addon.ruleMonth,
+      },
+      target: { ruleId: String(ruleId), ruleMonth, date: ruleDate },
+      expectedAmount,
+      expectedLabel,
+      anchorDate: settings.anchorDate,
+      horizonEnd,
+      targetMonthHasOverride,
+    });
+
+    if ("error" in result) {
+      throw new ConvexError(result.error);
+    }
+
+    await ctx.db.patch(addonId, {
+      ruleId,
+      ruleMonth,
+      date: result.patch.date,
+    });
+
+    return { dateChanged: result.dateChanged };
   },
 });

@@ -48,12 +48,30 @@ const shots: { view: string; file: string; note: string; extra?: (page: import('
     },
   },
   {
-    view: 'undo-toast',
-    file: '10-undo-toast.png',
-    note: 'Undo toast',
+    view: 'post-move-toast',
+    file: '10-post-move-toast.png',
+    note: 'Post-move toast (no undo)',
     extra: async (page) => {
       await expect(page.getByText('繰越分を定期へ移動しました')).toBeVisible({ timeout: 10_000 })
-      await expect(page.getByRole('button', { name: '元に戻す' })).toBeVisible()
+      await expect(page.getByRole('button', { name: '元に戻す' })).toHaveCount(0)
+    },
+  },
+  {
+    view: 'addon-line-detail',
+    file: '11-addon-line-detail.png',
+    note: 'Addon line detail',
+    extra: async (page) => {
+      await expect(page.getByTestId('addon-line-detail')).toBeVisible()
+      await expect(page.getByRole('button', { name: '元の取引に戻す' })).toBeVisible()
+      await expect(page.getByRole('button', { name: '別の場所へ移動' })).toBeVisible()
+    },
+  },
+  {
+    view: 'after-undo',
+    file: '12-after-undo-amounts.png',
+    note: 'Amounts after undo',
+    extra: async (page) => {
+      await expect(page.getByTestId('after-undo-amounts')).toContainText('¥54,000')
     },
   },
 ]
