@@ -3,6 +3,7 @@ import type { ReparentCandidate } from "./reparentCandidates";
 import {
   cardPrimaryLabel,
   candidateMatchesQuery,
+  reparentSelectionSummary,
   dayDistanceFromSource,
   groupRecurringCandidates,
   oneoffCandidatesForTab,
@@ -86,6 +87,21 @@ describe("groupRecurringCandidates", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]!.visibleItems).toHaveLength(1);
     expect(groups[0]!.hiddenCount).toBe(0);
+  });
+});
+
+describe("reparentSelectionSummary", () => {
+  it("表示タイトルと金額をまとめる", () => {
+    const oneoff: ReparentCandidate = {
+      targetKind: "transaction",
+      section: "oneoff",
+      txId: "t1" as Id<"transactions">,
+      name: "AMEX 12月",
+      date: "2026-12-01",
+      kind: "expense",
+      amount: 130_000,
+    };
+    expect(reparentSelectionSummary(oneoff)).toBe("AMEX 12月 ¥130,000");
   });
 });
 

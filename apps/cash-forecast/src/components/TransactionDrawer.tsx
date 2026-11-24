@@ -66,7 +66,7 @@ export function TransactionDrawer({
           <Drawer.Header>
             <Drawer.Heading>{titleFor(target)}</Drawer.Heading>
           </Drawer.Header>
-          <Drawer.Body>
+          <Drawer.Body className="flex min-h-0 flex-col">
             {opened &&
               (target?.isVirtual ? (
                 <RuleMonthDetail key={target.key} target={target} anchorDate={anchorDate} onClose={onClose} />

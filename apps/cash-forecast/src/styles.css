@@ -67,4 +67,25 @@
   .reparent-candidate-card__check {
     @apply flex size-6 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground;
   }
+
+  .reparent-picker {
+    @apply flex h-full min-h-[min(55vh,22rem)] w-full min-w-0 flex-1 flex-col;
+  }
+
+  .reparent-picker__tabs {
+    @apply sticky top-0 z-10 shrink-0 border-b border-border bg-surface pb-2;
+  }
+
+  .reparent-picker__scroll {
+    @apply min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin];
+  }
+
+  .reparent-picker__footer {
+    @apply sticky bottom-0 z-10 shrink-0 border-t border-border bg-surface pt-3;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .reparent-picker__footer-actions {
+    @apply mt-2 flex items-center justify-between gap-2;
+  }
 }

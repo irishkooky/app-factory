@@ -1,4 +1,5 @@
 import { formatDateShort, formatMonthLabel } from "./date";
+import { formatYen } from "./money";
 import type { ReparentCandidate, ReparentSection } from "./reparentCandidates";
 
 /** ルールグループごとに初期表示する月数（もっと見るで残りを出す） */
@@ -21,6 +22,11 @@ export function displayTitle(c: ReparentCandidate): string {
 }
 
 /** カード内の主ラベル（定期はルール名見出しの下なので月のみ） */
+/** フッター用「選択中：…」の一行ラベル */
+export function reparentSelectionSummary(c: ReparentCandidate): string {
+  return `${displayTitle(c)} ${formatYen(c.amount)}`;
+}
+
 export function cardPrimaryLabel(c: ReparentCandidate): string {
   if (
     (c.section === "recurring-virtual" || c.section === "recurring-confirmed") &&

@@ -42,7 +42,9 @@ const shots: { view: string; file: string; note: string; extra?: (page: import('
         .locator('button[data-candidate-key]', { hasText: '4/25' })
         .first()
         .click()
-      await expect(page.getByText(/ルール発生日と違う/)).toBeVisible({ timeout: 10_000 })
+      await expect(page.getByTestId('reparent-picker-footer').getByText(/ルール発生日と違う/)).toBeVisible({
+        timeout: 10_000,
+      })
     },
   },
   {

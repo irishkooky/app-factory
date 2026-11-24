@@ -11,6 +11,7 @@ import {
   oneoffCandidatesForTab,
   recurringCandidatesForTab,
   REPARENT_PICKER_SECTIONS,
+  reparentSelectionSummary,
 } from '../lib/reparentPickerLayout'
 
 export type { ReparentCandidate } from '../lib/reparentCandidates'
@@ -165,135 +166,152 @@ export function ReparentTargetPicker({
   const cardGridClass = 'reparent-candidate-grid'
 
   return (
-    <div className="flex flex-col gap-4" data-reparent-picker>
-      <div className="flex flex-col gap-1">
-        <p className="text-sm text-muted">移動する項目</p>
-        <p className="text-sm font-medium">
-          {lineLabel}
-          <span className="ml-2 tabular-nums text-muted">{formatYen(lineAmount)}</span>
-        </p>
-      </div>
-
-      <TextField isDisabled={isPending}>
-        <Label>移動先を検索</Label>
-        <Input
-          placeholder="名前または日付"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </TextField>
-
+    <div className="reparent-picker" data-reparent-picker>
       {tabs.length > 1 && (
-        <ToggleButtonGroup
-          selectionMode="single"
-          selectedKeys={new Set([activeTab])}
-          onSelectionChange={(keys) => {
-            const value = Array.from(keys)[0]
-            if (
-              value === 'oneoff' ||
-              value === 'recurring-virtual' ||
-              value === 'recurring-confirmed'
-            ) {
-              setActiveTab(value)
-            }
-          }}
-          isDisabled={isPending}
-          className="w-full"
-        >
-          {tabs.map((tab) => (
-            <ToggleButton
-              key={tab.id}
-              id={tab.id}
-              data-testid={`reparent-tab-${tab.id}`}
-              className="min-w-0 flex-1 text-xs sm:text-sm"
-            >
-              {tab.title}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
+        <div className="reparent-picker__tabs" data-testid="reparent-picker-tabs">
+          <ToggleButtonGroup
+            selectionMode="single"
+            selectedKeys={new Set([activeTab])}
+            onSelectionChange={(keys) => {
+              const value = Array.from(keys)[0]
+              if (
+                value === 'oneoff' ||
+                value === 'recurring-virtual' ||
+                value === 'recurring-confirmed'
+              ) {
+                setActiveTab(value)
+              }
+            }}
+            isDisabled={isPending}
+            className="w-full"
+          >
+            {tabs.map((tab) => (
+              <ToggleButton
+                key={tab.id}
+                id={tab.id}
+                data-testid={`reparent-tab-${tab.id}`}
+                className="min-w-0 flex-1 text-xs sm:text-sm"
+              >
+                {tab.title}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </div>
       )}
 
-      <div className="max-h-[min(24rem,55vh)] overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
-        {tabEmpty ? (
-          <p className="py-6 text-center text-sm text-muted">該当する取引がありません</p>
-        ) : activeTab === 'oneoff' ? (
-          <div className={cardGridClass} data-testid="reparent-candidate-grid">
-            {oneoffList.map((c) => (
-              <CandidateCard
-                key={candidateKey(c)}
-                c={c}
-                isSelected={selectionKey(selection) === candidateKey(c)}
-                isPending={isPending}
-                onSelect={() => selectFromCandidate(c, setSelection)}
-              />
-            ))}
+      <div className="reparent-picker__scroll">
+        <div className="flex flex-col gap-3 pb-3">
+          <div className="flex flex-col gap-1">
+            <p className="text-sm text-muted">移動する項目</p>
+            <p className="text-sm font-medium">
+              {lineLabel}
+              <span className="ml-2 tabular-nums text-muted">{formatYen(lineAmount)}</span>
+            </p>
           </div>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {(activeTab === 'recurring-virtual' ? virtualGroups : confirmedGroups).map((group) => (
-              <section key={group.ruleId} className="flex flex-col gap-2" data-rule-group={group.ruleId}>
-                <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">
-                  {group.ruleName}
-                </h3>
-                <div className={cardGridClass} data-testid="reparent-candidate-grid">
-                  {group.visibleItems.map((c) => (
-                    <CandidateCard
-                      key={candidateKey(c)}
-                      c={c}
-                      isSelected={selectionKey(selection) === candidateKey(c)}
-                      isPending={isPending}
-                      onSelect={() => selectFromCandidate(c, setSelection)}
-                    />
-                  ))}
-                </div>
-                {group.hiddenCount > 0 ? (
-                  <Button
-                    variant="tertiary"
-                    size="sm"
-                    className="self-start"
-                    onPress={() =>
-                      setExpandedRules((prev) => {
-                        const next = new Set(prev)
-                        next.add(group.ruleId)
-                        return next
-                      })
-                    }
-                  >
-                    もっと見る（あと{group.hiddenCount}件）
-                  </Button>
-                ) : null}
-              </section>
-            ))}
-          </div>
-        )}
+
+          <TextField isDisabled={isPending}>
+            <Label>移動先を検索</Label>
+            <Input
+              placeholder="名前または日付"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </TextField>
+
+          {tabEmpty ? (
+            <p className="py-6 text-center text-sm text-muted">該当する取引がありません</p>
+          ) : activeTab === 'oneoff' ? (
+            <div className={cardGridClass} data-testid="reparent-candidate-grid">
+              {oneoffList.map((c) => (
+                <CandidateCard
+                  key={candidateKey(c)}
+                  c={c}
+                  isSelected={selectionKey(selection) === candidateKey(c)}
+                  isPending={isPending}
+                  onSelect={() => selectFromCandidate(c, setSelection)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {(activeTab === 'recurring-virtual' ? virtualGroups : confirmedGroups).map((group) => (
+                <section key={group.ruleId} className="flex flex-col gap-2" data-rule-group={group.ruleId}>
+                  <h3 className="text-xs font-semibold tracking-wide text-muted uppercase">
+                    {group.ruleName}
+                  </h3>
+                  <div className={cardGridClass} data-testid="reparent-candidate-grid">
+                    {group.visibleItems.map((c) => (
+                      <CandidateCard
+                        key={candidateKey(c)}
+                        c={c}
+                        isSelected={selectionKey(selection) === candidateKey(c)}
+                        isPending={isPending}
+                        onSelect={() => selectFromCandidate(c, setSelection)}
+                      />
+                    ))}
+                  </div>
+                  {group.hiddenCount > 0 ? (
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      className="self-start"
+                      onPress={() =>
+                        setExpandedRules((prev) => {
+                          const next = new Set(prev)
+                          next.add(group.ruleId)
+                          return next
+                        })
+                      }
+                    >
+                      もっと見る（あと{group.hiddenCount}件）
+                    </Button>
+                  ) : null}
+                </section>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {dateChanged && (
-        <p className="text-sm text-warning" role="status">
-          {selection?.kind === 'rule-month'
-            ? 'ルール発生日と違うため、それまでの途中残高・最低残高が変わります（最終残高は同じことが多いです）。'
-            : '日付が違うため、途中の残高・最低残高が変わります（最終残高は同じです）。'}
-        </p>
-      )}
-
-      <div className="mt-2 flex justify-between">
-        <Button variant="tertiary" onPress={onCancel} isDisabled={isPending}>
-          キャンセル
-        </Button>
-        <Button
-          onPress={() => {
-            if (selection?.kind === 'transaction') {
-              onSelect(selection.txId)
-            } else if (selection?.kind === 'rule-month' && ruleMonthTarget !== undefined) {
-              onSelectRuleMonth?.(ruleMonthTarget)
-            }
-          }}
-          isDisabled={!canConfirm}
-          isPending={isPending}
-        >
-          移動する
-        </Button>
-      </div>
+      <footer className="reparent-picker__footer" data-testid="reparent-picker-footer">
+        <div className="flex min-h-[2.75rem] flex-col justify-center gap-1">
+          {selectedCandidate !== undefined ? (
+            <p className="text-sm font-medium" data-testid="reparent-selection-summary">
+              選択中：{reparentSelectionSummary(selectedCandidate)}
+            </p>
+          ) : (
+            <p className="text-sm text-muted" data-testid="reparent-selection-empty">
+              移動先を選んでください
+            </p>
+          )}
+          {dateChanged && (
+            <p className="text-xs text-warning" role="status">
+              {selection?.kind === 'rule-month'
+                ? 'ルール発生日と違うため、それまでの途中残高・最低残高が変わります（最終残高は同じことが多いです）。'
+                : '日付が違うため、途中の残高・最低残高が変わります（最終残高は同じです）。'}
+            </p>
+          )}
+        </div>
+        <div className="reparent-picker__footer-actions">
+          <Button variant="tertiary" onPress={onCancel} isDisabled={isPending}>
+            キャンセル
+          </Button>
+          <Button
+            data-testid="reparent-confirm-move"
+            onPress={() => {
+              if (selection?.kind === 'transaction') {
+                onSelect(selection.txId)
+              } else if (selection?.kind === 'rule-month' && ruleMonthTarget !== undefined) {
+                onSelectRuleMonth?.(ruleMonthTarget)
+              }
+            }}
+            isDisabled={!canConfirm}
+            isPending={isPending}
+          >
+            移動する
+          </Button>
+        </div>
+      </footer>
     </div>
   )
 }
