@@ -41,6 +41,9 @@ export default defineSchema({
     batchId: v.optional(v.string()), // 実績化した照合（reconcile）操作のバッチID。Undo用
     importBatchId: v.optional(v.string()), // PDF取り込み1回分のID。取り消し用（reconcileのbatchIdとは別物）
     importKey: v.optional(v.string()), // 取り込み行の同一性キー "jfc:<取引番号>:<回数>"。再取り込み時の重複防止
+    /** reparentBreakdownLineToRuleAddon 由来の上乗せのみ: 元の親取引へ戻す用（既存行は未設定） */
+    reparentOriginSourceId: v.optional(v.id("transactions")),
+    reparentOriginSourceIndex: v.optional(v.number()),
   })
     .index("by_user_date", ["userId", "date"])
     .index("by_user_rule", ["userId", "ruleId", "ruleMonth"])
