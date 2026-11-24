@@ -16,7 +16,7 @@ import type { AddonInfo, ForecastRow } from '../lib/forecast'
 import { addDays, formatDateShort, formatMonthLabel } from '../lib/date'
 import { formatYen, type Kind } from '../lib/money'
 import { KindYen, kindTone } from './Amount'
-import { notifyDeleted, notifyError, notifyMoved, notifySaved } from '../lib/notify'
+import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { UpgradeButton, usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
 import {
@@ -69,7 +69,14 @@ export function TransactionDrawer({
           <Drawer.Body className="flex min-h-0 flex-col">
             {opened &&
               (target?.isVirtual ? (
-                <RuleMonthDetail key={target.key} target={target} anchorDate={anchorDate} onClose={onClose} />
+                <RuleMonthDetail
+                  key={target.key}
+                  target={target}
+                  anchorDate={anchorDate}
+                  today={today}
+                  onClose={onClose}
+                  reparentCandidates={reparentCandidates}
+                />
               ) : (
                 <TransactionForm
                   key={target?.key ?? 'new'}
@@ -87,24 +94,105 @@ export function TransactionDrawer({
   )
 }
 
+export function AddonLineDetail({
+  addon,
+  canReparent,
+  isPending,
+  onBack,
+  onEdit,
+  onDelete,
+  onUndo,
+  onMove,
+}: {
+  addon: AddonInfo
+  canReparent: boolean
+  isPending: boolean
+  onBack: () => void
+  onEdit: () => void
+  onDelete: () => void
+  onUndo: () => void
+  onMove: () => void
+}) {
+  const canUndo = addon.reparentOrigin !== undefined
+
+  return (
+    <div className="flex flex-col gap-4" data-testid="addon-line-detail">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm text-muted">上乗せ</p>
+          <p className="truncate text-base font-medium">{addon.name}</p>
+        </div>
+        <span className={`text-lg font-bold tabular-nums ${kindTone(addon.kind)}`}>
+          <KindYen kind={addon.kind} amount={addon.amount} />
+        </span>
+      </div>
+
+      {canUndo && (
+        <Button variant="secondary" isPending={isPending} onPress={onUndo}>
+          元の取引に戻す
+        </Button>
+      )}
+      {canReparent ? (
+        <Button variant="secondary" isDisabled={isPending} onPress={onMove}>
+          別の場所へ移動
+        </Button>
+      ) : (
+        <p className="text-sm text-muted">上乗せの移動はProプラン限定です</p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant="tertiary" onPress={onEdit} isDisabled={isPending}>
+          名前・金額を編集
+        </Button>
+        <Button variant="tertiary" onPress={onDelete} isDisabled={isPending}>
+          削除
+        </Button>
+      </div>
+
+      <Button variant="tertiary" onPress={onBack} isDisabled={isPending}>
+        戻る
+      </Button>
+    </div>
+  )
+}
+
 // ルール月の詳細ビュー（仮想行クリック時）。
 // 「合算内訳の閲覧 / 上乗せの追加・編集・削除 / この月の請求額を確定」をこの中で完結させる。
 function RuleMonthDetail({
   target,
   anchorDate,
+  today: _today,
   onClose,
+  reparentCandidates,
 }: {
   target: ForecastRow
   anchorDate: string
+  today: string
   onClose: () => void
+  reparentCandidates: ReparentCandidate[]
 }) {
   const [mode, setMode] = useState<'detail' | 'confirm' | 'addon-add'>('detail')
   const [editingAddon, setEditingAddon] = useState<AddonInfo | null>(null)
+  const [detailAddon, setDetailAddon] = useState<AddonInfo | null>(null)
+  const [movingAddon, setMovingAddon] = useState<AddonInfo | null>(null)
+  const [addonSubmitting, setAddonSubmitting] = useState(false)
   const removeTx = useMutation(api.transactions.remove)
+  const undoReparentToRuleAddon = useMutation(api.transactions.undoReparentBreakdownLineToRuleAddon)
+  const reparentAddonToRuleMonth = useMutation(api.transactions.reparentAddonToRuleMonth)
+  const reparentAddonToTransaction = useMutation(api.transactions.reparentAddonToTransaction)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { plan } = usePlan()
   const confirm = useConfirm()
+  const canReparent = plan === 'pro'
   const canAddAddon = plan === 'pro'
+
+  const addonKindCandidates = filterReparentMoveCandidates(reparentCandidates, {
+    kind: target.kind,
+    sourceAddonRuleMonth:
+      target.ruleId !== undefined && target.ruleMonth !== undefined
+        ? { ruleId: target.ruleId, ruleMonth: target.ruleMonth }
+        : undefined,
+  })
 
   const doDeleteAddon = async (addon: AddonInfo) => {
     setDeletingId(addon.txId)
@@ -150,6 +238,106 @@ function RuleMonthDetail({
     )
   }
 
+  const handleUndoAddonReparent = async (addon: AddonInfo) => {
+    if (addon.reparentOrigin === undefined) return
+    setAddonSubmitting(true)
+    try {
+      await undoReparentToRuleAddon({
+        sourceId: addon.reparentOrigin.sourceId,
+        addonId: addon.txId,
+        sourceIndex: addon.reparentOrigin.sourceIndex,
+        expectedAmount: addon.amount,
+        expectedLabel: addon.rawName !== '' ? addon.rawName : undefined,
+      })
+      notifySaved('元の取引に戻しました')
+      onClose()
+    } catch (err) {
+      notifyError(err, '元の取引に戻せませんでした')
+      setAddonSubmitting(false)
+    }
+  }
+
+  const handleReparentAddonToTx = async (addon: AddonInfo, targetId: Id<'transactions'>) => {
+    setAddonSubmitting(true)
+    try {
+      const result = await reparentAddonToTransaction({
+        addonId: addon.txId,
+        targetId,
+        expectedAmount: addon.amount,
+        expectedLabel: addon.rawName !== '' ? addon.rawName : undefined,
+      })
+      notifySaved(`${addon.name}を移動しました`)
+      if (result.dateChanged) {
+        // 日付差はトースト本文に載せず保存のみ（誤タップ防止）
+      }
+      onClose()
+    } catch (err) {
+      notifyError(err, '移動に失敗しました')
+      setAddonSubmitting(false)
+    }
+  }
+
+  const handleReparentAddonRuleMonth = async (addon: AddonInfo, ruleTarget: ReparentRuleMonthTarget) => {
+    if (target.ruleId === undefined) return
+    setAddonSubmitting(true)
+    try {
+      await reparentAddonToRuleMonth({
+        addonId: addon.txId,
+        ruleId: ruleTarget.ruleId,
+        ruleMonth: ruleTarget.ruleMonth,
+        expectedRuleDate: ruleTarget.date,
+        expectedAmount: addon.amount,
+        expectedLabel: addon.rawName !== '' ? addon.rawName : undefined,
+      })
+      notifySaved(`${addon.name}を移動しました`)
+      onClose()
+    } catch (err) {
+      notifyError(err, '移動に失敗しました')
+      setAddonSubmitting(false)
+    }
+  }
+
+  if (movingAddon !== null && canReparent) {
+    return (
+      <ReparentTargetPicker
+        candidates={addonKindCandidates}
+        sourceDate={target.date}
+        lineLabel={movingAddon.name}
+        lineAmount={movingAddon.amount}
+        kind={target.kind}
+        isPending={addonSubmitting}
+        showRecurringSections
+        onSelect={(id) => {
+          void handleReparentAddonToTx(movingAddon, id)
+        }}
+        onSelectRuleMonth={(ruleTarget) => {
+          void handleReparentAddonRuleMonth(movingAddon, ruleTarget)
+        }}
+        onCancel={() => setMovingAddon(null)}
+      />
+    )
+  }
+
+  if (detailAddon) {
+    return (
+      <AddonLineDetail
+        addon={detailAddon}
+        canReparent={canReparent}
+        isPending={addonSubmitting}
+        onBack={() => setDetailAddon(null)}
+        onEdit={() => {
+          setEditingAddon(detailAddon)
+          setDetailAddon(null)
+        }}
+        onDelete={() => handleDeleteAddon(detailAddon)}
+        onUndo={() => {
+          void handleUndoAddonReparent(detailAddon)
+        }}
+        onMove={() => setMovingAddon(detailAddon)}
+      />
+    )
+  }
+
   const baseAmount = target.baseAmount ?? target.amount
 
   return (
@@ -170,23 +358,18 @@ function RuleMonthDetail({
         </div>
 
         {(target.addons ?? []).map((addon) => (
-          <div key={addon.txId} className="flex items-center justify-between gap-2">
+          <button
+            key={addon.txId}
+            type="button"
+            className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1.5 text-left hover:bg-surface-secondary"
+            data-testid="addon-line-open"
+            onClick={() => setDetailAddon(addon)}
+          >
             <span className="min-w-0 truncate text-sm text-muted">{addon.name}</span>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className={`text-sm tabular-nums ${kindTone(addon.kind)}`}><KindYen kind={addon.kind} amount={addon.amount} /></span>
-              <Button variant="tertiary" size="sm" onPress={() => setEditingAddon(addon)}>
-                編集
-              </Button>
-              <Button
-                variant="tertiary"
-                size="sm"
-                isPending={deletingId === addon.txId}
-                onPress={() => handleDeleteAddon(addon)}
-              >
-                削除
-              </Button>
-            </div>
-          </div>
+            <span className={`shrink-0 text-sm tabular-nums ${kindTone(addon.kind)}`}>
+              <KindYen kind={addon.kind} amount={addon.amount} />
+            </span>
+          </button>
         ))}
       </div>
 
@@ -443,7 +626,6 @@ function TransactionForm({
   const removeTx = useMutation(api.transactions.remove)
   const reparentLine = useMutation(api.transactions.reparentBreakdownLine)
   const reparentToRuleAddon = useMutation(api.transactions.reparentBreakdownLineToRuleAddon)
-  const undoReparentToRuleAddon = useMutation(api.transactions.undoReparentBreakdownLineToRuleAddon)
   const confirm = useConfirm()
 
   const minDate = addDays(anchorDate, 1)
@@ -471,42 +653,6 @@ function TransactionForm({
     sourceTxId: target?.txId,
   })
 
-  const runUndoRuleAddon = async (undo: {
-    sourceId: Id<'transactions'>
-    addonId: Id<'transactions'>
-    sourceIndex: number
-    expectedAmount: number
-    expectedLabel?: string
-  }) => {
-    try {
-      await undoReparentToRuleAddon(undo)
-      notifySaved('元に戻しました')
-    } catch (err) {
-      notifyError(err, '元に戻せませんでした')
-    }
-  }
-
-  const runUndo = async (undo: {
-    sourceId: Id<'transactions'>
-    targetId: Id<'transactions'>
-    index: number
-    expectedAmount: number
-    expectedLabel?: string
-  }) => {
-    try {
-      await reparentLine({
-        sourceId: undo.sourceId,
-        targetId: undo.targetId,
-        index: undo.index,
-        expectedAmount: undo.expectedAmount,
-        expectedLabel: undo.expectedLabel,
-      })
-      notifySaved('元に戻しました')
-    } catch (err) {
-      notifyError(err, '元に戻せませんでした')
-    }
-  }
-
   const handleReparent = async (targetId: Id<'transactions'>) => {
     if (!target?.txId || movingLine?.serverIndex === undefined) return
     const breakdown = target.amountBreakdown
@@ -528,14 +674,7 @@ function TransactionForm({
       })
       const label =
         movingLine.label !== '' ? movingLine.label : `項目${movingLine.serverIndex + 1}`
-      notifyMoved(`${label}を移動しました`, {
-        description: result.dateChanged
-          ? '途中の残高・最低残高が変わっている場合があります（最終残高は同じ）。'
-          : undefined,
-        onUndo: () => {
-          void runUndo(result.undo)
-        },
-      })
+      notifySaved(`${label}を移動しました`)
       onClose()
     } catch (err) {
       notifyError(err, '移動に失敗しました')
@@ -566,14 +705,7 @@ function TransactionForm({
       })
       const label =
         movingLine.label !== '' ? movingLine.label : `項目${movingLine.serverIndex + 1}`
-      notifyMoved(`${label}を定期へ移動しました`, {
-        description: result.dateChanged
-          ? 'ルール発生日と違うため、それまでの途中残高・最低残高が変わっている場合があります（最終残高は同じことが多いです）。'
-          : undefined,
-        onUndo: () => {
-          void runUndoRuleAddon(result.undo)
-        },
-      })
+      notifySaved(`${label}を定期へ移動しました`)
       onClose()
     } catch (err) {
       notifyError(err, '移動に失敗しました')

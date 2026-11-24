@@ -163,6 +163,8 @@ export function buildReparentRulesHarnessScenario(): ReparentRulesHarnessScenari
     ruleId: ruleRentId,
     ruleMonth: HARNESS_TARGET_RULE_MONTH,
     addon: true,
+    reparentOriginSourceId: sourceTx._id,
+    reparentOriginSourceIndex: reparent.undo.sourceIndex,
   };
 
   const transactionsAfter = [sourceAfter, ...transactionsBefore.slice(1), addonTx];

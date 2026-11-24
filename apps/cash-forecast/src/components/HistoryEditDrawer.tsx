@@ -14,7 +14,7 @@ import { useMutation } from 'convex/react'
 import { api } from '../../convex/_generated/api'
 import type { HistoryRow } from '../lib/history'
 import type { Kind } from '../lib/money'
-import { notifyDeleted, notifyError, notifyMoved, notifySaved } from '../lib/notify'
+import { notifyDeleted, notifyError, notifySaved } from '../lib/notify'
 import { usePlan } from './BillingControls'
 import { useConfirm } from './ConfirmDialog'
 import {
@@ -104,27 +104,6 @@ function HistoryEditForm({
     sourceTxId: target.txId,
   }).filter((c) => c.targetKind === 'transaction')
 
-  const runUndo = async (undo: {
-    sourceId: Id<'transactions'>
-    targetId: Id<'transactions'>
-    index: number
-    expectedAmount: number
-    expectedLabel?: string
-  }) => {
-    try {
-      await reparentLine({
-        sourceId: undo.sourceId,
-        targetId: undo.targetId,
-        index: undo.index,
-        expectedAmount: undo.expectedAmount,
-        expectedLabel: undo.expectedLabel,
-      })
-      notifySaved('元に戻しました')
-    } catch (err) {
-      notifyError(err, '元に戻せませんでした')
-    }
-  }
-
   const handleReparent = async (targetId: Id<'transactions'>) => {
     if (movingLine?.serverIndex === undefined || target.isAddon) return
     const breakdown = target.amountBreakdown
@@ -137,7 +116,7 @@ function HistoryEditForm({
 
     setSubmitting(true)
     try {
-      const result = await reparentLine({
+      await reparentLine({
         sourceId: target.txId,
         targetId,
         index: movingLine.serverIndex,
@@ -146,14 +125,7 @@ function HistoryEditForm({
       })
       const label =
         movingLine.label !== '' ? movingLine.label : `項目${movingLine.serverIndex + 1}`
-      notifyMoved(`${label}を移動しました`, {
-        description: result.dateChanged
-          ? '途中の残高・最低残高が変わっている場合があります（最終残高は同じ）。'
-          : undefined,
-        onUndo: () => {
-          void runUndo(result.undo)
-        },
-      })
+      notifySaved(`${label}を移動しました`)
       onClose()
     } catch (err) {
       notifyError(err, '移動に失敗しました')
