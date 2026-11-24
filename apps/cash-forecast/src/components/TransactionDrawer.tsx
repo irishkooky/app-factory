@@ -127,10 +127,14 @@ export function AddonLineDetail({
         </span>
       </div>
 
-      {canUndo && (
+      {canUndo ? (
         <Button variant="secondary" isPending={isPending} onPress={onUndo}>
           元の取引に戻す
         </Button>
+      ) : (
+        <p className="text-sm text-muted" data-testid="addon-no-reparent-origin">
+          手動で追加した上乗せは、元の取引へ戻せません（内訳から移動した上乗せのみ対象）。
+        </p>
       )}
       {canReparent ? (
         <Button variant="secondary" isDisabled={isPending} onPress={onMove}>
@@ -140,17 +144,22 @@ export function AddonLineDetail({
         <p className="text-sm text-muted">上乗せの移動はProプラン限定です</p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="tertiary" onPress={onEdit} isDisabled={isPending}>
-          名前・金額を編集
-        </Button>
-        <Button variant="tertiary" onPress={onDelete} isDisabled={isPending}>
-          削除
-        </Button>
-      </div>
+      <Button variant="tertiary" onPress={onEdit} isDisabled={isPending}>
+        名前・金額を編集
+      </Button>
 
       <Button variant="tertiary" onPress={onBack} isDisabled={isPending}>
         戻る
+      </Button>
+
+      <Button
+        variant="tertiary"
+        className="text-danger"
+        onPress={onDelete}
+        isDisabled={isPending}
+        data-testid="addon-delete"
+      >
+        削除
       </Button>
     </div>
   )
