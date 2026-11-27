@@ -13,6 +13,8 @@ function sample(overrides: Partial<SakeRecord>): SakeRecord {
     rating: 4,
     memo: "すっきり",
     label: { ...EMPTY_LABEL, brandName: "獺祭" },
+    analysisStatus: "done",
+    analysisError: "",
     imageMime: "image/jpeg",
     thumbMime: "image/jpeg",
     image: blob,

@@ -14,6 +14,8 @@ export const EMPTY_LABEL: SakeLabelInfo = {
   tasteHints: "",
 };
 
+export type AnalysisStatus = "pending" | "done" | "failed";
+
 export interface SakeRecord {
   id: string;
   createdAt: number;
@@ -21,6 +23,8 @@ export interface SakeRecord {
   rating: number;
   memo: string;
   label: SakeLabelInfo;
+  analysisStatus: AnalysisStatus;
+  analysisError: string;
   imageMime: string;
   thumbMime: string;
   image: Blob;

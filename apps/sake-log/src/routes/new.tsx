@@ -10,11 +10,11 @@ import {
   Rating,
   Stack,
   Text,
-  Textarea,
   Title,
 } from "@mantine/core";
 import { createSakeRecord } from "../lib/db";
 import { prepareSakeImages } from "../lib/image";
+import { startLabelAnalysis } from "../lib/run-analysis";
 
 export const Route = createFileRoute("/new")({
   component: NewEntryPage,
@@ -31,8 +31,7 @@ function NewEntryPage() {
   const [thumb, setThumb] = useState<Blob | null>(null);
   const [imageMime, setImageMime] = useState<string>("image/jpeg");
   const [thumbMime, setThumbMime] = useState<string>("image/jpeg");
-  const [rating, setRating] = useState(3);
-  const [memo, setMemo] = useState("");
+  const [rating, setRating] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,84 +55,75 @@ function NewEntryPage() {
   }
 
   async function save() {
-    if (!image || !thumb) {
-      setError("先にラベル写真を選んでください");
-      return;
-    }
+    if (!image || !thumb || rating < 1) return;
     setBusy(true);
     setError(null);
     try {
       const record = await createSakeRecord({
         rating,
-        memo,
+        memo: "",
         image,
         thumb,
         imageMime,
         thumbMime,
       });
-      await navigate({ to: "/entry/$entryId", params: { entryId: record.id } });
+      void startLabelAnalysis(record.id);
+      await navigate({ to: "/" });
     } catch (err) {
       setError(errorMessage(err));
-    } finally {
       setBusy(false);
     }
   }
 
   return (
     <Box mih="100dvh" px="md" py="md" maw={480} mx="auto">
-      <Stack gap="md">
+      <Stack gap="lg">
         <Group justify="space-between">
-          <Title order={3}>記録を追加</Title>
+          <Title order={3}>記録する</Title>
           <Button component={Link} to="/" variant="subtle" size="compact-sm">
             一覧へ
           </Button>
         </Group>
 
         {error ? (
-          <Alert color="red" title="エラー">
+          <Alert color="red" title="保存できませんでした">
             {error}
           </Alert>
         ) : null}
 
         <FileButton onChange={(file) => void onSelect(file)} accept="image/*" capture="environment">
           {(props) => (
-            <Button {...props} variant="light" loading={busy} fullWidth>
-              カメラで撮る / 写真を選ぶ
+            <Button {...props} variant="light" loading={busy && !image} fullWidth size="md">
+              写真を撮る / 選ぶ
             </Button>
           )}
         </FileButton>
-        <Text size="xs" c="dimmed">
-          iOS では「写真ライブラリ」からも選べます
-        </Text>
 
         {preview ? (
-          <Image src={preview} alt="プレビュー" radius="md" fit="contain" mah={360} />
+          <Image src={preview} alt="ラベル写真" radius="md" fit="contain" mah={360} />
         ) : (
           <Box
-            h={200}
+            h={220}
             bg="gray.1"
             style={{ borderRadius: 12, border: "1px dashed var(--mantine-color-gray-4)" }}
           />
         )}
 
-        <Stack gap={4}>
+        <Stack gap={6} align="center">
           <Text size="sm" fw={600}>
             評価
           </Text>
-          <Rating value={rating} onChange={(v) => setRating(v ?? 3)} size="lg" />
+          <Rating value={rating} onChange={(value) => setRating(value ?? 0)} size="xl" />
         </Stack>
 
-        <Textarea
-          label="ひとことメモ（任意）"
-          placeholder="香り・温度・食中酒など"
-          value={memo}
-          onChange={(e) => setMemo(e.currentTarget.value)}
-          minRows={3}
-          autosize
-        />
-
-        <Button onClick={() => void save()} loading={busy} disabled={!image} fullWidth size="md">
-          保存する
+        <Button
+          onClick={() => void save()}
+          loading={busy && !!image}
+          disabled={!image || rating < 1}
+          fullWidth
+          size="md"
+        >
+          保存
         </Button>
       </Stack>
     </Box>

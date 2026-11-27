@@ -15,6 +15,7 @@ import {
 } from "@mantine/core";
 import { listSakeRecords } from "../lib/db";
 import { filterSakeRecords } from "../lib/filters";
+import { startLabelAnalysis, subscribeSakeChanges } from "../lib/run-analysis";
 import type { RatingFilter, SakeRecord } from "../lib/types";
 import { StarRating } from "../components/StarRating";
 
@@ -31,8 +32,8 @@ function GalleryPage() {
   const [query, setQuery] = useState("");
   const [thumbs, setThumbs] = useState<ThumbMap>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     const data = await listSakeRecords();
     setRecords(data);
     setLoading(false);
@@ -40,7 +41,16 @@ function GalleryPage() {
 
   useEffect(() => {
     void load();
+    return subscribeSakeChanges(() => {
+      void load(true);
+    });
   }, [load]);
+
+  useEffect(() => {
+    for (const record of records) {
+      if (record.analysisStatus === "pending") void startLabelAnalysis(record.id);
+    }
+  }, [records]);
 
   useEffect(() => {
     const next: ThumbMap = {};
@@ -74,7 +84,7 @@ function GalleryPage() {
         </Group>
 
         <TextInput
-          placeholder="銘柄・酒蔵・メモで検索"
+          placeholder="銘柄・酒蔵で検索"
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
           radius="md"
@@ -142,11 +152,12 @@ function GalleryPage() {
                     }}
                   >
                     <StarRating value={record.rating} size="xs" />
-                    {record.label.brandName ? (
-                      <Text size="xs" c="white" lineClamp={1} mt={2}>
-                        {record.label.brandName}
-                      </Text>
-                    ) : null}
+                    <Text size="xs" c="white" lineClamp={1} mt={2}>
+                      {record.analysisStatus === "pending"
+                        ? "AI解析中…"
+                        : record.label.brandName ||
+                          (record.analysisStatus === "failed" ? "解析失敗" : "銘柄未設定")}
+                    </Text>
                   </Box>
                 </Box>
               </Link>

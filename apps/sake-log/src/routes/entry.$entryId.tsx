@@ -1,31 +1,26 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  Alert,
+  Badge,
   Box,
   Button,
   Group,
   Image,
   Loader,
+  Paper,
   Rating,
   Stack,
   Text,
-  TextInput,
-  Textarea,
   Title,
 } from "@mantine/core";
-import { blobToBase64 } from "../lib/blob";
 import { deleteSakeRecord, getSakeRecord, updateSakeRecord } from "../lib/db";
-import { EMPTY_LABEL, type SakeLabelInfo, type SakeRecord } from "../lib/types";
-import { analyzeSakeLabel } from "../server/analyze-label";
+import { canRetryAnalysis } from "../lib/analysis-state";
+import { startLabelAnalysis, subscribeSakeChanges } from "../lib/run-analysis";
+import type { SakeRecord } from "../lib/types";
 
 export const Route = createFileRoute("/entry/$entryId")({
   component: EntryDetailPage,
 });
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 function EntryDetailPage() {
   const { entryId } = Route.useParams();
@@ -33,29 +28,25 @@ function EntryDetailPage() {
   const [record, setRecord] = useState<SakeRecord | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rating, setRating] = useState(3);
-  const [memo, setMemo] = useState("");
-  const [label, setLabel] = useState<SakeLabelInfo>({ ...EMPTY_LABEL });
-  const [busy, setBusy] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const data = await getSakeRecord(entryId);
     setRecord(data);
-    if (data) {
-      setRating(data.rating);
-      setMemo(data.memo);
-      setLabel(data.label);
-    }
+    setMissing(!data);
     setLoading(false);
   }, [entryId]);
 
   useEffect(() => {
     void load();
+    return subscribeSakeChanges(() => {
+      void load();
+    });
   }, [load]);
+
+  useEffect(() => {
+    if (record?.analysisStatus === "pending") void startLabelAnalysis(record.id);
+  }, [record]);
 
   useEffect(() => {
     if (!record) return;
@@ -64,40 +55,10 @@ function EntryDetailPage() {
     return () => URL.revokeObjectURL(url);
   }, [record]);
 
-  async function save() {
-    if (!record) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await updateSakeRecord(record.id, { rating, memo, label });
-      setRecord(next);
-      setMessage("保存しました");
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runAi() {
-    if (!record) return;
-    setAiBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const base64 = await blobToBase64(record.image);
-      const result = await analyzeSakeLabel({
-        data: { imageBase64: base64, mimeType: record.imageMime },
-      });
-      setLabel({ ...EMPTY_LABEL, ...result });
-      const next = await updateSakeRecord(record.id, { label: result });
-      setRecord(next);
-      setMessage("ラベルを解析しました。必要なら手で直してください。");
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setAiBusy(false);
-    }
+  async function changeRating(value: number) {
+    if (!record || value < 1) return;
+    setRecord({ ...record, rating: value });
+    await updateSakeRecord(record.id, { rating: value });
   }
 
   async function remove() {
@@ -107,14 +68,12 @@ function EntryDetailPage() {
     await navigate({ to: "/" });
   }
 
-  if (loading) {
-    return <Loader mx="auto" mt="xl" />;
-  }
+  if (loading) return <Loader mx="auto" mt="xl" />;
 
-  if (!record) {
+  if (missing || !record) {
     return (
       <Stack p="md">
-        <Alert color="orange">記録が見つかりません</Alert>
+        <Text>記録が見つかりません</Text>
         <Button component={Link} to="/">
           一覧へ戻る
         </Button>
@@ -122,8 +81,10 @@ function EntryDetailPage() {
     );
   }
 
+  const { label } = record;
+
   return (
-    <Box mih="100dvh" px="md" py="md" maw={480} mx="auto" pb={80}>
+    <Box mih="100dvh" px="md" py="md" maw={480} mx="auto" pb={40}>
       <Stack gap="md">
         <Group justify="space-between">
           <Title order={3}>詳細</Title>
@@ -132,76 +93,69 @@ function EntryDetailPage() {
           </Button>
         </Group>
 
-        {imageUrl ? <Image src={imageUrl} alt="ラベル写真" radius="md" fit="contain" /> : null}
-
-        {message ? (
-          <Alert color="green" title="完了">
-            {message}
-          </Alert>
-        ) : null}
-        {error ? (
-          <Alert color="red" title="エラー">
-            {error}
-          </Alert>
+        {imageUrl ? (
+          <Image src={imageUrl} alt={label.brandName || "ラベル写真"} radius="md" fit="contain" />
         ) : null}
 
-        <Stack gap={4}>
-          <Text size="sm" fw={600}>
+        <Stack gap={4} align="flex-start">
+          <Text size="sm" c="dimmed">
             評価
           </Text>
-          <Rating value={rating} onChange={(v) => setRating(v ?? record?.rating ?? 3)} size="lg" />
+          <Rating
+            value={record.rating}
+            onChange={(value) => void changeRating(value ?? record.rating)}
+            size="lg"
+          />
         </Stack>
 
-        <Textarea
-          label="ひとことメモ"
-          value={memo}
-          onChange={(e) => setMemo(e.currentTarget.value)}
-          minRows={2}
-          autosize
-        />
+        {record.analysisStatus === "pending" ? (
+          <Text size="sm" c="dimmed">
+            AI解析中…
+          </Text>
+        ) : null}
 
-        <Title order={5}>銘柄情報</Title>
-        <TextInput
-          data-testid="sake-brand-name"
-          label="銘柄名"
-          value={label.brandName}
-          onChange={(e) => setLabel((prev) => ({ ...prev, brandName: e.currentTarget.value }))}
-        />
-        <TextInput
-          data-testid="sake-brewery"
-          label="酒蔵"
-          value={label.brewery}
-          onChange={(e) => setLabel((prev) => ({ ...prev, brewery: e.currentTarget.value }))}
-        />
-        <TextInput
-          data-testid="sake-classification"
-          label="特定名称"
-          value={label.classification}
-          onChange={(e) => setLabel((prev) => ({ ...prev, classification: e.currentTarget.value }))}
-        />
-        <TextInput
-          data-testid="sake-region"
-          label="産地"
-          value={label.region}
-          onChange={(e) => setLabel((prev) => ({ ...prev, region: e.currentTarget.value }))}
-        />
-        <Textarea
-          data-testid="sake-taste-hints"
-          label="味わいメモ候補"
-          value={label.tasteHints}
-          onChange={(e) => setLabel((prev) => ({ ...prev, tasteHints: e.currentTarget.value }))}
-          minRows={2}
-          autosize
-        />
+        {record.analysisStatus === "done" ? (
+          <Paper withBorder radius="md" p="md">
+            <Stack gap="xs">
+              <Title order={2}>{label.brandName || "銘柄名なし"}</Title>
+              {label.brewery ? <Text>{label.brewery}</Text> : null}
+              <Group gap="xs">
+                {label.classification ? (
+                  <Badge tt="none" variant="light" color="grape">
+                    {label.classification}
+                  </Badge>
+                ) : null}
+                {label.region ? (
+                  <Badge tt="none" variant="light" color="gray">
+                    {label.region}
+                  </Badge>
+                ) : null}
+              </Group>
+              {label.tasteHints ? (
+                <Text size="sm" c="dimmed">
+                  {label.tasteHints}
+                </Text>
+              ) : null}
+            </Stack>
+          </Paper>
+        ) : null}
 
-        <Button variant="light" onClick={() => void runAi()} loading={aiBusy} fullWidth>
-          AIでラベル解析
-        </Button>
+        {canRetryAnalysis(record.analysisStatus) ? (
+          <Stack gap={6}>
+            <Text size="sm" c="dimmed">
+              {record.analysisError || "解析できませんでした"}
+            </Text>
+            <Button
+              variant="subtle"
+              size="compact-sm"
+              onClick={() => void startLabelAnalysis(record.id)}
+            >
+              解析を再試行
+            </Button>
+          </Stack>
+        ) : null}
 
-        <Button onClick={() => void save()} loading={busy} fullWidth>
-          変更を保存
-        </Button>
-        <Button color="red" variant="outline" onClick={() => void remove()} fullWidth>
+        <Button color="red" variant="outline" onClick={() => void remove()}>
           削除
         </Button>
       </Stack>

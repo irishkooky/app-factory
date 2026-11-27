@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "deploy": "vp run build && wrangler deploy",
     "cf-typegen": "wrangler types",
-    "test": "node --experimental-strip-types src/lib/image-scale.test.ts && node --experimental-strip-types src/lib/filters.test.ts && node --experimental-strip-types src/lib/db-record.test.ts && node --experimental-strip-types src/server/parse-label.test.ts"
+    "test": "node --experimental-strip-types src/lib/image-scale.test.ts && node --experimental-strip-types src/lib/filters.test.ts && node --experimental-strip-types src/lib/db-record.test.ts && node --experimental-strip-types src/lib/analysis-state.test.ts && node --experimental-strip-types src/server/parse-label.test.ts"
   },
   "dependencies": {
     "@mantine/core": "^9.4.1",

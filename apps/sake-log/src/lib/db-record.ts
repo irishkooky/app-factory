@@ -1,4 +1,5 @@
-import { EMPTY_LABEL, type SakeLabelInfo, type SakeRecord } from "./types.ts";
+import { analysisBegin } from "./analysis-state.ts";
+import { EMPTY_LABEL, type AnalysisStatus, type SakeLabelInfo, type SakeRecord } from "./types.ts";
 
 const MIN_RATING = 1;
 const MAX_RATING = 5;
@@ -28,18 +29,26 @@ export function validateStoredRecord(raw: unknown): SakeRecord | null {
   if (!(r.image instanceof Blob) || !(r.thumb instanceof Blob)) return null;
   if (typeof r.imageMime !== "string" || typeof r.thumbMime !== "string") return null;
   const memo = typeof r.memo === "string" ? r.memo : "";
+  const label = normalizeLabel(r.label ?? EMPTY_LABEL);
   return {
     id: r.id,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     rating: clampRating(typeof r.rating === "number" ? r.rating : MIN_RATING),
     memo,
-    label: normalizeLabel(r.label ?? EMPTY_LABEL),
+    label,
+    analysisStatus: readAnalysisStatus(r.analysisStatus),
+    analysisError: typeof r.analysisError === "string" ? r.analysisError : "",
     imageMime: r.imageMime,
     thumbMime: r.thumbMime,
     image: r.image,
     thumb: r.thumb,
   };
+}
+
+function readAnalysisStatus(value: unknown): AnalysisStatus {
+  if (value === "pending" || value === "done" || value === "failed") return value;
+  return "done";
 }
 
 export function buildNewRecord(input: {
@@ -61,6 +70,7 @@ export function buildNewRecord(input: {
     rating: clampRating(input.rating),
     memo: input.memo.trim(),
     label: input.label ?? { ...EMPTY_LABEL },
+    ...analysisBegin(),
     imageMime: input.imageMime,
     thumbMime: input.thumbMime,
     image: input.image,

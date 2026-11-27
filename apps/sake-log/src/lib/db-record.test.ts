@@ -18,6 +18,7 @@ const record = buildNewRecord({
 });
 assert.equal(record.memo, "芳醇");
 assert.equal(record.createdAt, 100);
+assert.equal(record.analysisStatus, "pending");
 
 assert.equal(validateStoredRecord(null), null);
 assert.ok(validateStoredRecord(record));

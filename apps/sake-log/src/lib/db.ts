@@ -1,5 +1,6 @@
 import { buildNewRecord, validateStoredRecord } from "./db-record.ts";
 import type { SakeLabelInfo, SakeRecord } from "./types.ts";
+import type { AnalysisFields } from "./analysis-state.ts";
 
 const DB_NAME = "sake-log-v1";
 const STORE = "entries";
@@ -81,7 +82,7 @@ export async function createSakeRecord(input: {
 
 export async function updateSakeRecord(
   id: string,
-  patch: Partial<Pick<SakeRecord, "rating" | "memo" | "label">>,
+  patch: Partial<Pick<SakeRecord, "rating" | "memo" | "label"> & AnalysisFields>,
 ): Promise<SakeRecord> {
   const current = await getSakeRecord(id);
   if (!current) throw new Error("記録が見つかりません");
