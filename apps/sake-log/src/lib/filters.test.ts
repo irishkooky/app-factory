@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { registerSuite } from "./test-case.ts";
 import { filterSakeRecords, matchesRatingFilter } from "./filters.ts";
 import type { SakeRecord } from "./types.ts";
 import { EMPTY_LABEL } from "./types.ts";
@@ -35,3 +36,5 @@ const rows = [
 const filtered = filterSakeRecords(rows, { filter: "4plus", query: "獺" });
 assert.equal(filtered.length, 1);
 assert.equal(filtered[0]?.id, "a");
+
+registerSuite("filters");
