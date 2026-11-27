@@ -111,6 +111,12 @@ export const META: Record<string, AppMeta> = {
     category: 'tool',
     tags: ['Qwen', 'LLM', '比較', 'コスト'],
   },
+  'sake-log': {
+    title: '日本酒ログ',
+    description: 'ラベル写真と星だけで飲んだ日本酒を残す。銘柄は Gemini がラベルから読み取る。',
+    category: 'tool',
+    tags: ['日本酒', '写真', 'Gemini'],
+  },
   'salon-booking': {
     title: 'SALON LUMIÈRE',
     description: '架空の美容室の予約サイト。メニュー・スタイリスト紹介から予約まで通せる。',

@@ -29,6 +29,10 @@
       "service": "convex-showcase"
     },
     {
+      "binding": "APP_FAMILY_TREE",
+      "service": "family-tree"
+    },
+    {
       "binding": "APP_GUESTBOOK",
       "service": "guestbook"
     },
@@ -63,6 +67,10 @@
     {
       "binding": "APP_QWEN_ARENA",
       "service": "qwen-arena"
+    },
+    {
+      "binding": "APP_SAKE_LOG",
+      "service": "sake-log"
     },
     {
       "binding": "APP_SALON_BOOKING",
