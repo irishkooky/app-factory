@@ -47,7 +47,6 @@ export const Route = createFileRoute("/")({
 
 type ThumbMap = Record<string, string>;
 
-// Drawer は中身の枠に height: 100vh を渡す。渡された高さを捨てて、写真と★の高さにする。
 function CaptureSheetFrame({
   style,
   children,
