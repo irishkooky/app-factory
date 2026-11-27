@@ -20,7 +20,7 @@ export type RegistryEntry = {
 }
 
 export const SUBDOMAIN = "ichigoooo"
-export const GENERATED_AT = "2026-10-03T05:21:29.849Z"
+export const GENERATED_AT = "2026-11-27T02:41:46.952Z"
 
 export const REGISTRY: RegistryEntry[] = [
   {
@@ -59,7 +59,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://cash-forecast.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-07-12T05:07:30.309258Z",
-    modifiedAt: "2026-09-09T12:35:38.493075Z",
+    modifiedAt: "2026-11-24T08:55:11.678984Z",
     hasShot: true,
     binding: "APP_CASH_FORECAST",
   },
@@ -72,6 +72,16 @@ export const REGISTRY: RegistryEntry[] = [
     modifiedAt: "2026-08-08T03:23:59.778324Z",
     hasShot: true,
     binding: "APP_CONVEX_SHOWCASE",
+  },
+  {
+    slug: "family-tree",
+    workerName: "family-tree",
+    url: "https://family-tree.ichigoooo.workers.dev",
+    deployed: true,
+    createdAt: "2026-10-11T11:29:08.125149Z",
+    modifiedAt: "2026-10-11T11:29:13.279556Z",
+    hasShot: true,
+    binding: "APP_FAMILY_TREE",
   },
   {
     slug: "guestbook",
@@ -109,7 +119,7 @@ export const REGISTRY: RegistryEntry[] = [
     url: "https://lab.ichigoooo.workers.dev",
     deployed: true,
     createdAt: "2026-08-16T11:00:36.351525Z",
-    modifiedAt: "2026-09-29T00:32:35.982317Z",
+    modifiedAt: "2026-11-19T05:35:26.272363Z",
     hasShot: false,
     binding: null,
   },
@@ -174,6 +184,16 @@ export const REGISTRY: RegistryEntry[] = [
     binding: "APP_QWEN_ARENA",
   },
   {
+    slug: "sake-log",
+    workerName: "sake-log",
+    url: "https://sake-log.ichigoooo.workers.dev",
+    deployed: true,
+    createdAt: "2026-11-27T02:40:22.146768Z",
+    modifiedAt: "2026-11-27T02:40:25.978448Z",
+    hasShot: true,
+    binding: "APP_SAKE_LOG",
+  },
+  {
     slug: "salon-booking",
     workerName: "salon-booking",
     url: "https://salon-booking.ichigoooo.workers.dev",
@@ -190,7 +210,7 @@ export const REGISTRY: RegistryEntry[] = [
     deployed: true,
     createdAt: "2026-10-03T05:19:27.502853Z",
     modifiedAt: "2026-10-03T05:19:32.096441Z",
-    hasShot: false,
+    hasShot: true,
     binding: "APP_SQL_BASICS",
   },
   {
