@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { computeScaledSize, pickOutputMime, FULL_MAX_EDGE } from "./image-scale.ts";
+import { registerSuite } from "./test-case.ts";
 
 const full = computeScaledSize(2048, 1536, FULL_MAX_EDGE);
 assert.equal(full.width, 1024);
@@ -13,3 +14,5 @@ assert.equal(small.scale, 1);
 
 assert.equal(pickOutputMime(true), "image/webp");
 assert.equal(pickOutputMime(false), "image/jpeg");
+
+registerSuite("image scale");

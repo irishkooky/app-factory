@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { fallbackLabelAnalysis, parseLabelAnalysis } from "./parse-label.ts";
+import { registerSuite } from "../lib/test-case.ts";
 
 const parsed = parseLabelAnalysis({
   brandName: " 獺祭 ",
@@ -15,3 +16,5 @@ assert.equal(parseLabelAnalysis({ brand_name: "八海山" }).brandName, "八海�
 
 const fb = fallbackLabelAnalysis("timeout");
 assert.ok(fb.tasteHints.includes("timeout"));
+
+registerSuite("parse label");

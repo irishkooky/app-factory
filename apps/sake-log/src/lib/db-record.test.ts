@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { buildNewRecord, clampRating, validateStoredRecord } from "./db-record.ts";
+import { registerSuite } from "./test-case.ts";
 
 assert.equal(clampRating(0), 1);
 assert.equal(clampRating(6), 5);
@@ -22,3 +23,5 @@ assert.equal(record.analysisStatus, "pending");
 
 assert.equal(validateStoredRecord(null), null);
 assert.ok(validateStoredRecord(record));
+
+registerSuite("db record");

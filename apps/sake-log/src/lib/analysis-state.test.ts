@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { canRetryAnalysis, transitionAnalysis, type AnalysisFields } from "./analysis-state.ts";
+import { registerSuite } from "./test-case.ts";
 
 const pending: AnalysisFields = { analysisStatus: "pending", analysisError: "" };
 
@@ -23,3 +24,5 @@ assert.equal(recovered.analysisStatus, "done");
 
 const blank = transitionAnalysis(pending, { type: "fail", message: "  " });
 assert.equal(blank.analysisError, "解析に失敗しました");
+
+registerSuite("analysis state");
