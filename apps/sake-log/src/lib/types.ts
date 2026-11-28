@@ -16,11 +16,14 @@ export const EMPTY_LABEL: SakeLabelInfo = {
 
 export type AnalysisStatus = "pending" | "done" | "failed";
 
+export type Dryness = 1 | 2 | 3 | 4 | 5;
+
 export interface SakeRecord {
   id: string;
   createdAt: number;
   updatedAt: number;
-  rating: number;
+  rating: number | null;
+  dryness: Dryness | null;
   memo: string;
   label: SakeLabelInfo;
   analysisStatus: AnalysisStatus;

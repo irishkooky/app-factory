@@ -1,12 +1,21 @@
 import { analysisBegin } from "./analysis-state.ts";
-import { EMPTY_LABEL, type AnalysisStatus, type SakeLabelInfo, type SakeRecord } from "./types.ts";
+import {
+  EMPTY_LABEL,
+  type AnalysisStatus,
+  type Dryness,
+  type SakeLabelInfo,
+  type SakeRecord,
+} from "./types.ts";
 
-const MIN_RATING = 1;
-const MAX_RATING = 5;
+function readRating(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value)) return null;
+  if (value < 1 || value > 5) return null;
+  return value;
+}
 
-export function clampRating(value: number): number {
-  if (!Number.isFinite(value)) return MIN_RATING;
-  return Math.min(MAX_RATING, Math.max(MIN_RATING, Math.round(value)));
+function readDryness(value: unknown): Dryness | null {
+  if (value === 1 || value === 2 || value === 3 || value === 4 || value === 5) return value;
+  return null;
 }
 
 export function normalizeLabel(input: unknown): SakeLabelInfo {
@@ -28,13 +37,14 @@ export function validateStoredRecord(raw: unknown): SakeRecord | null {
   if (typeof r.createdAt !== "number" || typeof r.updatedAt !== "number") return null;
   if (!(r.image instanceof Blob) || !(r.thumb instanceof Blob)) return null;
   if (typeof r.imageMime !== "string" || typeof r.thumbMime !== "string") return null;
-  const memo = typeof r.memo === "string" ? r.memo : "";
+  const memo = typeof r.memo === "string" ? r.memo.trim() : "";
   const label = normalizeLabel(r.label ?? EMPTY_LABEL);
   return {
     id: r.id,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
-    rating: clampRating(typeof r.rating === "number" ? r.rating : MIN_RATING),
+    rating: readRating(r.rating),
+    dryness: readDryness(r.dryness),
     memo,
     label,
     analysisStatus: readAnalysisStatus(r.analysisStatus),
@@ -53,7 +63,8 @@ function readAnalysisStatus(value: unknown): AnalysisStatus {
 
 export function buildNewRecord(input: {
   id: string;
-  rating: number;
+  rating: number | null;
+  dryness: Dryness | null;
   memo: string;
   label?: SakeLabelInfo;
   image: Blob;
@@ -67,7 +78,8 @@ export function buildNewRecord(input: {
     id: input.id,
     createdAt: now,
     updatedAt: now,
-    rating: clampRating(input.rating),
+    rating: readRating(input.rating),
+    dryness: readDryness(input.dryness),
     memo: input.memo.trim(),
     label: input.label ?? { ...EMPTY_LABEL },
     ...analysisBegin(),
