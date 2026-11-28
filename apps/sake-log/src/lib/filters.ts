@@ -1,6 +1,7 @@
 import type { RatingFilter, SakeRecord } from "./types.ts";
 
-export function matchesRatingFilter(rating: number, filter: RatingFilter): boolean {
+export function matchesRatingFilter(rating: number | null, filter: RatingFilter): boolean {
+  if (rating === null) return filter === "all";
   switch (filter) {
     case "all":
       return true;

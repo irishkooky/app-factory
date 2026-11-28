@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   Badge,
@@ -11,12 +11,14 @@ import {
   Rating,
   Stack,
   Text,
+  Textarea,
   Title,
 } from "@mantine/core";
-import { deleteSakeRecord, getSakeRecord, updateSakeRecord } from "../lib/db";
+import { DrynessScale } from "../components/DrynessScale";
 import { canRetryAnalysis } from "../lib/analysis-state";
+import { deleteSakeRecord, getSakeRecord, updateSakeRecord } from "../lib/db";
 import { startLabelAnalysis, subscribeSakeChanges } from "../lib/run-analysis";
-import type { SakeRecord } from "../lib/types";
+import type { Dryness, SakeRecord } from "../lib/types";
 
 export const Route = createFileRoute("/entry/$entryId")({
   component: EntryDetailPage,
@@ -26,15 +28,31 @@ function EntryDetailPage() {
   const { entryId } = Route.useParams();
   const navigate = useNavigate();
   const [record, setRecord] = useState<SakeRecord | null>(null);
+  const [memo, setMemo] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const recordRef = useRef(record);
+  const memoFocused = useRef(false);
+  const memoWriting = useRef(false);
+  const seenEntryId = useRef(entryId);
+  recordRef.current = record;
+  if (seenEntryId.current !== entryId) {
+    seenEntryId.current = entryId;
+    memoFocused.current = false;
+    memoWriting.current = false;
+  }
 
   const load = useCallback(async () => {
     const data = await getSakeRecord(entryId);
     setRecord(data);
     setMissing(!data);
     setLoading(false);
+    if (!data) {
+      setMemo("");
+      return;
+    }
+    if (!memoFocused.current && !memoWriting.current) setMemo(data.memo);
   }, [entryId]);
 
   useEffect(() => {
@@ -48,23 +66,53 @@ function EntryDetailPage() {
     if (record?.analysisStatus === "pending") void startLabelAnalysis(record.id);
   }, [record]);
 
+  const imageBlob = record?.image;
   useEffect(() => {
-    if (!record) return;
-    const url = URL.createObjectURL(record.image);
+    if (!imageBlob) {
+      setImageUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(imageBlob);
     setImageUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [record]);
+  }, [imageBlob]);
 
   async function changeRating(value: number) {
-    if (!record || value < 1) return;
-    setRecord({ ...record, rating: value });
-    await updateSakeRecord(record.id, { rating: value });
+    const current = recordRef.current;
+    if (!current) return;
+    if (!Number.isInteger(value) || value < 1 || value > 5) return;
+    setRecord({ ...current, rating: value });
+    await updateSakeRecord(current.id, { rating: value });
+  }
+
+  async function changeDryness(step: Dryness) {
+    const current = recordRef.current;
+    if (!current) return;
+    const dryness = current.dryness === step ? null : step;
+    setRecord({ ...current, dryness });
+    await updateSakeRecord(current.id, { dryness });
+  }
+
+  async function saveMemo(raw: string) {
+    const current = recordRef.current;
+    if (!current) return;
+    const next = raw.trim();
+    setMemo(next);
+    if (next === current.memo) return;
+    memoWriting.current = true;
+    setRecord({ ...current, memo: next });
+    try {
+      await updateSakeRecord(current.id, { memo: next });
+    } finally {
+      memoWriting.current = false;
+    }
   }
 
   async function remove() {
-    if (!record) return;
+    const current = recordRef.current;
+    if (!current) return;
     if (!window.confirm("この記録を削除しますか？")) return;
-    await deleteSakeRecord(record.id);
+    await deleteSakeRecord(current.id);
     await navigate({ to: "/" });
   }
 
@@ -98,15 +146,31 @@ function EntryDetailPage() {
         ) : null}
 
         <Stack gap={4} align="flex-start">
-          <Text size="sm" c="dimmed">
-            評価
-          </Text>
+          <Text size="sm">おいしかった？</Text>
           <Rating
-            value={record.rating}
-            onChange={(value) => void changeRating(value ?? record.rating)}
+            value={record.rating ?? 0}
+            onChange={(value) => void changeRating(value)}
             size="lg"
           />
         </Stack>
+
+        <DrynessScale value={record.dryness} onChange={(step) => void changeDryness(step)} />
+
+        <Textarea
+          label="感想"
+          autosize
+          minRows={1}
+          maxRows={2}
+          value={memo}
+          onChange={(event) => setMemo(event.currentTarget.value)}
+          onFocus={() => {
+            memoFocused.current = true;
+          }}
+          onBlur={(event) => {
+            memoFocused.current = false;
+            void saveMemo(event.currentTarget.value);
+          }}
+        />
 
         {record.analysisStatus === "pending" ? (
           <Text size="sm" c="dimmed">

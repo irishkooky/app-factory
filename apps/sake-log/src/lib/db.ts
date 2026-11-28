@@ -1,10 +1,21 @@
 import { buildNewRecord, validateStoredRecord } from "./db-record.ts";
-import type { SakeLabelInfo, SakeRecord } from "./types.ts";
+import type { Dryness, SakeLabelInfo, SakeRecord } from "./types.ts";
 import type { AnalysisFields } from "./analysis-state.ts";
 
 const DB_NAME = "sake-log-v1";
 const STORE = "entries";
 const DB_VERSION = 1;
+const updateQueue = new Map<string, Promise<unknown>>();
+
+function enqueueUpdate<T>(id: string, task: () => Promise<T>): Promise<T> {
+  const previous = updateQueue.get(id) ?? Promise.resolve();
+  const run = previous.then(task, task);
+  updateQueue.set(id, run);
+  void run.finally(() => {
+    if (updateQueue.get(id) === run) updateQueue.delete(id);
+  });
+  return run;
+}
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -63,7 +74,8 @@ export async function putSakeRecord(record: SakeRecord): Promise<void> {
 }
 
 export async function createSakeRecord(input: {
-  rating: number;
+  rating: number | null;
+  dryness: Dryness | null;
   memo: string;
   label?: SakeLabelInfo;
   image: Blob;
@@ -80,20 +92,23 @@ export async function createSakeRecord(input: {
   return record;
 }
 
-export async function updateSakeRecord(
+export function updateSakeRecord(
   id: string,
-  patch: Partial<Pick<SakeRecord, "rating" | "memo" | "label"> & AnalysisFields>,
+  patch: Partial<Pick<SakeRecord, "rating" | "dryness" | "memo" | "label"> & AnalysisFields>,
 ): Promise<SakeRecord> {
-  const current = await getSakeRecord(id);
-  if (!current) throw new Error("記録が見つかりません");
-  const next: SakeRecord = {
-    ...current,
-    ...patch,
-    label: patch.label ?? current.label,
-    updatedAt: Date.now(),
-  };
-  await putSakeRecord(next);
-  return next;
+  return enqueueUpdate(id, async () => {
+    const current = await getSakeRecord(id);
+    if (!current) throw new Error("記録が見つかりません");
+    const next: SakeRecord = {
+      ...current,
+      ...patch,
+      memo: patch.memo !== undefined ? patch.memo.trim() : current.memo,
+      label: patch.label ?? current.label,
+      updatedAt: Date.now(),
+    };
+    await putSakeRecord(next);
+    return next;
+  });
 }
 
 export async function deleteSakeRecord(id: string): Promise<void> {
