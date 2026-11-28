@@ -1,36 +1,33 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import {
   ActionIcon,
   Affix,
   Box,
-  Drawer,
+  Button,
   Group,
   Image,
   Loader,
+  Modal,
   Rating,
   SegmentedControl,
   SimpleGrid,
   Stack,
   Text,
+  Textarea,
   TextInput,
   Title,
   VisuallyHidden,
 } from "@mantine/core";
+import { DrynessScale } from "../components/DrynessScale";
+import { StarRating } from "../components/StarRating";
 import {
+  EMPTY_DRAFT,
   freshCaptureVisible,
   isSheetOpen,
   shotOf,
   stepCapture,
+  type CaptureDraft,
   type CaptureEvent,
   type CaptureSession,
 } from "../lib/capture-session";
@@ -38,29 +35,13 @@ import { createSakeRecord, listSakeRecords } from "../lib/db";
 import { filterSakeRecords } from "../lib/filters";
 import { prepareSakeImages, type PreparedSakeImages } from "../lib/image";
 import { startLabelAnalysis, subscribeSakeChanges } from "../lib/run-analysis";
-import type { RatingFilter, SakeRecord } from "../lib/types";
-import { StarRating } from "../components/StarRating";
+import type { Dryness, RatingFilter, SakeRecord } from "../lib/types";
 
 export const Route = createFileRoute("/")({
   component: GalleryPage,
 });
 
 type ThumbMap = Record<string, string>;
-
-function CaptureSheetFrame({
-  style,
-  children,
-  ...props
-}: {
-  style?: CSSProperties;
-  children?: ReactNode;
-}) {
-  return (
-    <div {...props} style={{ ...style, height: "auto" }}>
-      {children}
-    </div>
-  );
-}
 
 function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -82,6 +63,7 @@ function GalleryPage() {
   const [query, setQuery] = useState("");
   const [thumbs, setThumbs] = useState<ThumbMap>({});
   const inputRef = useRef<HTMLInputElement>(null);
+  const saveRef = useRef<HTMLButtonElement>(null);
   const filterRef = useRef(filter);
   const queryRef = useRef(query);
   filterRef.current = filter;
@@ -139,18 +121,30 @@ function GalleryPage() {
     [records, filter, query],
   );
 
-  async function saveShot(shot: PreparedSakeImages, rating: number) {
+  const draft: CaptureDraft =
+    session.phase === "review" || session.phase === "saving" || session.phase === "failed"
+      ? session.draft
+      : EMPTY_DRAFT;
+  const saving = session.phase === "saving";
+  const shot = shotOf(session);
+
+  function revealSaveButton() {
+    saveRef.current?.scrollIntoView({ block: "end", inline: "nearest" });
+  }
+
+  async function saveShot(prepared: PreparedSakeImages, nextDraft: CaptureDraft) {
     try {
       const record = await createSakeRecord({
-        rating,
-        memo: "",
-        image: shot.image,
-        thumb: shot.thumb,
-        imageMime: shot.imageMime,
-        thumbMime: shot.thumbMime,
+        rating: nextDraft.rating,
+        dryness: nextDraft.dryness,
+        memo: nextDraft.memo,
+        image: prepared.image,
+        thumb: prepared.thumb,
+        imageMime: prepared.imageMime,
+        thumbMime: prepared.thumbMime,
       });
       void startLabelAnalysis(record.id);
-      if (!freshCaptureVisible(rating, filterRef.current, queryRef.current)) {
+      if (!freshCaptureVisible(nextDraft, filterRef.current, queryRef.current)) {
         setFilter("all");
         setQuery("");
       }
@@ -161,11 +155,25 @@ function GalleryPage() {
     }
   }
 
-  function onRate(value: number) {
-    const before = sessionRef.current;
-    const next = dispatch({ type: "rate", rating: value });
-    if (before.phase === "saving" || next.phase !== "saving") return;
-    void saveShot(next.shot, next.rating);
+  function onSave() {
+    if (sessionRef.current.phase === "saving") return;
+    const next = dispatch({ type: "save" });
+    if (next.phase !== "saving") return;
+    void saveShot(next.shot, next.draft);
+  }
+
+  function onRating(value: number) {
+    if (!Number.isInteger(value) || value < 1 || value > 5) return;
+    dispatch({ type: "set-rating", rating: value });
+  }
+
+  function onDryness(step: Dryness) {
+    dispatch({ type: "set-dryness", dryness: step });
+  }
+
+  function closeCapture() {
+    if (sessionRef.current.phase === "saving") return;
+    dispatch({ type: "dismiss" });
   }
 
   async function onPhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -182,15 +190,13 @@ function GalleryPage() {
     if (before.phase !== "idle" || picked.phase !== "preparing") return;
 
     try {
-      const shot = await prepareSakeImages(file);
-      const reviewed = dispatch({ type: "ready", shot });
-      if (shotOf(reviewed) !== shot) URL.revokeObjectURL(shot.previewUrl);
+      const prepared = await prepareSakeImages(file);
+      const reviewed = dispatch({ type: "ready", shot: prepared });
+      if (shotOf(reviewed) !== prepared) URL.revokeObjectURL(prepared.previewUrl);
     } catch (err) {
       dispatch({ type: "prepare-failed", message: errorText(err) });
     }
   }
-
-  const shot = shotOf(session);
 
   return (
     <Box mih="100dvh" pb={96} px="sm" pt="md" bg="var(--mantine-color-gray-0)">
@@ -308,36 +314,101 @@ function GalleryPage() {
         )}
       </Stack>
 
-      <Drawer
+      <Modal
         opened={isSheetOpen(session)}
-        onClose={() => dispatch({ type: "dismiss" })}
-        position="bottom"
-        scrollAreaComponent={CaptureSheetFrame}
+        onClose={closeCapture}
+        centered
+        size="sm"
+        yOffset="1rem"
+        xOffset="1rem"
+        closeOnClickOutside={session.phase !== "saving"}
         withCloseButton
         closeButtonProps={{ "aria-label": "閉じる" }}
-        title={<VisuallyHidden>評価</VisuallyHidden>}
-        styles={{ content: { height: "auto", borderRadius: "16px 16px 0 0" } }}
+        title={<VisuallyHidden>記録</VisuallyHidden>}
+        styles={{
+          content: {
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            maxHeight: "calc(100dvh - 2rem)",
+          },
+          header: {
+            position: "absolute",
+            top: 0,
+            insetInline: 0,
+            minHeight: 0,
+            background: "transparent",
+            zIndex: 2,
+            pointerEvents: "none",
+          },
+          close: {
+            pointerEvents: "auto",
+            background: "rgba(255,255,255,0.92)",
+            borderRadius: 999,
+          },
+          body: {
+            overflowY: "auto",
+            flex: "1 1 auto",
+            minHeight: 0,
+            maxHeight: "calc(100dvh - 2rem)",
+          },
+        }}
       >
-        <Stack gap="md" pb="sm">
+        <Stack gap="md">
           {shot ? (
-            <Image src={shot.previewUrl} alt="ラベル写真" fit="contain" mah={240} w="100%" />
+            <Box h="42dvh" bg="gray.1" mx="calc(var(--mb-padding, var(--mantine-spacing-md)) * -1)">
+              <Image src={shot.previewUrl} alt="ラベル写真" fit="contain" h="100%" w="100%" />
+            </Box>
           ) : null}
-          <Group justify="center">
+          <Stack gap={6}>
+            <Text size="sm">おいしさ</Text>
             <Rating
-              size="xl"
               count={5}
-              value={session.phase === "saving" ? session.rating : 0}
-              readOnly={session.phase === "saving"}
-              onChange={(value) => onRate(value ?? 0)}
+              size="xl"
+              value={draft.rating ?? 0}
+              readOnly={saving}
+              onChange={onRating}
             />
-          </Group>
+            <Group justify="space-between">
+              <Text size="xs" c="dimmed">
+                いまいち
+              </Text>
+              <Text size="xs" c="dimmed">
+                うまい
+              </Text>
+            </Group>
+          </Stack>
+          <DrynessScale value={draft.dryness} onChange={onDryness} disabled={saving} />
+          <Textarea
+            label="感想"
+            autosize
+            minRows={1}
+            maxRows={2}
+            value={draft.memo}
+            readOnly={saving}
+            onChange={(event) => dispatch({ type: "set-memo", memo: event.currentTarget.value })}
+            onFocus={() => {
+              revealSaveButton();
+              window.setTimeout(revealSaveButton, 250);
+            }}
+          />
           {session.phase === "failed" && session.shot !== null ? (
-            <Text c="red" size="sm" ta="center">
+            <Text c="red" size="sm">
               {session.message}
             </Text>
           ) : null}
+          <Button
+            ref={saveRef}
+            fullWidth
+            loading={saving}
+            style={{ scrollMarginBottom: "1rem" }}
+            onClick={() => void onSave()}
+          >
+            保存
+          </Button>
         </Stack>
-      </Drawer>
+      </Modal>
 
       {isSheetOpen(session) ? null : (
         <Affix position={{ bottom: 24, right: 20 }}>
