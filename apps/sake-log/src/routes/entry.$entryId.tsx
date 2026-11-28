@@ -146,7 +146,7 @@ function EntryDetailPage() {
         ) : null}
 
         <Stack gap={4} align="flex-start">
-          <Text size="sm">おいしさ</Text>
+          <Text size="sm">おいしかった？</Text>
           <Rating
             value={record.rating ?? 0}
             onChange={(value) => void changeRating(value)}

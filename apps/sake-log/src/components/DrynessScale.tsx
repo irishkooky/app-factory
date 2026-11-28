@@ -25,7 +25,7 @@ export function DrynessScale({
   return (
     <Stack gap={6}>
       <Text id={labelId} size="sm">
-        甘辛
+        甘い？辛い？
       </Text>
       <Box
         role="radiogroup"

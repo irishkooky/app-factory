@@ -27,7 +27,7 @@ export function TasteStars({
   return (
     <Stack gap={6}>
       <Text id={labelId} size="sm">
-        おいしさ
+        おいしかった？
       </Text>
       <Box
         role="radiogroup"
