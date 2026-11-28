@@ -9,7 +9,6 @@ import {
   Image,
   Loader,
   Modal,
-  Rating,
   SegmentedControl,
   SimpleGrid,
   Stack,
@@ -20,6 +19,7 @@ import {
   VisuallyHidden,
 } from "@mantine/core";
 import { DrynessScale } from "../components/DrynessScale";
+import { TasteStars } from "../components/TasteStars";
 import { StarRating } from "../components/StarRating";
 import {
   EMPTY_DRAFT,
@@ -332,6 +332,7 @@ function GalleryPage() {
             flexDirection: "column",
             overflow: "hidden",
             maxHeight: "calc(100dvh - 2rem)",
+            background: "var(--mantine-color-body)",
           },
           header: {
             position: "absolute",
@@ -352,33 +353,28 @@ function GalleryPage() {
             flex: "1 1 auto",
             minHeight: 0,
             maxHeight: "calc(100dvh - 2rem)",
+            background: "var(--mantine-color-body)",
           },
         }}
       >
         <Stack gap="md">
           {shot ? (
-            <Box h="42dvh" bg="gray.1" mx="calc(var(--mb-padding, var(--mantine-spacing-md)) * -1)">
-              <Image src={shot.previewUrl} alt="ラベル写真" fit="contain" h="100%" w="100%" />
+            <Box
+              h="42dvh"
+              bg="var(--mantine-color-body)"
+              mx="calc(var(--mb-padding, var(--mantine-spacing-md)) * -1)"
+            >
+              <Image
+                src={shot.previewUrl}
+                alt="ラベル写真"
+                fit="contain"
+                h="100%"
+                w="100%"
+                bg="var(--mantine-color-body)"
+              />
             </Box>
           ) : null}
-          <Stack gap={6}>
-            <Text size="sm">おいしさ</Text>
-            <Rating
-              count={5}
-              size="xl"
-              value={draft.rating ?? 0}
-              readOnly={saving}
-              onChange={onRating}
-            />
-            <Group justify="space-between">
-              <Text size="xs" c="dimmed">
-                いまいち
-              </Text>
-              <Text size="xs" c="dimmed">
-                うまい
-              </Text>
-            </Group>
-          </Stack>
+          <TasteStars value={draft.rating} onChange={onRating} disabled={saving} />
           <DrynessScale value={draft.dryness} onChange={onDryness} disabled={saving} />
           <Textarea
             label="感想"
